@@ -1,4 +1,4 @@
-# Project Brief: Personal Finance App
+# Project Brief: Kippo
 
 ## Executive Summary (v2)
 This project is a personal finance management application for Android and iOS, built with React Native. The app aims to provide users with a comprehensive suite of tools to track their income, expenses, and investments, calculate their net worth, and set savings goals. Key features will include integration with mobile money and bank accounts for automated data syncing, AI-powered financial insights, and push notifications for important alerts. The backend will be built on a cost-effective and scalable serverless architecture to ensure security and data persistence. The project will eventually be monetized through a subscription model for premium features.
