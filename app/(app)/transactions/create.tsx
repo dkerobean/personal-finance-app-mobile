@@ -88,7 +88,21 @@ export default function CreateTransactionScreen() {
       Alert.alert('Success', 'Transaction created successfully');
       router.back();
     } else if (error) {
-      Alert.alert('Error', error);
+      console.error('Transaction creation error:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = error;
+      if (error.includes('permission') || error.includes('RLS')) {
+        errorMessage = 'You do not have permission to create transactions. Please check your account settings.';
+      } else if (error.includes('connection') || error.includes('network')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.includes('validation') || error.includes('invalid')) {
+        errorMessage = 'Invalid transaction data. Please check your input and try again.';
+      } else if (error.includes('database') || error.includes('Database')) {
+        errorMessage = 'Database error occurred. Please try again later.';
+      }
+      
+      Alert.alert('Error Creating Transaction', errorMessage);
     }
   };
 

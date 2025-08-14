@@ -27,9 +27,17 @@ export const categoriesApi = {
 
   async create(request: CreateCategoryRequest): Promise<ApiResponse<Category>> {
     try {
+      // Get the current authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase
         .from('categories')
         .insert({
+          user_id: user.id, // Explicitly set the user_id
           name: request.name,
           icon_name: request.icon_name,
         })
@@ -100,15 +108,22 @@ export const categoriesApi = {
 
   async seedDefaults(): Promise<ApiResponse<Category[]>> {
     try {
+      // Get the current authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        throw new Error('User not authenticated');
+      }
+
       const defaultCategories = [
-        { name: 'Food', icon_name: 'restaurant' },
-        { name: 'Transport', icon_name: 'car' },
-        { name: 'Salary', icon_name: 'attach-money' },
-        { name: 'Entertainment', icon_name: 'movie' },
-        { name: 'Shopping', icon_name: 'shopping-bag' },
-        { name: 'Bills', icon_name: 'receipt' },
-        { name: 'Health', icon_name: 'local-hospital' },
-        { name: 'Education', icon_name: 'school' },
+        { user_id: user.id, name: 'Food', icon_name: 'restaurant' },
+        { user_id: user.id, name: 'Transport', icon_name: 'car' },
+        { user_id: user.id, name: 'Salary', icon_name: 'attach-money' },
+        { user_id: user.id, name: 'Entertainment', icon_name: 'movie' },
+        { user_id: user.id, name: 'Shopping', icon_name: 'shopping-bag' },
+        { user_id: user.id, name: 'Bills', icon_name: 'receipt' },
+        { user_id: user.id, name: 'Health', icon_name: 'local-hospital' },
+        { user_id: user.id, name: 'Education', icon_name: 'school' },
       ];
 
       const { data, error } = await supabase
