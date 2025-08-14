@@ -1,8 +1,7 @@
-export const APP_NAME = 'Personal Finance App';
+export const APP_NAME = 'Kippo';
 
 export const STORAGE_KEYS = {
   AUTH_TOKEN: 'auth_token',
-  USER_SESSION: 'user_session',
 } as const;
 
 export const VALIDATION_RULES = {

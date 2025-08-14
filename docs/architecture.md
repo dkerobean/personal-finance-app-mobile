@@ -1,6 +1,6 @@
-Personal Finance App Fullstack Architecture Document
+Kippo Fullstack Architecture Document
 Introduction
-This document outlines the complete fullstack architecture for the Personal Finance App, including the backend systems on Supabase, the frontend React Native mobile application, and their integration. It serves as the single source of truth for AI-driven development, ensuring consistency across the entire technology stack.
+This document outlines the complete fullstack architecture for the Kippo, including the backend systems on Supabase, the frontend React Native mobile application, and their integration. It serves as the single source of truth for AI-driven development, ensuring consistency across the entire technology stack.
 
 Starter Template or Existing Project
 We will begin with a standard Expo starter template (e.g., expo-router with tabs) and manually integrate the Supabase client. This approach provides a solid, community-tested foundation for navigation and project structure.
@@ -273,7 +273,7 @@ YAML
 
 openapi: 3.0.3
 info:
-  title: "Personal Finance App API"
+  title: "Kippo API"
   version: "1.0.0"
   description: "API for managing personal finances, accounts, and budgets."
 servers:

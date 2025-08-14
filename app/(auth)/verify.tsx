@@ -13,10 +13,12 @@ import { authService } from '@/services/authService';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function VerifyScreen(): React.ReactElement {
-  const params = useLocalSearchParams<{ email: string }>();
+  const params = useLocalSearchParams<{ email: string; firstName?: string }>();
   const email = params.email || '';
+  const firstName = params.firstName || '';
   const [verificationCode, setVerificationCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const setSession = useAuthStore((state) => state.setSession);
@@ -40,27 +42,19 @@ export default function VerifyScreen(): React.ReactElement {
         return;
       }
 
-      // Get the user session after verification
-      const session = await authService.getSession();
-      if (session) {
-        setSession(session.access_token);
-        setUser({
-          id: session.user.id,
-          email: session.user.email || '',
-          emailConfirmed: true,
-          createdAt: session.user.created_at,
-          updatedAt: session.user.updated_at || session.user.created_at,
-        });
-      }
-
-      Alert.alert('Success', 'Email verified successfully!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            router.replace('/(app)' as any);
+      // Email verified successfully, redirect to login
+      Alert.alert(
+        'Success', 
+        'Email verified successfully! You can now sign in.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              router.replace('/(auth)/login');
+            },
           },
-        },
-      ]);
+        ]
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Verification failed';
       setError(message);
@@ -71,11 +65,24 @@ export default function VerifyScreen(): React.ReactElement {
   };
 
   const handleResendCode = async (): Promise<void> => {
+    setIsResending(true);
+    setError(null);
+
     try {
-      const result = await authService.signUp(email, 'resend');
-      Alert.alert('Info', 'Verification code resent to your email');
+      const result = await authService.resendVerificationCode(email, firstName);
+      
+      if (result.success) {
+        Alert.alert('Success', result.message || 'Verification code resent to your email!');
+      } else {
+        setError(result.message || 'Failed to resend verification code');
+        Alert.alert('Error', result.message || 'Failed to resend verification code');
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to resend verification code');
+      const message = error instanceof Error ? error.message : 'Failed to resend verification code';
+      setError(message);
+      Alert.alert('Error', message);
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -118,8 +125,14 @@ export default function VerifyScreen(): React.ReactElement {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.resendButton} onPress={handleResendCode}>
-            <Text style={styles.resendButtonText}>Didn't receive the code? Resend</Text>
+          <TouchableOpacity 
+            style={[styles.resendButton, isResending && styles.buttonDisabled]} 
+            onPress={handleResendCode}
+            disabled={isResending}
+          >
+            <Text style={styles.resendButtonText}>
+              {isResending ? 'Resending...' : "Didn't receive the code? Resend"}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

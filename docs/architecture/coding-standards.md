@@ -1,7 +1,7 @@
 # Coding Standards
 
 ## Overview
-This document defines the coding standards and best practices for the Personal Finance App project. These standards ensure code consistency, maintainability, and quality across both the React Native frontend and Supabase backend.
+This document defines the coding standards and best practices for the Kippo project. These standards ensure code consistency, maintainability, and quality across both the React Native frontend and Supabase backend.
 
 ## Language Standards
 
