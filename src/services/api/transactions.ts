@@ -30,9 +30,17 @@ export const transactionsApi = {
 
   async create(request: CreateTransactionRequest): Promise<ApiResponse<Transaction>> {
     try {
+      // Get the current authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase
         .from('transactions')
         .insert({
+          user_id: user.id, // Explicitly set the user_id
           amount: request.amount,
           type: request.type,
           category_id: request.category_id,

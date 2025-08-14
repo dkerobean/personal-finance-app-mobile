@@ -31,9 +31,7 @@ export default function AppLayout(): React.ReactElement {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="settings" />
-      <Stack.Screen name="transactions" />
+      {/* Expo Router auto-discovers routes based on file structure */}
     </Stack>
   );
 }
