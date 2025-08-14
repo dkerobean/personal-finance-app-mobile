@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Personal Finance App",
-    "slug": "personal-finance-app",
+    "name": "Kippo",
+    "slug": "kippo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -27,7 +27,7 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "scheme": "personal-finance-app",
+    "scheme": "kippo",
     "plugins": [
       "expo-router",
       "expo-secure-store"

@@ -1,7 +1,7 @@
 # Source Tree Structure
 
 ## Overview
-This document defines the unified project structure for the Personal Finance App, following a Polyrepo architecture with separate repositories for the mobile frontend and backend services. The structure is designed to maintain consistency, scalability, and developer productivity.
+This document defines the unified project structure for the Kippo, following a Polyrepo architecture with separate repositories for the mobile frontend and backend services. The structure is designed to maintain consistency, scalability, and developer productivity.
 
 ## Repository Organization
 

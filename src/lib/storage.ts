@@ -29,10 +29,7 @@ export const secureStorage = {
 
   async clear(): Promise<void> {
     try {
-      await Promise.all([
-        SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN),
-        SecureStore.deleteItemAsync(STORAGE_KEYS.USER_SESSION),
-      ]);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
     } catch (error) {
       console.error('Error clearing secure storage:', error);
     }

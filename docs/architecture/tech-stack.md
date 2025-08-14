@@ -1,7 +1,7 @@
 # Tech Stack
 
 ## Overview
-This document serves as the single source of truth for all technologies used in the Personal Finance App project. It defines the complete technology stack across frontend, backend, testing, and deployment infrastructure.
+This document serves as the single source of truth for all technologies used in the Kippo project. It defines the complete technology stack across frontend, backend, testing, and deployment infrastructure.
 
 ## Technology Stack Table
 

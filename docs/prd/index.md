@@ -1,8 +1,8 @@
-# Personal Finance App Product Requirements Document (PRD)
+# Kippo Product Requirements Document (PRD)
 
 ## Table of Contents
 
-- [Personal Finance App Product Requirements Document (PRD)](#table-of-contents)
+- [Kippo Product Requirements Document (PRD)](#table-of-contents)
   - [Goals and Background Context](./goals-and-background-context.md)
     - [Goals](./goals-and-background-context.md#goals)
     - [Background Context](./goals-and-background-context.md#background-context)

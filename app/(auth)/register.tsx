@@ -11,15 +11,18 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { validateEmail, validatePassword } from '@/lib/validators';
-import { supabase } from '@/services/supabaseClient';
+import { authService } from '@/services/authService';
+import { useAuthStore } from '@/stores/authStore';
 
 interface FormData {
+  firstName: string;
   email: string;
   password: string;
   confirmPassword: string;
 }
 
 interface FormErrors {
+  firstName?: string;
   email?: string;
   password?: string;
   confirmPassword?: string;
@@ -28,15 +31,23 @@ interface FormErrors {
 
 export default function RegisterScreen(): React.ReactElement {
   const [formData, setFormData] = useState<FormData>({
+    firstName: '',
     email: '',
     password: '',
     confirmPassword: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+  const { setUser, setSession } = useAuthStore();
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
+
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'First name is required';
+    } else if (formData.firstName.trim().length < 2) {
+      newErrors.firstName = 'First name must be at least 2 characters';
+    }
 
     if (!formData.email) {
       newErrors.email = 'Email is required';
@@ -70,34 +81,33 @@ export default function RegisterScreen(): React.ReactElement {
     setErrors({});
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-      });
+      const result = await authService.signUp(
+        formData.email, 
+        formData.password, 
+        formData.firstName.trim()
+      );
 
-      if (error) {
-        setErrors({ general: error.message });
-        Alert.alert('Error', error.message);
+      if (!result.success) {
+        setErrors({ general: result.message || 'Registration failed' });
+        Alert.alert('Registration Failed', result.message || 'An error occurred');
         return;
       }
 
-      if (data.user && !data.user.email_confirmed_at) {
-        Alert.alert(
-          'Success',
-          'Verification email sent! Please check your inbox.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.push({
-                  pathname: '/verify',
-                  params: { email: formData.email },
-                } as any);
-              },
-            },
-          ]
-        );
+      // Temporarily bypass email verification - get session and log user in immediately
+      const session = await authService.getSession();
+      if (session) {
+        setSession(session);
+        setUser(session.user);
       }
+
+      Alert.alert('Success', 'Account created successfully! Welcome to Kippo!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            router.replace('/(app)');
+          },
+        },
+      ]);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unexpected error occurred';
       setErrors({ general: message });
@@ -114,6 +124,10 @@ export default function RegisterScreen(): React.ReactElement {
     }
   };
 
+  const navigateToLogin = (): void => {
+    router.push('/(auth)/login');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -123,6 +137,19 @@ export default function RegisterScreen(): React.ReactElement {
         </View>
 
         <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>First Name</Text>
+            <TextInput
+              style={[styles.input, errors.firstName ? styles.inputError : null]}
+              placeholder="Enter your first name"
+              value={formData.firstName}
+              onChangeText={(value) => updateFormData('firstName', value)}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+            {errors.firstName && <Text style={styles.errorText}>{errors.firstName}</Text>}
+          </View>
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
             <TextInput
@@ -178,6 +205,13 @@ export default function RegisterScreen(): React.ReactElement {
               {isLoading ? 'Creating Account...' : 'Create Account'}
             </Text>
           </TouchableOpacity>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <TouchableOpacity onPress={navigateToLogin}>
+              <Text style={styles.footerLink}>Sign In</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -258,6 +292,21 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#ffffff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  footerText: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  footerLink: {
+    fontSize: 16,
+    color: '#2563eb',
     fontWeight: '600',
   },
 });
