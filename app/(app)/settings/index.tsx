@@ -26,6 +26,13 @@ const settingsOptions: SettingsOption[] = [
     icon: 'category',
     route: '/settings/categories',
   },
+  {
+    id: 'momo',
+    title: 'MTN MoMo Integration',
+    description: 'Connect and sync your MTN MoMo account',
+    icon: 'phone-android',
+    route: '/settings/momo',
+  },
   // Add more settings options here as the app grows
   // {
   //   id: 'profile',

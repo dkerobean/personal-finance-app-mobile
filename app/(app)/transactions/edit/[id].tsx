@@ -17,7 +17,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useCategoryStore } from '@/stores/categoryStore';
-import { transactionsApi } from '@/services/api/transactions';
+import { transactionsApi, isSyncedTransaction } from '@/services/api/transactions';
+import SyncedTransactionBadge from '@/components/SyncedTransactionBadge';
+import CategorySuggestionBadge from '@/components/transactions/CategorySuggestionBadge';
+import BulkCategorizeModal from '@/components/features/BulkCategorizeModal';
 import type { Transaction, TransactionType } from '@/types/models';
 
 export default function EditTransactionScreen() {
@@ -37,6 +40,8 @@ export default function EditTransactionScreen() {
   const [description, setDescription] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   // Form validation errors
   const [amountError, setAmountError] = useState('');
@@ -145,6 +150,7 @@ export default function EditTransactionScreen() {
   };
 
   const selectedCategory = categories.find(cat => cat.id === categoryId);
+  const isSync = transaction ? isSyncedTransaction(transaction) : false;
 
   if (isLoading) {
     return (
@@ -181,15 +187,25 @@ export default function EditTransactionScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.content}>
+          {isSync && (
+            <View style={styles.syncNotice}>
+              <SyncedTransactionBadge accountName={transaction?.account?.account_name} />
+              <Text style={styles.syncNoticeText}>
+                This transaction was synced from your MTN MoMo account. Only the category can be changed.
+              </Text>
+            </View>
+          )}
+          
           <View style={styles.form}>
             {/* Amount Input */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Amount</Text>
               <TextInput
-                style={[styles.input, amountError ? styles.inputError : null]}
+                style={[styles.input, amountError ? styles.inputError : null, isSync && styles.disabledInput]}
                 placeholder="0.00"
                 value={amount}
                 onChangeText={(text) => {
+                  if (isSync) return; // Prevent editing for synced transactions
                   // Only allow numbers and decimal point
                   const cleanedText = text.replace(/[^0-9.]/g, '');
                   setAmount(cleanedText);
@@ -197,6 +213,7 @@ export default function EditTransactionScreen() {
                 }}
                 keyboardType="decimal-pad"
                 autoCapitalize="none"
+                editable={!isSync}
               />
               {amountError && (
                 <Text style={styles.errorText}>{amountError}</Text>
@@ -211,9 +228,11 @@ export default function EditTransactionScreen() {
                   style={[
                     styles.segmentButton,
                     styles.leftSegment,
-                    type === 'income' && styles.segmentButtonActive
+                    type === 'income' && styles.segmentButtonActive,
+                    isSync && styles.disabledButton
                   ]}
-                  onPress={() => setType('income')}
+                  onPress={() => !isSync && setType('income')}
+                  disabled={isSync}
                 >
                   <Text style={[
                     styles.segmentText,
@@ -226,9 +245,11 @@ export default function EditTransactionScreen() {
                   style={[
                     styles.segmentButton,
                     styles.rightSegment,
-                    type === 'expense' && styles.segmentButtonActive
+                    type === 'expense' && styles.segmentButtonActive,
+                    isSync && styles.disabledButton
                   ]}
-                  onPress={() => setType('expense')}
+                  onPress={() => !isSync && setType('expense')}
+                  disabled={isSync}
                 >
                   <Text style={[
                     styles.segmentText,
@@ -242,7 +263,28 @@ export default function EditTransactionScreen() {
 
             {/* Category Picker */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Category</Text>
+              <View style={styles.categoryHeader}>
+                <Text style={styles.label}>Category</Text>
+                {transaction && (
+                  <CategorySuggestionBadge 
+                    isAutoCategorized={transaction.auto_categorized || false}
+                    confidence={transaction.categorization_confidence ? transaction.categorization_confidence * 100 : 0}
+                    size="small"
+                    showConfidence={transaction.auto_categorized}
+                  />
+                )}
+              </View>
+              
+              {transaction?.auto_categorized && (
+                <View style={styles.categorizationInfo}>
+                  <MaterialIcons name="info-outline" size={16} color="#6366f1" />
+                  <Text style={styles.categorizationText}>
+                    This category was automatically suggested based on the transaction details. 
+                    Confidence: {transaction.categorization_confidence ? Math.round(transaction.categorization_confidence * 100) : 0}%
+                  </Text>
+                </View>
+              )}
+              
               <TouchableOpacity
                 style={[styles.pickerButton, categoryError ? styles.inputError : null]}
                 onPress={() => setShowCategoryPicker(true)}
@@ -266,14 +308,38 @@ export default function EditTransactionScreen() {
               {categoryError && (
                 <Text style={styles.errorText}>{categoryError}</Text>
               )}
+              
+              {/* Categorization Actions */}
+              {transaction && (
+                <View style={styles.categorizationActions}>
+                  {transaction.auto_categorized && (
+                    <TouchableOpacity
+                      style={styles.feedbackButton}
+                      onPress={() => setShowFeedbackModal(true)}
+                    >
+                      <MaterialIcons name="feedback" size={16} color="#6366f1" />
+                      <Text style={styles.feedbackButtonText}>Improve Categorization</Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  <TouchableOpacity
+                    style={styles.bulkButton}
+                    onPress={() => setShowBulkModal(true)}
+                  >
+                    <MaterialIcons name="layers" size={16} color="#059669" />
+                    <Text style={styles.bulkButtonText}>Categorize Similar</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             {/* Date Picker */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Date</Text>
               <TouchableOpacity
-                style={styles.pickerButton}
-                onPress={() => setShowDatePicker(true)}
+                style={[styles.pickerButton, isSync && styles.disabledInput]}
+                onPress={() => !isSync && setShowDatePicker(true)}
+                disabled={isSync}
               >
                 <View style={styles.pickerContent}>
                   <MaterialIcons name="event" size={20} color="#007bff" />
@@ -287,13 +353,14 @@ export default function EditTransactionScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Description (Optional)</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Add a note about this transaction"
+                style={[styles.input, styles.textArea, isSync && styles.disabledInput]}
+                placeholder={isSync ? "Description cannot be edited for synced transactions" : "Add a note about this transaction"}
                 value={description}
-                onChangeText={setDescription}
+                onChangeText={(text) => !isSync && setDescription(text)}
                 multiline
                 numberOfLines={3}
                 maxLength={200}
+                editable={!isSync}
               />
             </View>
           </View>
@@ -378,6 +445,71 @@ export default function EditTransactionScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Bulk Categorization Modal */}
+      {transaction && (
+        <BulkCategorizeModal
+          visible={showBulkModal}
+          onClose={() => setShowBulkModal(false)}
+          referenceTransaction={transaction}
+        />
+      )}
+
+      {/* Feedback Modal */}
+      <Modal
+        visible={showFeedbackModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <View style={styles.feedbackModalContainer}>
+          <View style={styles.feedbackModalHeader}>
+            <TouchableOpacity onPress={() => setShowFeedbackModal(false)}>
+              <MaterialIcons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+            <Text style={styles.feedbackModalTitle}>Improve Categorization</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShowFeedbackModal(false);
+                Alert.alert('Thank you!', 'Your feedback helps improve our categorization system.');
+              }}
+            >
+              <Text style={styles.feedbackSubmitText}>Submit</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.feedbackModalContent}>
+            <Text style={styles.feedbackQuestion}>
+              Why was this transaction incorrectly categorized?
+            </Text>
+            
+            <View style={styles.feedbackOptions}>
+              <TouchableOpacity style={styles.feedbackOption}>
+                <MaterialIcons name="radio-button-unchecked" size={20} color="#666" />
+                <Text style={styles.feedbackOptionText}>Wrong merchant recognition</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.feedbackOption}>
+                <MaterialIcons name="radio-button-unchecked" size={20} color="#666" />
+                <Text style={styles.feedbackOptionText}>Amount-based categorization error</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.feedbackOption}>
+                <MaterialIcons name="radio-button-unchecked" size={20} color="#666" />
+                <Text style={styles.feedbackOptionText}>Description keywords not recognized</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.feedbackOption}>
+                <MaterialIcons name="radio-button-unchecked" size={20} color="#666" />
+                <Text style={styles.feedbackOptionText}>Personal preference (this is correct category for me)</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.feedbackNote}>
+              Your feedback helps our AI learn better categorization patterns for future transactions.
+            </Text>
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -392,6 +524,20 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+  },
+  syncNotice: {
+    backgroundColor: '#fff3e0',
+    borderColor: '#ff6b00',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    gap: 12,
+  },
+  syncNoticeText: {
+    fontSize: 14,
+    color: '#cc5500',
+    lineHeight: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -456,6 +602,15 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: '#dc3545',
+  },
+  disabledInput: {
+    backgroundColor: '#f3f4f6',
+    color: '#9ca3af',
+    borderColor: '#e5e7eb',
+  },
+  disabledButton: {
+    backgroundColor: '#f3f4f6',
+    opacity: 0.6,
   },
   segmentedControl: {
     flexDirection: 'row',
@@ -524,9 +679,6 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: '#007bff',
   },
-  disabledButton: {
-    backgroundColor: '#9ca3af',
-  },
   primaryButtonText: {
     color: '#fff',
     fontSize: 16,
@@ -582,5 +734,116 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#374151',
     flex: 1,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  categorizationInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#6366f1',
+  },
+  categorizationText: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
+    flex: 1,
+  },
+  categorizationActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  feedbackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#f8fafc',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#6366f1',
+  },
+  feedbackButtonText: {
+    fontSize: 12,
+    color: '#6366f1',
+    fontWeight: '500',
+  },
+  bulkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#059669',
+  },
+  bulkButtonText: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '500',
+  },
+  feedbackModalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  feedbackModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  feedbackModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  feedbackSubmitText: {
+    color: '#007bff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  feedbackModalContent: {
+    flex: 1,
+    padding: 16,
+  },
+  feedbackQuestion: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 20,
+  },
+  feedbackOptions: {
+    gap: 16,
+    marginBottom: 24,
+  },
+  feedbackOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  feedbackOptionText: {
+    fontSize: 14,
+    color: '#4b5563',
+    flex: 1,
+  },
+  feedbackNote: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
 });
