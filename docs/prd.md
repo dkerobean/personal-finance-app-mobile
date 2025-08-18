@@ -23,8 +23,8 @@ The project aims to solve the problem of financial fragmentation for tech-savvy 
 ### Functional
 1.  **FR1:** The system shall allow users to securely create an account, log in, and log out.
 2.  **FR2:** Users must be able to manually add, edit, and delete income and expense transactions.
-3.  **FR3:** The system must provide a secure interface to connect to Ghanaian bank and Mobile Money accounts via a third-party data aggregator API.
-4.  **FR4:** The system shall automatically synchronize and display transactions from all linked accounts.
+3.  **FR3:** The system must provide a secure interface to connect to MTN Mobile Money accounts via the MTN MoMo API.
+4.  **FR4:** The system shall automatically synchronize and display transactions from all linked MTN MoMo accounts.
 5.  **FR5:** Users must be able to assign categories (e.g., "Food," "Transport," "Salary") to transactions.
 6.  **FR6:** The application must feature a main dashboard that displays a high-level summary of the user's financial status, including account balances and recent spending.
 7.  **FR7:** The system shall be able to generate a simple monthly report comparing total income versus total expenses.
@@ -39,7 +39,7 @@ The project aims to solve the problem of financial fragmentation for tech-savvy 
 3.  **NFR3:** The backend infrastructure (Supabase) must be configured to operate within the free tier to minimize cost.
 4.  **NFR4:** All sensitive user data, including credentials and financial information, must be encrypted both in transit and at rest.
 5.  **NFR5:** The application must adhere to best practices for handling sensitive financial data, ensuring user privacy and security.
-6.  **NFR6:** The integration with the third-party financial data aggregator must be reliable and handle connection errors gracefully.
+6.  **NFR6:** The integration with the MTN MoMo API must be reliable and handle connection errors gracefully.
 
 ---
 
@@ -87,7 +87,7 @@ The application is designed as a mobile-first experience for iOS and Android dev
 ### Additional Technical Assumptions and Requests
 * **Frontend Framework:** React Native with the Expo framework.
 * **Backend Platform:** Supabase.
-* **External APIs:** A financial data aggregator (e.g., Mono) and a push notification service (e.g., OneSignal).
+* **External APIs:** MTN MoMo API for mobile money integration and a push notification service (e.g., OneSignal).
 * **Source Control:** GitHub.
 
 ---
@@ -96,8 +96,8 @@ The application is designed as a mobile-first experience for iOS and Android dev
 
 * **Epic 1: Foundation & Manual Finance Tracking**
     * **Goal:** Establish the application's core infrastructure with secure user authentication and provide all the necessary tools for a user to manually track their income and expenses.
-* **Epic 2: Automated Account Integration**
-    * **Goal:** Introduce the core automation feature by securely connecting to users' bank and mobile money accounts to synchronize their transactions automatically.
+* **Epic 2: Automated MTN MoMo Integration**
+    * **Goal:** Introduce the core automation feature by securely connecting to users' MTN Mobile Money accounts to synchronize their transactions automatically.
 * **Epic 3: Budgeting, Reporting & Alerts**
     * **Goal:** Empower users to manage their finances proactively by introducing tools for creating budgets, viewing simple reports, and receiving important financial alerts.
 
@@ -172,66 +172,66 @@ The application is designed as a mobile-first experience for iOS and Android dev
 
 ---
 
-## Epic 2: Automated Account Integration
+## Epic 2: Automated MTN MoMo Integration
 
-**Expanded Goal:** The goal of this epic is to deliver the app's primary value proposition: automation. We will build the functionality to securely link external financial accounts (banks and mobile money) using a third-party aggregator. This will eliminate the need for manual data entry, providing users with a real-time, hands-off overview of their financial activity.
+**Expanded Goal:** The goal of this epic is to deliver the app's primary value proposition: automation. We will build the functionality to securely link MTN Mobile Money accounts using the MTN MoMo API. This will eliminate the need for manual data entry, providing users with a real-time, hands-off overview of their mobile money financial activity.
 
-#### Story 2.1: Secure Account Linking
+#### Story 2.1: Secure MTN MoMo Account Linking
 **As a** user,
-**I want** to securely connect my bank and mobile money accounts to the app,
-**so that** my transactions can be automatically tracked.
+**I want** to securely connect my MTN Mobile Money account to the app,
+**so that** my MoMo transactions can be automatically tracked.
 
 ##### Acceptance Criteria
-1.  An "Add Account" option is available within the app.
-2.  Tapping this option launches the third-party aggregator's (e.g., Mono) secure connection widget.
-3.  The user can successfully authenticate with their financial institution via the widget.
-4.  Upon a successful link, the app securely stores the necessary token to access the account's data.
-5.  The newly linked account appears in a list of "Linked Accounts" in the app's settings.
-6.  The user has the ability to unlink an existing account.
+1.  An "Add MTN MoMo Account" option is available within the app.
+2.  Tapping this option launches the MTN MoMo API authentication flow.
+3.  The user can successfully authenticate with their MTN MoMo account credentials.
+4.  Upon a successful link, the app securely stores the necessary API tokens to access the account's transaction data.
+5.  The newly linked MTN MoMo account appears in a list of "Linked Accounts" in the app's settings.
+6.  The user has the ability to unlink their MTN MoMo account.
 
-#### Story 2.2: Initial Transaction Sync
+#### Story 2.2: Initial MTN MoMo Transaction Sync
 **As a** user,
-**I want** the app to import my recent transaction history after I link a new account,
-**so that** I have an immediate and useful overview of my spending.
+**I want** the app to import my recent MTN MoMo transaction history after I link my account,
+**so that** I have an immediate and useful overview of my mobile money activity.
 
 ##### Acceptance Criteria
-1.  Immediately after an account is successfully linked, the app automatically fetches the last 30 days of transactions.
-2.  Fetched transactions are stored securely in the database and associated with the correct user and account.
+1.  Immediately after MTN MoMo account is successfully linked, the app automatically fetches the last 30 days of MoMo transactions.
+2.  Fetched MoMo transactions are stored securely in the database and associated with the correct user and MTN MoMo account.
 3.  The sync process displays clear feedback to the user (e.g., a loading indicator followed by a success message).
-4.  The process gracefully handles and reports any API errors during the sync.
+4.  The process gracefully handles and reports any MTN MoMo API errors during the sync.
 
-#### Story 2.3: Displaying Synced Transactions
+#### Story 2.3: Displaying Synced MTN MoMo Transactions
 **As a** user,
-**I want** to see my automatically synced transactions alongside my manual entries,
-**so that** I have a single, unified view of my finances.
+**I want** to see my automatically synced MTN MoMo transactions alongside my manual entries,
+**so that** I have a single, unified view of my finances including mobile money activity.
 
 ##### Acceptance Criteria
-1.  Synced transactions appear in the main "All Transactions" list.
-2.  Synced transactions are clearly identifiable from manual entries (e.g., via a bank logo).
-3.  The dashboard's "Total Balance" and "Recent Transactions" widgets are updated to include data from synced accounts.
-4.  Users can change the category of a synced transaction but cannot edit the amount, date, or description.
+1.  Synced MTN MoMo transactions appear in the main "All Transactions" list.
+2.  Synced MoMo transactions are clearly identifiable from manual entries (e.g., via the MTN MoMo logo).
+3.  The dashboard's "Total Balance" and "Recent Transactions" widgets are updated to include data from synced MTN MoMo accounts.
+4.  Users can change the category of a synced MoMo transaction but cannot edit the amount, date, or description.
 
-#### Story 2.4: Basic Automated Categorization
+#### Story 2.4: Basic Automated Categorization for MoMo Transactions
 **As a** user,
-**I want** the app to intelligently suggest categories for my synced transactions,
-**so that** I can save time on manual organization.
+**I want** the app to intelligently suggest categories for my synced MTN MoMo transactions,
+**so that** I can save time on manual organization of my mobile money activity.
 
 ##### Acceptance Criteria
-1.  When new transactions are synced, a backend process attempts to assign a category based on the transaction description (e.g., "UBER" is categorized as "Transport").
-2.  A basic set of categorization rules is implemented.
-3.  Transactions that cannot be automatically categorized are marked as "Uncategorized".
-4.  The user can easily re-categorize any transaction.
+1.  When new MTN MoMo transactions are synced, a backend process attempts to assign a category based on the transaction description and MoMo patterns (e.g., "Mobile Money Deposit" is categorized as "Income", "Airtime Purchase" as "Utilities").
+2.  A basic set of MoMo-specific categorization rules is implemented for common mobile money transaction types.
+3.  MoMo transactions that cannot be automatically categorized are marked as "Uncategorized".
+4.  The user can easily re-categorize any MoMo transaction.
 
-#### Story 2.5: Background Synchronization
+#### Story 2.5: Background MTN MoMo Synchronization
 **As a** user,
-**I want** my financial accounts to be updated automatically in the background,
-**so that** my data is always up-to-date without manual effort.
+**I want** my MTN MoMo account to be updated automatically in the background,
+**so that** my mobile money data is always up-to-date without manual effort.
 
 ##### Acceptance Criteria
-1.  A scheduled backend task runs periodically (e.g., daily) to fetch new transactions for all linked accounts.
-2.  Only new transactions that have not been previously synced are added to the database.
-3.  The background sync is efficient and handles errors without impacting the user experience.
-4.  (Optional for MVP) The user receives a notification if a linked account requires re-authentication.
+1.  A scheduled backend task runs periodically (e.g., daily) to fetch new transactions for all linked MTN MoMo accounts.
+2.  Only new MoMo transactions that have not been previously synced are added to the database.
+3.  The background sync is efficient and handles MTN MoMo API errors without impacting the user experience.
+4.  (Optional for MVP) The user receives a notification if the linked MTN MoMo account requires re-authentication.
 
 ---
 

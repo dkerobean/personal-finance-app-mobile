@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { TransactionState, TransactionActions } from '@/types/store';
 import type { TransactionType } from '@/types/models';
-import { transactionsApi } from '@/services/api/transactions';
+import { transactionsApi, isSyncedTransaction } from '@/services/api/transactions';
 
 interface TransactionStore extends TransactionState, TransactionActions {}
 
@@ -187,6 +187,47 @@ export const useDashboardData = () => {
       .reduce((sum, t) => sum + t.amount, 0);
   };
 
+  // Synced transaction selectors
+  const getSyncedTransactions = () => {
+    return transactions.filter(t => isSyncedTransaction(t));
+  };
+
+  const getManualTransactions = () => {
+    return transactions.filter(t => !isSyncedTransaction(t));
+  };
+
+  const getSyncedTransactionCount = (): number => {
+    return getSyncedTransactions().length;
+  };
+
+  const getManualTransactionCount = (): number => {
+    return getManualTransactions().length;
+  };
+
+  const getSyncedIncome = (): number => {
+    return getSyncedTransactions()
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+  };
+
+  const getSyncedExpenses = (): number => {
+    return getSyncedTransactions()
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+  };
+
+  const getManualIncome = (): number => {
+    return getManualTransactions()
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+  };
+
+  const getManualExpenses = (): number => {
+    return getManualTransactions()
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+  };
+
   return {
     transactions,
     isLoading,
@@ -195,5 +236,14 @@ export const useDashboardData = () => {
     recentTransactions: getRecentTransactions(),
     totalIncome: getTotalIncome(),
     totalExpenses: getTotalExpenses(),
+    // Synced transaction data
+    syncedTransactions: getSyncedTransactions(),
+    manualTransactions: getManualTransactions(),
+    syncedTransactionCount: getSyncedTransactionCount(),
+    manualTransactionCount: getManualTransactionCount(),
+    syncedIncome: getSyncedIncome(),
+    syncedExpenses: getSyncedExpenses(),
+    manualIncome: getManualIncome(),
+    manualExpenses: getManualExpenses(),
   };
 };

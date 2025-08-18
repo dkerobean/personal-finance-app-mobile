@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { isSyncedTransaction } from '@/services/api/transactions';
+import SyncedTransactionBadge from '@/components/SyncedTransactionBadge';
 import type { Transaction } from '@/types/models';
 
 interface RecentTransactionsProps {
@@ -120,9 +122,14 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
               </View>
               
               <View style={styles.transactionDetails}>
-                <Text style={styles.categoryName}>
-                  {transaction.category?.name || 'Unknown Category'}
-                </Text>
+                <View style={styles.categoryRow}>
+                  <Text style={styles.categoryName}>
+                    {transaction.category?.name || 'Unknown Category'}
+                  </Text>
+                  {isSyncedTransaction(transaction) && (
+                    <SyncedTransactionBadge size="small" />
+                  )}
+                </View>
                 <Text style={styles.transactionDate}>
                   {formatDate(transaction.transaction_date)}
                 </Text>
@@ -255,11 +262,17 @@ const styles = StyleSheet.create({
   transactionDetails: {
     flex: 1,
   },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 2,
+  },
   categoryName: {
     fontSize: 16,
     fontWeight: '500',
     color: '#374151',
-    marginBottom: 2,
   },
   transactionDate: {
     fontSize: 12,

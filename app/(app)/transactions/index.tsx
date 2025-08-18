@@ -13,6 +13,8 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useCategoryStore } from '@/stores/categoryStore';
+import { isSyncedTransaction } from '@/services/api/transactions';
+import SyncedTransactionBadge from '@/components/SyncedTransactionBadge';
 import type { Transaction } from '@/types/models';
 
 export default function TransactionsScreen() {
@@ -36,6 +38,15 @@ export default function TransactionsScreen() {
   }, []);
 
   const handleDeletePress = (transaction: Transaction) => {
+    if (isSyncedTransaction(transaction)) {
+      Alert.alert(
+        'Cannot Delete Synced Transaction',
+        'This transaction was automatically synced from your MTN MoMo account and cannot be deleted. You can only change its category.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
     Alert.alert(
       'Delete Transaction',
       `Are you sure you want to delete this ${transaction.type} of $${transaction.amount.toFixed(2)}? This action cannot be undone.`,
@@ -143,9 +154,17 @@ export default function TransactionsScreen() {
                       />
                     </View>
                     <View style={styles.transactionDetails}>
-                      <Text style={styles.transactionCategory}>
-                        {transaction.category?.name || 'Unknown Category'}
-                      </Text>
+                      <View style={styles.categoryRow}>
+                        <Text style={styles.transactionCategory}>
+                          {transaction.category?.name || 'Unknown Category'}
+                        </Text>
+                        {isSyncedTransaction(transaction) && (
+                          <SyncedTransactionBadge 
+                            accountName={transaction.account?.account_name}
+                            size="small"
+                          />
+                        )}
+                      </View>
                       <Text style={styles.transactionDate}>
                         {formatDate(transaction.transaction_date)}
                       </Text>
@@ -166,15 +185,27 @@ export default function TransactionsScreen() {
                     >
                       {formatAmount(transaction.amount, transaction.type)}
                     </Text>
-                    <TouchableOpacity 
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleDeletePress(transaction);
-                      }}
-                      style={styles.deleteButton}
-                    >
-                      <MaterialIcons name="delete" size={16} color="#dc3545" />
-                    </TouchableOpacity>
+                    {!isSyncedTransaction(transaction) ? (
+                      <TouchableOpacity 
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleDeletePress(transaction);
+                        }}
+                        style={styles.deleteButton}
+                      >
+                        <MaterialIcons name="delete" size={16} color="#dc3545" />
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity 
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleDeletePress(transaction);
+                        }}
+                        style={styles.editButton}
+                      >
+                        <MaterialIcons name="edit" size={16} color="#6b7280" />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -293,6 +324,12 @@ const styles = StyleSheet.create({
   transactionDetails: {
     flex: 1,
   },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
   transactionCategory: {
     fontSize: 16,
     fontWeight: '500',
@@ -316,6 +353,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   deleteButton: {
+    marginTop: 4,
+    padding: 4,
+  },
+  editButton: {
     marginTop: 4,
     padding: 4,
   },

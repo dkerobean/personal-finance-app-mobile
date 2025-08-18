@@ -38,4 +38,21 @@ export interface Transaction {
   created_at: string;
   updated_at: string;
   category?: Category;
+  momo_external_id?: string;
+  momo_transaction_id?: string;
+  momo_reference_id?: string;
+  momo_status?: string;
+  momo_payer_info?: string;
+  momo_financial_transaction_id?: string;
+  merchant_name?: string;
+  auto_categorized?: boolean;
+  categorization_confidence?: number;
+  account?: MoMoAccountInfo;
+}
+
+export interface MoMoAccountInfo {
+  id: string;
+  phone_number: string;
+  account_name: string;
+  is_active: boolean;
 }

@@ -20,6 +20,12 @@ const mockSupabase = supabase as jest.Mocked<typeof supabase>;
 describe('transactionsApi', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset the mock implementation
+    mockSupabase.from.mockClear();
+  });
+
+  afterEach(() => {
+    jest.resetAllMocks();
   });
 
   describe('list', () => {
