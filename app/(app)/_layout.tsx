@@ -16,7 +16,12 @@ export default function AppLayout(): React.ReactElement {
   useEffect(() => {
     // Redirect to login if not authenticated and store is hydrated
     if (hydrated && !isAuthenticated && !isLoading) {
-      router.replace('/(auth)/login');
+      console.log('User not authenticated, redirecting to login');
+      try {
+        router.replace('/(auth)/login');
+      } catch (error) {
+        console.error('Navigation error:', error);
+      }
     }
   }, [isAuthenticated, isLoading, hydrated]);
 

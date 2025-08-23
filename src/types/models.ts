@@ -30,6 +30,7 @@ export type TransactionType = 'income' | 'expense';
 export interface Transaction {
   id: string;
   user_id: string;
+  account_id?: string; // UUID - Links to accounts table for synced transactions
   amount: number;
   type: TransactionType;
   category_id: string;
@@ -38,6 +39,10 @@ export interface Transaction {
   created_at: string;
   updated_at: string;
   category?: Category;
+  // Platform-specific identifiers
+  mono_transaction_id?: string; // For bank transactions via Mono
+  mtn_reference_id?: string; // For MTN MoMo transactions
+  // Legacy MTN MoMo fields (maintained for backward compatibility)
   momo_external_id?: string;
   momo_transaction_id?: string;
   momo_reference_id?: string;
@@ -45,9 +50,43 @@ export interface Transaction {
   momo_payer_info?: string;
   momo_financial_transaction_id?: string;
   merchant_name?: string;
+  // Transaction metadata
+  institution_name?: string; // e.g., 'GCB Bank' OR 'MTN Mobile Money'
+  is_synced?: boolean; // Set to true for all synced transactions
   auto_categorized?: boolean;
   categorization_confidence?: number;
+  sync_log_id?: string; // Links to transaction_sync_log table
+  platform_source?: 'mono' | 'mtn_momo' | 'manual'; // Platform transparency
+  // Account information (for backward compatibility)
   account?: MoMoAccountInfo;
+}
+
+// Extended transaction interface for unified display
+export interface TransactionWithAccount extends Omit<Transaction, 'account'> {
+  account?: {
+    id: string;
+    account_name: string;
+    account_type: 'bank' | 'mobile_money';
+    institution_name: string; // e.g., 'GCB Bank', 'Access Bank' for Mono OR 'MTN Mobile Money' for MTN MoMo
+    platform_source?: 'mono' | 'mtn_momo'; // Platform identifier for transparency
+  };
+}
+
+export interface Account {
+  id: string; // UUID
+  user_id: string; // UUID
+  account_name: string;
+  account_type: 'bank' | 'mobile_money';
+  institution_name: string; // e.g., 'GCB Bank', 'Access Bank' OR 'MTN Mobile Money'
+  balance: number;
+  // Platform-specific identifiers (only one will be populated)
+  mono_account_id?: string; // For bank accounts via Mono
+  mtn_reference_id?: string; // For MTN MoMo accounts
+  mtn_phone_number?: string; // MTN MoMo phone number
+  last_synced_at: string; // ISO 8601 Timestamp
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface MoMoAccountInfo {
@@ -55,4 +94,172 @@ export interface MoMoAccountInfo {
   phone_number: string;
   account_name: string;
   is_active: boolean;
+}
+
+// Mono API Types
+export interface MonoConnectResponse {
+  code: string;
+  id: string;
+}
+
+export interface MonoAccountData {
+  id: string;
+  account: {
+    id: string;
+    name: string;
+    accountNumber: string;
+    type: string;
+    balance: number;
+    currency: string;
+  };
+  institution: {
+    name: string;
+    bankCode: string;
+    type: string;
+  };
+}
+
+export interface MonoLinkingResult {
+  success: boolean;
+  account?: Account;
+  error?: string;
+}
+
+// MTN MoMo API Types  
+export interface MTNMoMoLinkingResult {
+  success: boolean;
+  account?: Account;
+  error?: string;
+}
+
+// Budget Types
+export interface Budget {
+  id: string;
+  user_id: string;
+  category_id: string;
+  amount: number;
+  month: string; // Format: 'YYYY-MM-01'
+  created_at: string;
+  updated_at: string;
+  category_name?: string;
+  category_icon_name?: string;
+}
+
+export interface CreateBudgetRequest {
+  category_id: string;
+  amount: number;
+  month: string; // Format: 'YYYY-MM-01'
+}
+
+export interface UpdateBudgetRequest {
+  amount: number;
+}
+
+export type BudgetStatus = 'on_track' | 'warning' | 'over_budget';
+
+export interface BudgetWithSpending extends Budget {
+  spent: number; // Total spent in category for the month
+  percentage: number; // (spent / amount) * 100
+  remaining: number; // amount - spent
+  status: BudgetStatus;
+  transaction_count: number; // Number of transactions in category/month
+}
+
+// Alert Types
+export interface AlertSettings {
+  id: string;
+  user_id: string;
+  budget_alerts_enabled: boolean;
+  warning_threshold: number; // Default 90
+  over_budget_alerts_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateAlertSettingsRequest {
+  budget_alerts_enabled?: boolean;
+  warning_threshold?: number;
+  over_budget_alerts_enabled?: boolean;
+}
+
+export interface UpdateAlertSettingsRequest {
+  budget_alerts_enabled?: boolean;
+  warning_threshold?: number;
+  over_budget_alerts_enabled?: boolean;
+}
+
+export type AlertType = 'warning' | 'over_budget';
+
+export interface AlertHistory {
+  id: string;
+  user_id: string;
+  budget_id: string;
+  alert_type: AlertType;
+  sent_at: string;
+  notification_id: string | null;
+  status: 'sent' | 'failed' | 'pending';
+  error_message: string | null;
+  spent_amount: number;
+  budget_amount: number;
+  percentage: number;
+  category_name?: string;
+  budget_month?: string;
+}
+
+// Report Types
+export interface MonthlyReport {
+  month: string; // 'YYYY-MM' format
+  totalIncome: number;
+  totalExpenses: number;
+  netIncome: number; // totalIncome - totalExpenses
+  transactionCount: number;
+  incomeTransactionCount: number;
+  expenseTransactionCount: number;
+  categoryBreakdown: CategorySpending[];
+  topCategories: CategorySpending[]; // Top 5 spending categories
+  avgTransactionAmount: number;
+  largestExpense?: {
+    amount: number;
+    description?: string;
+    category_name?: string;
+    date: string;
+  };
+  largestIncome?: {
+    amount: number;
+    description?: string;
+    category_name?: string;
+    date: string;
+  };
+}
+
+export interface CategorySpending {
+  categoryId: string;
+  categoryName: string;
+  categoryIcon: string;
+  totalAmount: number;
+  percentage: number; // percentage of total expenses
+  transactionCount: number;
+  avgTransactionAmount: number;
+  type: 'income' | 'expense';
+}
+
+export interface MonthlyReportRequest {
+  month: string; // 'YYYY-MM' format
+  includeBudgets?: boolean; // Include budget comparison data
+}
+
+export interface MonthlyReportSummary {
+  month: string;
+  totalIncome: number;
+  totalExpenses: number;
+  netIncome: number;
+  transactionCount: number;
+}
+
+export interface ReportComparison {
+  currentMonth: MonthlyReportSummary;
+  previousMonth: MonthlyReportSummary;
+  changeIncome: number; // percentage change
+  changeExpenses: number; // percentage change
+  changeNet: number; // percentage change
 }

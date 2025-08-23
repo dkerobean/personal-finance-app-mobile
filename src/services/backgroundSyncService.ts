@@ -34,15 +34,33 @@ class BackgroundSyncService {
   private getEdgeFunctionUrl(): string {
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl) {
-      throw new Error('Supabase URL not configured');
+      console.warn('Supabase URL not configured. Background sync will be disabled.');
+      return '';
     }
     return `${supabaseUrl}/functions/v1/background-sync`;
+  }
+
+  private isServiceAvailable(): boolean {
+    return !!process.env.EXPO_PUBLIC_SUPABASE_URL;
   }
 
   /**
    * Get background sync configuration and status
    */
   async getSyncStatus(): Promise<ApiResponse<BackgroundSyncStatus>> {
+    if (!this.isServiceAvailable()) {
+      return {
+        data: {
+          isEnabled: false,
+          frequencyHours: 24,
+          maxConcurrentAccounts: 5,
+          lastRunAt: null,
+          nextRunAt: null,
+        },
+        error: null,
+      };
+    }
+
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
@@ -108,10 +126,11 @@ class BackgroundSyncService {
       }
 
       const { data: accounts, error } = await supabase
-        .from('momo_account_links')
-        .select('id, account_name, phone_number, sync_status, last_sync_at, last_sync_attempt')
+        .from('accounts')
+        .select('id, account_name, phone_number, sync_status, last_synced_at, last_sync_attempt, platform_source')
         .eq('user_id', session.user.id)
         .eq('is_active', true)
+        .in('platform_source', ['mtn_momo', 'mono'])
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -142,7 +161,7 @@ class BackgroundSyncService {
             accountName: account.account_name,
             phoneNumber: account.phone_number,
             syncStatus: account.sync_status || 'active',
-            lastSyncAt: account.last_sync_at,
+            lastSyncAt: account.last_synced_at,
             lastSyncAttempt: account.last_sync_attempt,
             errorMessage,
           };
@@ -321,8 +340,9 @@ class BackgroundSyncService {
           sync_started_at,
           sync_completed_at,
           error_message,
-          momo_account_links (
-            account_name
+          account:accounts (
+            account_name,
+            platform_source
           )
         `)
         .eq('user_id', session.user.id)
@@ -335,7 +355,9 @@ class BackgroundSyncService {
 
       const history = (syncLogs || []).map(log => ({
         id: log.id,
-        accountName: log.momo_account_links?.account_name || 'Unknown Account',
+        accountName: Array.isArray(log.account) 
+          ? (log.account[0] as any)?.account_name || 'Unknown Account'
+          : (log.account as any)?.account_name || 'Unknown Account',
         syncType: log.sync_type,
         syncStatus: log.sync_status,
         transactionsSynced: log.transactions_synced || 0,

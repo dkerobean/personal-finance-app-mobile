@@ -33,6 +33,13 @@ const settingsOptions: SettingsOption[] = [
     icon: 'phone-android',
     route: '/settings/momo',
   },
+  {
+    id: 'notifications',
+    title: 'Notifications',
+    description: 'Manage budget alerts and notification preferences',
+    icon: 'notifications',
+    route: '/settings/notifications',
+  },
   // Add more settings options here as the app grows
   // {
   //   id: 'profile',
@@ -40,13 +47,6 @@ const settingsOptions: SettingsOption[] = [
   //   description: 'Update your profile information',
   //   icon: 'person',
   //   route: '/settings/profile',
-  // },
-  // {
-  //   id: 'notifications',
-  //   title: 'Notifications',
-  //   description: 'Manage notification preferences',
-  //   icon: 'notifications',
-  //   route: '/settings/notifications',
   // },
 ];
 

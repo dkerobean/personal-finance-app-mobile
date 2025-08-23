@@ -176,26 +176,43 @@ export const authService = {
       const verificationCode = otpManager.generateOTP(email);
       await otpManager.storeOTP(email, verificationCode);
 
-      const emailResult = await resendService.sendVerificationEmail(email, {
-        firstName: firstName || 'there',
-        verificationCode,
-        appName: 'Kippo',
-        companyName: 'Kippo',
-        supportEmail: 'support@kippo.com',
-        expirationMinutes: otpManager.getConfig().EXPIRATION_MINUTES,
-      });
+      try {
+        const emailResult = await resendService.sendVerificationEmail(email, {
+          firstName: firstName || 'there',
+          verificationCode,
+          appName: 'Kippo',
+          companyName: 'Kippo',
+          supportEmail: 'support@kippo.com',
+          expirationMinutes: otpManager.getConfig().EXPIRATION_MINUTES,
+        });
 
-      if (!emailResult.success) {
+        if (!emailResult.success && emailResult.message?.includes('service disabled')) {
+          // Email service is disabled, but we can still proceed
+          console.log('Email service disabled, but verification code generated');
+          return {
+            success: true,
+            message: 'Verification code generated. (Email service disabled in development)',
+          };
+        }
+
+        if (!emailResult.success) {
+          return {
+            success: false,
+            message: 'Failed to send verification email. Please try again.',
+          };
+        }
+
         return {
-          success: false,
-          message: 'Failed to send verification email. Please try again.',
+          success: true,
+          message: 'New verification code sent! Please check your email.',
+        };
+      } catch (emailError) {
+        console.warn('Email service error, but continuing with verification:', emailError);
+        return {
+          success: true,
+          message: 'Verification code generated. (Email service unavailable)',
         };
       }
-
-      return {
-        success: true,
-        message: 'New verification code sent! Please check your email.',
-      };
     } catch (error) {
       return {
         success: false,

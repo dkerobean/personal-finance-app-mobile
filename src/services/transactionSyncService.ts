@@ -56,10 +56,11 @@ class TransactionSyncService {
 
       // Check if account is already linked
       const { data: existingLink } = await supabase
-        .from('momo_account_links')
+        .from('accounts')
         .select('*')
         .eq('user_id', user.id)
         .eq('phone_number', request.phone_number)
+        .eq('platform_source', 'mtn_momo')
         .single();
 
       if (existingLink) {
@@ -71,13 +72,16 @@ class TransactionSyncService {
         );
       }
 
-      // Create new account link
+      // Create new account link in unified accounts table
       const { data, error } = await supabase
-        .from('momo_account_links')
+        .from('accounts')
         .insert({
           user_id: user.id,
           phone_number: request.phone_number,
           account_name: request.account_name,
+          account_type: 'mobile_money',
+          platform_source: 'mtn_momo',
+          mtn_reference_id: request.phone_number,
           is_active: true,
         })
         .select('*')
@@ -127,9 +131,10 @@ class TransactionSyncService {
       }
 
       const { data, error } = await supabase
-        .from('momo_account_links')
+        .from('accounts')
         .select('*')
         .eq('user_id', user.id)
+        .eq('platform_source', 'mtn_momo')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -172,10 +177,11 @@ class TransactionSyncService {
 
       // First check if account exists and belongs to user
       const { data: existingAccount } = await supabase
-        .from('momo_account_links')
+        .from('accounts')
         .select('*')
         .eq('id', accountId)
         .eq('user_id', user.id)
+        .eq('platform_source', 'mtn_momo')
         .single();
 
       if (!existingAccount) {
@@ -188,7 +194,7 @@ class TransactionSyncService {
       }
 
       const { error } = await supabase
-        .from('momo_account_links')
+        .from('accounts')
         .update({ is_active: false })
         .eq('id', accountId)
         .eq('user_id', user.id);
@@ -731,7 +737,7 @@ class TransactionSyncService {
         .from('transaction_sync_log')
         .select(`
           *,
-          momo_account:momo_account_links(phone_number, account_name)
+          account:accounts(id, phone_number, account_name, platform_source)
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })

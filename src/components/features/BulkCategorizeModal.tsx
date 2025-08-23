@@ -145,12 +145,30 @@ export default function BulkCategorizeModal({
           onPress: async () => {
             setUpdating(true);
             try {
-              for (const transaction of selectedTransactions) {
-                await updateTransaction(transaction.id, {
-                  category_id: selectedCategory.id,
-                } as any);
+              // Use the new bulk recategorize API
+              const transactionIds = selectedTransactions.map(tx => tx.id);
+              const response = await transactionsApi.bulkRecategorize(transactionIds, selectedCategory.id);
+              
+              if (response.error) {
+                Alert.alert('Error', response.error.message);
+                return;
               }
-              Alert.alert('Success', `Updated ${selectedTransactions.length} transactions`);
+
+              const { updated, errors } = response.data!;
+              
+              if (errors.length > 0) {
+                Alert.alert(
+                  'Partial Success', 
+                  `Updated ${updated} transactions. ${errors.length} failed:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? '\n...' : ''}`
+                );
+              } else {
+                Alert.alert('Success', `Updated ${updated} transactions`);
+              }
+              
+              // Refresh the transaction store
+              const { loadTransactions } = useTransactionStore.getState();
+              await loadTransactions();
+              
               onClose();
             } catch (error) {
               Alert.alert('Error', 'Failed to update transactions');

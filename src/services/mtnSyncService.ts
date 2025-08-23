@@ -2,6 +2,17 @@ import { supabase } from '@/services/supabaseClient';
 import { handleApiError, createApiResponse } from '@/services/apiClient';
 import type { ApiResponse } from '@/types/api';
 
+export type SyncStatus = 'idle' | 'fetching' | 'storing' | 'completed' | 'error';
+
+export interface SyncProgress {
+  status: SyncStatus;
+  message: string;
+  transactionCount?: number;
+  accountType?: 'bank' | 'mobile_money';
+  institutionName?: string;
+  error?: string;
+}
+
 interface SyncRequest {
   accountId: string;
   dateRange?: {
@@ -14,6 +25,8 @@ interface SyncResult {
   totalTransactions: number;
   newTransactions: number;
   updatedTransactions: number;
+  accountType: 'bank' | 'mobile_money';
+  institutionName: string;
   errors: string[];
 }
 
@@ -80,6 +93,8 @@ class MTNSyncService {
         totalTransactions: 0,
         newTransactions: 0,
         updatedTransactions: 0,
+        accountType: 'mobile_money' as const,
+        institutionName: 'MTN Mobile Money',
         errors: [],
       });
 
@@ -97,18 +112,28 @@ class MTNSyncService {
 
   async syncAccountWithProgress(
     accountId: string,
-    onProgress?: (status: 'fetching' | 'storing' | 'completed') => void,
+    onProgress?: (progress: SyncProgress) => void,
     dateRange?: SyncRequest['dateRange']
   ): Promise<ApiResponse<SyncResult>> {
     try {
       // Notify start of fetching
-      onProgress?.('fetching');
+      onProgress?.({
+        status: 'fetching',
+        message: 'Fetching MTN MoMo transactions...',
+        accountType: 'mobile_money',
+        institutionName: 'MTN Mobile Money',
+      });
 
       // Simulate some delay for fetching stage
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Notify start of storing
-      onProgress?.('storing');
+      onProgress?.({
+        status: 'storing',
+        message: 'Storing transactions...',
+        accountType: 'mobile_money',
+        institutionName: 'MTN Mobile Money',
+      });
 
       // Call the actual sync service
       const result = await this.syncAccount(accountId, dateRange);
@@ -117,18 +142,42 @@ class MTNSyncService {
       await new Promise(resolve => setTimeout(resolve, 800));
 
       // Notify completion
-      if (!result.error) {
-        onProgress?.('completed');
+      if (!result.error && result.data) {
+        onProgress?.({
+          status: 'completed',
+          message: `Imported ${result.data.newTransactions} mobile money transactions`,
+          transactionCount: result.data.newTransactions,
+          accountType: 'mobile_money',
+          institutionName: 'MTN Mobile Money',
+        });
+      } else if (result.error) {
+        onProgress?.({
+          status: 'error',
+          message: result.error.message,
+          error: result.error.message,
+          accountType: 'mobile_money',
+          institutionName: 'MTN Mobile Money',
+        });
       }
 
       return result;
     } catch (error) {
+      const errorMessage = handleApiError(error);
       console.error('MTN sync with progress error:', error);
+      
+      onProgress?.({
+        status: 'error',
+        message: errorMessage,
+        error: errorMessage,
+        accountType: 'mobile_money',
+        institutionName: 'MTN Mobile Money',
+      });
+
       return {
         data: undefined,
         error: {
           code: 'SYNC_ERROR',
-          message: handleApiError(error),
+          message: errorMessage,
         },
       };
     }
@@ -159,6 +208,77 @@ class MTNSyncService {
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
     });
+  }
+
+  /**
+   * Validate if an account is properly configured for syncing
+   */
+  async validateAccount(accountId: string): Promise<ApiResponse<{ isValid: boolean; message?: string }>> {
+    try {
+      // Get account from database
+      const { data: account, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('id', accountId)
+        .single();
+
+      if (error) {
+        return createApiResponse({ isValid: false, message: 'Account not found' }, {
+          code: 'ACCOUNT_NOT_FOUND',
+          message: 'Account not found',
+        });
+      }
+
+      if (!account.is_active) {
+        return createApiResponse({
+          isValid: false,
+          message: 'Account is inactive',
+        });
+      }
+
+      if (account.account_type !== 'mobile_money') {
+        return createApiResponse({
+          isValid: false,
+          message: 'Account is not a mobile money account',
+        });
+      }
+
+      if (!account.mtn_reference_id && !account.mtn_phone_number) {
+        return createApiResponse({
+          isValid: false,
+          message: 'Account is missing MTN MoMo configuration',
+        });
+      }
+
+      return createApiResponse({
+        isValid: true,
+        message: 'Account is valid for syncing',
+      });
+
+    } catch (error) {
+      const errorMessage = handleApiError(error);
+      return createApiResponse({ isValid: false, message: errorMessage }, {
+        code: 'VALIDATION_ERROR',
+        message: errorMessage,
+      });
+    }
+  }
+
+  /**
+   * Get sync history for an account
+   */
+  async getSyncHistory(accountId: string, limit: number = 10): Promise<ApiResponse<any[]>> {
+    try {
+      // This would typically fetch from a sync_history table
+      // For now, return empty array as placeholder
+      return createApiResponse([]);
+
+    } catch (error) {
+      return createApiResponse([], {
+        code: 'SYNC_HISTORY_ERROR',
+        message: handleApiError(error),
+      });
+    }
   }
 }
 

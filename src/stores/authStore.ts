@@ -44,53 +44,94 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     set({ isLoading: true });
 
     try {
-      // Check for existing session
-      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('Initializing auth store...');
+      
+      // Check for existing session with timeout
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session check timeout')), 10000)
+      );
+      
+      const { data: { session }, error } = await Promise.race([
+        sessionPromise,
+        timeoutPromise
+      ]) as any;
+      
+      if (error) {
+        console.warn('Session check error:', error.message);
+      }
       
       if (session && !error) {
+        console.log('Found existing session for:', session.user?.email);
         set({
           session,
           user: session.user,
           isAuthenticated: true,
         });
       } else {
+        console.log('No existing session found, clearing storage');
         // Clear any stale data
-        await secureStorage.clear();
+        try {
+          await secureStorage.clear();
+        } catch (storageError) {
+          console.warn('Storage clear error:', storageError);
+        }
       }
 
-      // Set up auth state listener
+      // Set up auth state listener with error handling
       supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
 
-        if (session) {
-          // Only store the access token, not the entire session (which can exceed SecureStore limits)
-          await secureStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, session.access_token);
-          
-          set({
-            session,
-            user: session.user,
-            isAuthenticated: true,
-          });
-        } else {
-          // Handle logout/expired session
-          await secureStorage.clear();
-          set({
-            session: null,
-            user: null,
-            isAuthenticated: false,
-          });
+        try {
+          if (session) {
+            // Only store the access token, not the entire session (which can exceed SecureStore limits)
+            try {
+              await secureStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, session.access_token);
+            } catch (storageError) {
+              console.warn('Failed to store auth token:', storageError);
+            }
+            
+            set({
+              session,
+              user: session.user,
+              isAuthenticated: true,
+            });
+          } else {
+            // Handle logout/expired session
+            try {
+              await secureStorage.clear();
+            } catch (storageError) {
+              console.warn('Failed to clear storage:', storageError);
+            }
+            
+            set({
+              session: null,
+              user: null,
+              isAuthenticated: false,
+            });
+          }
+        } catch (authStateError) {
+          console.error('Auth state change error:', authStateError);
         }
       });
 
     } catch (error) {
       console.error('Auth initialization error:', error);
-      await secureStorage.clear();
+      
+      // Try to clear storage, but don't fail if it doesn't work
+      try {
+        await secureStorage.clear();
+      } catch (storageError) {
+        console.warn('Failed to clear storage after init error:', storageError);
+      }
+      
       set({
         session: null,
         user: null,
         isAuthenticated: false,
       });
     } finally {
+      console.log('Auth initialization completed');
       set({ 
         isLoading: false,
         hydrated: true,

@@ -222,7 +222,7 @@ export const useMoMoStore = create<MoMoStore>((set, get) => ({
     try {
       const response = await mtnSyncService.syncAccountWithProgress(
         accountId,
-        (status) => setSyncStatus(status)
+        (progress) => setSyncStatus(progress.status)
       );
       
       if (response.error) {

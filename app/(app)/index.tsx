@@ -7,6 +7,7 @@ import { useTransactionStore, useDashboardData } from '@/stores/transactionStore
 import { authService } from '@/services/authService';
 import TotalBalanceCard from '@/components/dashboard/TotalBalanceCard';
 import RecentTransactions from '@/components/dashboard/RecentTransactions';
+import AccountsOverviewCard from '@/components/dashboard/AccountsOverviewCard';
 
 export default function DashboardScreen(): React.ReactElement {
   const { user, logout } = useAuthStore();
@@ -37,6 +38,23 @@ export default function DashboardScreen(): React.ReactElement {
     router.push('/transactions');
   };
 
+  const handleViewBudgets = (): void => {
+    router.push('/budgets');
+  };
+
+  const handleManageAccounts = (): void => {
+    router.push('/accounts');
+  };
+
+  const handleViewReports = (): void => {
+    router.push('/reports');
+  };
+
+  const handleSettings = (): void => {
+    router.push('/settings');
+  };
+
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView 
@@ -51,13 +69,21 @@ export default function DashboardScreen(): React.ReactElement {
             <Text style={styles.title}>Dashboard</Text>
             <Text style={styles.welcomeText}>Welcome back, {user?.email?.split('@')[0] || 'User'}!</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton} onPress={handleSignOut}>
-            <MaterialIcons name="account-circle" size={32} color="#6b7280" />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.settingsButton} onPress={handleSettings}>
+              <MaterialIcons name="settings" size={24} color="#6b7280" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.profileButton} onPress={handleSignOut}>
+              <MaterialIcons name="account-circle" size={32} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Total Balance Card */}
         <TotalBalanceCard transactions={transactions} isLoading={isLoading} />
+
+        {/* Accounts Overview */}
+        <AccountsOverviewCard onAccountsPress={handleManageAccounts} />
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
@@ -69,6 +95,19 @@ export default function DashboardScreen(): React.ReactElement {
           <TouchableOpacity style={styles.actionButtonSecondary} onPress={handleViewTransactions}>
             <MaterialIcons name="list" size={24} color="#2563eb" />
             <Text style={styles.actionButtonSecondaryText}>View All</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Budget and Reports Actions */}
+        <View style={styles.budgetActions}>
+          <TouchableOpacity style={styles.budgetButton} onPress={handleViewBudgets}>
+            <MaterialIcons name="account-balance-wallet" size={24} color="#059669" />
+            <Text style={styles.budgetButtonText}>Manage Budgets</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.reportsButton} onPress={handleViewReports}>
+            <MaterialIcons name="assessment" size={24} color="#7c3aed" />
+            <Text style={styles.reportsButtonText}>View Reports</Text>
           </TouchableOpacity>
         </View>
 
@@ -124,6 +163,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingsButton: {
+    padding: 8,
+    marginRight: 4,
+  },
   profileButton: {
     padding: 8,
   },
@@ -163,6 +210,45 @@ const styles = StyleSheet.create({
   },
   actionButtonSecondaryText: {
     color: '#2563eb',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  budgetActions: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    gap: 12,
+  },
+  budgetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: '#059669',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  budgetButtonText: {
+    color: '#059669',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  reportsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: '#7c3aed',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  reportsButtonText: {
+    color: '#7c3aed',
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
