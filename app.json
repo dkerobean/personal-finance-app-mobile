@@ -44,6 +44,6 @@
     "extra": {
       "oneSignalAppId": null
     },
-    "newArchEnabled": false
+    "newArchEnabled": true
   }
 }

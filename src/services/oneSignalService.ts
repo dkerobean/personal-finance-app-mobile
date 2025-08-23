@@ -1,6 +1,38 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { OneSignal } from 'react-native-onesignal';
+
+// Conditional import to avoid native module errors in Expo Go
+let OneSignal: any;
+let isOneSignalAvailable = false;
+
+try {
+  // Only import OneSignal if we're in a development build or production
+  const { OneSignal: OneSignalImport } = require('react-native-onesignal');
+  OneSignal = OneSignalImport;
+  isOneSignalAvailable = true;
+} catch (error) {
+  console.warn('OneSignal not available - running in Expo Go or missing native module:', error);
+  // Create a mock OneSignal object for development
+  OneSignal = {
+    initialize: () => {},
+    Notifications: {
+      requestPermission: () => Promise.resolve(false),
+      getPermissionAsync: () => Promise.resolve(false),
+      addEventListener: () => {},
+    },
+    User: {
+      pushSubscription: {
+        addEventListener: () => {},
+        optOut: () => Promise.resolve(),
+        optIn: () => Promise.resolve(),
+        getOptedIn: () => false,
+      },
+    },
+    login: () => Promise.resolve(),
+    logout: () => Promise.resolve(),
+  };
+  isOneSignalAvailable = false;
+}
 
 interface OneSignalConfig {
   appId: string;
@@ -31,7 +63,7 @@ export class OneSignalService {
     
     this.config = {
       appId,
-      enabled: false, // Temporarily disabled for debugging
+      enabled: isOneSignalAvailable && Boolean(appId), // Only enable if OneSignal is available and configured
     };
   }
 
@@ -43,6 +75,13 @@ export class OneSignalService {
   }
 
   /**
+   * Check if we're running in Expo Go environment
+   */
+  private isExpoGo(): boolean {
+    return Constants.appOwnership === 'expo';
+  }
+
+  /**
    * Initialize OneSignal with app configuration
    */
   async initialize(userId?: string): Promise<boolean> {
@@ -50,8 +89,18 @@ export class OneSignalService {
       return true;
     }
 
+    if (!isOneSignalAvailable) {
+      console.warn('OneSignal native module not available - running in Expo Go or missing dependency');
+      return false;
+    }
+
     if (!this.config.enabled) {
       console.warn('OneSignal not configured - notifications will be disabled');
+      return false;
+    }
+
+    if (this.isExpoGo()) {
+      console.warn('OneSignal not supported in Expo Go - use development build for push notifications');
       return false;
     }
 
