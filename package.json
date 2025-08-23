@@ -22,6 +22,7 @@
     "@react-native-aria/utils": "^0.2.12",
     "@react-native-community/datetimepicker": "^8.4.4",
     "@react-native-picker/picker": "^2.11.1",
+    "@shopify/react-native-skia": "^2.2.3",
     "@supabase/supabase-js": "^2.45.4",
     "date-fns": "^4.1.0",
     "expo": "^54.0.0-preview.6",
