@@ -15,7 +15,10 @@ import { useTransactionStore } from '@/stores/transactionStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { isSyncedTransaction } from '@/services/api/transactions';
 import SyncedTransactionBadge from '@/components/SyncedTransactionBadge';
-import type { Transaction } from '@/types/models';
+import InstitutionBadge from '@/components/InstitutionBadge';
+import PlatformSourceIndicator from '@/components/PlatformSourceIndicator';
+import CategorySuggestionBadge from '@/components/transactions/CategorySuggestionBadge';
+import type { Transaction, TransactionWithAccount } from '@/types/models';
 
 export default function TransactionsScreen() {
   const router = useRouter();
@@ -39,9 +42,10 @@ export default function TransactionsScreen() {
 
   const handleDeletePress = (transaction: Transaction) => {
     if (isSyncedTransaction(transaction)) {
+      const platformName = getTransactionPlatformName(transaction);
       Alert.alert(
         'Cannot Delete Synced Transaction',
-        'This transaction was automatically synced from your MTN MoMo account and cannot be deleted. You can only change its category.',
+        `This transaction was automatically synced from your ${platformName} account and cannot be deleted. You can only change its category.`,
         [{ text: 'OK', style: 'default' }]
       );
       return;
@@ -78,6 +82,40 @@ export default function TransactionsScreen() {
 
   const toggleSortOrder = () => {
     setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
+  };
+
+  // Helper functions for platform-specific information
+  const getTransactionPlatformName = (transaction: Transaction): string => {
+    if (!isSyncedTransaction(transaction)) return 'Manual';
+    
+    // Check platform_source first (new field)
+    if (transaction.platform_source === 'mono') return 'bank';
+    if (transaction.platform_source === 'mtn_momo') return 'MTN MoMo';
+    
+    // Fallback to checking identifiers
+    if (transaction.mono_transaction_id) return 'bank';
+    if (transaction.mtn_reference_id || transaction.momo_external_id) return 'MTN MoMo';
+    
+    return 'synced account';
+  };
+
+  const getTransactionAccountType = (transaction: Transaction): 'bank' | 'mobile_money' | 'manual' => {
+    if (!isSyncedTransaction(transaction)) return 'manual';
+    
+    // Check platform_source first (new field)
+    if (transaction.platform_source === 'mono') return 'bank';
+    if (transaction.platform_source === 'mtn_momo') return 'mobile_money';
+    
+    // Fallback to checking identifiers
+    if (transaction.mono_transaction_id) return 'bank';
+    if (transaction.mtn_reference_id || transaction.momo_external_id) return 'mobile_money';
+    
+    return 'manual';
+  };
+
+  const getInstitutionDisplayName = (transaction: Transaction): string => {
+    if (!isSyncedTransaction(transaction)) return 'Manual Entry';
+    return transaction.institution_name || 'Unknown Institution';
   };
 
   const formatDate = (dateString: string) => {
@@ -158,12 +196,22 @@ export default function TransactionsScreen() {
                         <Text style={styles.transactionCategory}>
                           {transaction.category?.name || 'Unknown Category'}
                         </Text>
-                        {isSyncedTransaction(transaction) && (
-                          <SyncedTransactionBadge 
-                            accountName={transaction.account?.account_name}
+                        <View style={styles.badgeRow}>
+                          <InstitutionBadge 
+                            institutionName={getInstitutionDisplayName(transaction)}
+                            accountType={getTransactionAccountType(transaction)}
                             size="small"
                           />
-                        )}
+                          <PlatformSourceIndicator 
+                            accountType={getTransactionAccountType(transaction)}
+                            size="small"
+                          />
+                          <CategorySuggestionBadge 
+                            isAutoCategorized={!!transaction.auto_categorized}
+                            confidence={transaction.categorization_confidence ? transaction.categorization_confidence * 100 : undefined}
+                            size="small"
+                          />
+                        </View>
                       </View>
                       <Text style={styles.transactionDate}>
                         {formatDate(transaction.transaction_date)}
@@ -326,8 +374,15 @@ const styles = StyleSheet.create({
   },
   categoryRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     gap: 8,
+    flexWrap: 'wrap',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     flexWrap: 'wrap',
   },
   transactionCategory: {

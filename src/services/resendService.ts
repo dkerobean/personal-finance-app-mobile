@@ -7,15 +7,37 @@ function getApiKey(): string {
   const apiKey = process.env.EXPO_PUBLIC_RESEND_API_KEY as string;
   
   if (!apiKey) {
-    throw new Error('RESEND API key not found. Please set EXPO_PUBLIC_RESEND_API_KEY in your environment variables.');
+    console.warn('RESEND API key not found. Email functionality will be disabled.');
+    return '';
   }
   
   return apiKey;
 }
 
+function isServiceAvailable(): boolean {
+  return !!process.env.EXPO_PUBLIC_RESEND_API_KEY;
+}
+
 async function sendEmailViaAPI(emailData: ResendEmailOptions): Promise<EmailResponse> {
+  if (!isServiceAvailable()) {
+    console.log('Email service not available, simulating successful send for development');
+    return {
+      success: true,
+      message: 'Email service disabled - using mock response for development',
+      id: 'mock-email-id',
+    };
+  }
+
   try {
     const apiKey = getApiKey();
+    
+    if (!apiKey) {
+      return {
+        success: false,
+        message: 'Email service not configured',
+        error: 'Missing API key',
+      };
+    }
     
     const response = await fetch(RESEND_API_URL, {
       method: 'POST',

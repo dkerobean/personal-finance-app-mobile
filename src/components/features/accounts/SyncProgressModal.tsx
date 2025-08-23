@@ -17,13 +17,26 @@ interface SyncProgressModalProps {
   transactionCount?: number;
   errorMessage?: string;
   autoCloseDelay?: number; // in milliseconds
+  accountType?: 'bank' | 'mobile_money';
+  platformSource?: 'mono' | 'mtn_momo';
+  institutionName?: string;
 }
 
-const SYNC_STEPS = [
-  { key: 'fetching', label: 'Fetching MTN MoMo transactions...', progress: 33 },
-  { key: 'storing', label: 'Storing data...', progress: 66 },
-  { key: 'completed', label: 'Complete!', progress: 100 },
-] as const;
+const getSyncSteps = (platformSource: 'mono' | 'mtn_momo' = 'mtn_momo', accountType: 'bank' | 'mobile_money' = 'mobile_money') => {
+  if (platformSource === 'mono' || accountType === 'bank') {
+    return [
+      { key: 'fetching', label: 'Fetching bank account information...', progress: 33 },
+      { key: 'storing', label: 'Processing and categorizing transactions...', progress: 66 },
+      { key: 'completed', label: 'Bank sync complete!', progress: 100 },
+    ] as const;
+  } else {
+    return [
+      { key: 'fetching', label: 'Fetching MTN MoMo transactions...', progress: 33 },
+      { key: 'storing', label: 'Processing mobile money data...', progress: 66 },
+      { key: 'completed', label: 'MoMo sync complete!', progress: 100 },
+    ] as const;
+  }
+};
 
 export function SyncProgressModal({
   isOpen,
@@ -32,6 +45,9 @@ export function SyncProgressModal({
   transactionCount = 0,
   errorMessage,
   autoCloseDelay = 3000,
+  accountType = 'mobile_money',
+  platformSource,
+  institutionName,
 }: SyncProgressModalProps) {
   // Auto-close timer for successful sync
   React.useEffect(() => {
@@ -44,16 +60,18 @@ export function SyncProgressModal({
     }
   }, [syncStatus, autoCloseDelay, onClose]);
 
+  const syncSteps = getSyncSteps(platformSource, accountType);
+
   const getCurrentStep = () => {
     switch (syncStatus) {
       case 'fetching':
-        return SYNC_STEPS[0];
+        return syncSteps[0];
       case 'storing':
-        return SYNC_STEPS[1];
+        return syncSteps[1];
       case 'completed':
-        return SYNC_STEPS[2];
+        return syncSteps[2];
       default:
-        return SYNC_STEPS[0];
+        return syncSteps[0];
     }
   };
 
@@ -88,7 +106,10 @@ export function SyncProgressModal({
       return errorMessage || 'An error occurred during sync';
     }
     if (isCompleted) {
-      return `Imported ${transactionCount} mobile money transaction${transactionCount !== 1 ? 's' : ''}`;
+      const platformText = platformSource === 'mono' || accountType === 'bank' ? 'bank transaction' : 'mobile money transaction';
+      const institutionText = institutionName ? ` from ${institutionName}` : '';
+      const platformPrefix = platformSource === 'mono' ? 'Bank' : platformSource === 'mtn_momo' ? 'MoMo' : '';
+      return `${platformPrefix}: Imported ${transactionCount} ${platformText}${transactionCount !== 1 ? 's' : ''}${institutionText}`;
     }
     return currentStep.label;
   };
@@ -126,7 +147,11 @@ export function SyncProgressModal({
         <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>MTN MoMo Sync</Text>
+            <Text style={styles.title}>
+              {platformSource === 'mono' ? 'Bank Account Sync' : 
+               platformSource === 'mtn_momo' ? 'MTN MoMo Sync' :
+               accountType === 'bank' ? 'Bank Account Sync' : 'MTN MoMo Sync'}
+            </Text>
             {!isLoading && (
               <TouchableOpacity 
                 style={styles.closeButton}
@@ -177,7 +202,7 @@ export function SyncProgressModal({
             {/* Loading Steps Indicator */}
             {isLoading && (
               <View style={styles.stepsContainer}>
-                {SYNC_STEPS.map((step, index) => {
+                {syncSteps.map((step, index) => {
                   const isCurrentStep = step.key === syncStatus;
                   const isCompletedStep = 
                     (syncStatus === 'storing' && step.key === 'fetching');

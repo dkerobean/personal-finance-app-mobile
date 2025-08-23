@@ -6,8 +6,8 @@ export interface ApiError {
 }
 
 export interface ApiResponse<T> {
-  data?: T;
-  error?: ApiError['error'];
+  data: T | null;
+  error: ApiError['error'] | null;
 }
 
 export interface SignUpRequest {

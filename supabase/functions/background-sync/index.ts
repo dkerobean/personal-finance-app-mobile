@@ -10,9 +10,12 @@ interface BackgroundSyncRequest {
 
 interface AccountSyncResult {
   accountId: string;
-  phoneNumber: string;
+  phoneNumber?: string;
+  platform: 'mono' | 'mtn_momo';
+  accountName: string;
   status: 'success' | 'failed' | 'auth_error';
   transactionsSynced: number;
+  totalProcessed: number;
   error?: string;
   duration: number;
 }
@@ -118,16 +121,26 @@ serve(async (req) => {
       );
     }
 
-    // Use configured max concurrent accounts if available
-    const effectiveMaxConcurrent = syncConfig?.max_concurrent_accounts || maxConcurrentAccounts;
+    // Use configured max concurrent accounts if available, with platform-specific defaults
+    const monoMaxConcurrent = syncConfig?.mono_max_concurrent || Math.floor(maxConcurrentAccounts * 0.6);
+    const mtnMaxConcurrent = syncConfig?.mtn_max_concurrent || Math.floor(maxConcurrentAccounts * 0.4);
+    
+    console.log(`Platform limits - Mono: ${monoMaxConcurrent}, MTN MoMo: ${mtnMaxConcurrent}`);
 
-    // Initialize SyncOrchestrator
-    const syncOrchestrator = new SyncOrchestrator(supabaseClient, effectiveMaxConcurrent);
+    // Initialize SyncOrchestrator with dual platform limits
+    const syncOrchestrator = new SyncOrchestrator(supabaseClient, {
+      mono: monoMaxConcurrent,
+      mtn_momo: mtnMaxConcurrent
+    });
 
-    // Load accounts for syncing
-    await syncOrchestrator.loadAccountsForSync(forceSync);
+    // Load accounts for syncing using dual platform function
+    await syncOrchestrator.loadAccountsForDualPlatformSync(
+      forceSync,
+      syncConfig?.mono_sync_frequency_hours || 6,
+      syncConfig?.mtn_sync_frequency_hours || 4
+    );
 
-    if (syncOrchestrator.getQueueLength() === 0) {
+    if (syncOrchestrator.getTotalQueueLength() === 0) {
       console.log('No accounts found for background sync');
       const endTime = new Date();
       const response: BackgroundSyncResponse = {
@@ -149,10 +162,10 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Found ${syncOrchestrator.getQueueLength()} accounts to sync`);
+    console.log(`Found ${syncOrchestrator.getTotalQueueLength()} accounts to sync (Mono: ${syncOrchestrator.getMonoQueueLength()}, MTN MoMo: ${syncOrchestrator.getMtnMomoQueueLength()})`);
 
-    // Process the sync queue
-    const metrics = await syncOrchestrator.processQueue();
+    // Process the dual platform sync queue
+    const metrics = await syncOrchestrator.processDualPlatformQueue();
 
     // Update sync configuration with last run time
     if (syncConfig) {
@@ -166,18 +179,8 @@ serve(async (req) => {
         .eq('id', syncConfig.id);
     }
 
-    // Convert metrics to response format
-    const syncResults: AccountSyncResult[] = [];
-    for (let i = 0; i < metrics.totalAccounts; i++) {
-      syncResults.push({
-        accountId: `account-${i}`,
-        phoneNumber: 'unknown',
-        status: i < metrics.successfulSyncs ? 'success' : 
-                i < metrics.successfulSyncs + metrics.authErrorSyncs ? 'auth_error' : 'failed',
-        transactionsSynced: Math.floor(metrics.totalTransactionsSynced / metrics.totalAccounts) || 0,
-        duration: metrics.averageSyncDuration,
-      });
-    }
+    // Convert metrics to response format with platform-specific results
+    const syncResults: AccountSyncResult[] = [...metrics.monoResults, ...metrics.mtnMomoResults];
 
     const endTime = new Date();
     const response: BackgroundSyncResponse = {

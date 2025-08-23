@@ -574,6 +574,99 @@ class MtnMomoService {
       // Log the error but continue execution
     }
   }
+
+  // Link MTN MoMo account (for dual platform integration)
+  async linkAccount(phoneNumber: string, pin: string): Promise<{ success: boolean; account?: any; error?: string }> {
+    try {
+      // Validate inputs
+      validateInput('phoneNumber', phoneNumber, validators.phoneNumber, 'Please enter a valid Ghana phone number');
+      
+      // Initialize if needed
+      await this.loadStoredCredentials();
+      
+      if (!this.apiUser || !this.apiKey) {
+        const initResponse = await this.initializeForSandbox();
+        if (!initResponse.success) {
+          return {
+            success: false,
+            error: initResponse.error?.message || 'Failed to initialize MTN MoMo service'
+          };
+        }
+      }
+
+      // Get account balance to verify connection
+      const balanceResponse = await this.getAccountBalance();
+      if (!balanceResponse.success) {
+        return {
+          success: false,
+          error: 'Failed to connect to MTN MoMo account. Please check your credentials.'
+        };
+      }
+
+      // Create account record via backend
+      const { supabase } = await import('../supabaseClient');
+      const { data, error } = await supabase.functions.invoke('accounts-link-momo', {
+        body: {
+          phone_number: phoneNumber,
+          account_name: `MTN MoMo (${phoneNumber})`,
+          balance: balanceResponse.data?.availableBalance || 0
+        }
+      });
+
+      if (error) {
+        return {
+          success: false,
+          error: 'Failed to save MTN MoMo account. Please try again.'
+        };
+      }
+
+      return {
+        success: true,
+        account: data.account
+      };
+
+    } catch (error) {
+      logError(error as Error, 'linkAccount');
+      return {
+        success: false,
+        error: 'An unexpected error occurred. Please try again.'
+      };
+    }
+  }
+
+  // Unlink MTN MoMo account
+  async unlinkAccount(accountId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { supabase } = await import('../supabaseClient');
+      
+      const { error } = await supabase
+        .from('accounts')
+        .delete()
+        .eq('id', accountId)
+        .eq('account_type', 'mobile_money');
+
+      if (error) {
+        return {
+          success: false,
+          error: 'Failed to unlink MTN MoMo account. Please try again.'
+        };
+      }
+
+      return { success: true };
+
+    } catch (error) {
+      logError(error as Error, 'unlinkAccount');
+      return {
+        success: false,
+        error: 'An unexpected error occurred. Please try again.'
+      };
+    }
+  }
+
+  // Check if MTN MoMo is configured
+  isConfigured(): boolean {
+    return !!(this.config.subscriptionKey && this.config.baseUrl);
+  }
 }
 
 export const mtnMomoService = new MtnMomoService();

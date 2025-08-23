@@ -1,11 +1,18 @@
 import { supabase } from '@/services/supabaseClient';
 import { transactionCategorizer } from '@/services/transactionCategorizer';
+import { alertProcessingService } from '@/services/alertProcessingService';
 import type { Transaction, Category } from '@/types/models';
 import type { CreateTransactionRequest, UpdateTransactionRequest, ApiResponse } from '@/types/api';
 import { handleApiError, createApiResponse } from '@/services/apiClient';
 
 const isSyncedTransaction = (transaction: any): boolean => {
-  return !!(transaction.momo_external_id || transaction.momo_transaction_id);
+  return !!(
+    transaction.is_synced || 
+    transaction.mono_transaction_id || 
+    transaction.mtn_reference_id ||
+    transaction.momo_external_id || 
+    transaction.momo_transaction_id
+  );
 };
 
 export { isSyncedTransaction };
@@ -18,7 +25,7 @@ export const transactionsApi = {
         .select(`
           *,
           category:categories(*),
-          account:momo_account_links(id, phone_number, account_name, is_active)
+          account:accounts(id, account_name, account_type, institution_name, mono_account_id, mtn_reference_id)
         `)
         .order('transaction_date', { ascending: false });
 
@@ -58,12 +65,19 @@ export const transactionsApi = {
         .select(`
           *,
           category:categories(*),
-          account:momo_account_links(id, phone_number, account_name, is_active)
+          account:accounts(id, account_name, account_type, institution_name, mono_account_id, mtn_reference_id)
         `)
         .single();
 
       if (error) {
         throw error;
+      }
+
+      // Trigger alert processing for new expense transactions
+      if (data && data.type === 'expense') {
+        alertProcessingService.onTransactionCreated(data).catch(error => {
+          console.error('Alert processing failed for new transaction:', error);
+        });
       }
 
       return createApiResponse(data);
@@ -114,12 +128,19 @@ export const transactionsApi = {
         .select(`
           *,
           category:categories(*),
-          account:momo_account_links(id, phone_number, account_name, is_active)
+          account:accounts(id, account_name, account_type, institution_name, mono_account_id, mtn_reference_id)
         `)
         .single();
 
       if (error) {
         throw error;
+      }
+
+      // Trigger alert processing for updated transactions that affect budgets
+      if (data) {
+        alertProcessingService.onTransactionUpdated(id, existingTransaction, data).catch(error => {
+          console.error('Alert processing failed for updated transaction:', error);
+        });
       }
 
       return createApiResponse(data);
@@ -134,6 +155,10 @@ export const transactionsApi = {
 
   async delete(id: string): Promise<ApiResponse<void>> {
     try {
+      // Get the transaction before deleting to trigger alerts
+      const existingResponse = await this.getById(id);
+      const existingTransaction = existingResponse.data;
+
       const { error } = await supabase
         .from('transactions')
         .delete()
@@ -141,6 +166,13 @@ export const transactionsApi = {
 
       if (error) {
         throw error;
+      }
+
+      // Trigger alert processing for deleted expense transactions
+      if (existingTransaction) {
+        alertProcessingService.onTransactionDeleted(existingTransaction).catch(error => {
+          console.error('Alert processing failed for deleted transaction:', error);
+        });
       }
 
       return createApiResponse();
@@ -160,7 +192,7 @@ export const transactionsApi = {
         .select(`
           *,
           category:categories(*),
-          account:momo_account_links(id, phone_number, account_name, is_active)
+          account:accounts(id, account_name, account_type, institution_name, mono_account_id, mtn_reference_id)
         `)
         .eq('id', id)
         .single();
@@ -245,6 +277,93 @@ export const transactionsApi = {
       const errorMessage = handleApiError(error);
       return createApiResponse([] as Category[], {
         code: 'FETCH_SUGGESTIONS_ERROR',
+        message: errorMessage,
+      });
+    }
+  },
+
+  async provideCategoryFeedback(
+    transactionId: string, 
+    originalCategoryId: string, 
+    newCategoryId: string,
+    confidence: number
+  ): Promise<ApiResponse<void>> {
+    try {
+      // This could store feedback for improving categorization accuracy
+      // For now, we'll just update the transaction and mark it as manually categorized
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          category_id: newCategoryId,
+          auto_categorized: false, // Mark as manually corrected
+          categorization_confidence: null, // Clear auto confidence
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', transactionId);
+
+      if (error) {
+        throw error;
+      }
+
+      // In a more advanced implementation, this would:
+      // 1. Store the feedback in a categorization_feedback table
+      // 2. Use this data to improve future categorization rules
+      // 3. Train ML models with user corrections
+
+      return createApiResponse();
+    } catch (error) {
+      const errorMessage = handleApiError(error);
+      return createApiResponse(undefined, {
+        code: 'FEEDBACK_ERROR',
+        message: errorMessage,
+      });
+    }
+  },
+
+  async bulkRecategorize(
+    transactionIds: string[],
+    newCategoryId: string
+  ): Promise<ApiResponse<{ updated: number; errors: string[] }>> {
+    try {
+      let updated = 0;
+      const errors: string[] = [];
+
+      for (const transactionId of transactionIds) {
+        try {
+          const { error } = await supabase
+            .from('transactions')
+            .update({
+              category_id: newCategoryId,
+              auto_categorized: false, // Mark as manually categorized
+              categorization_confidence: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', transactionId);
+
+          if (error) {
+            throw error;
+          }
+          updated++;
+        } catch (error) {
+          errors.push(`Transaction ${transactionId}: ${handleApiError(error)}`);
+        }
+      }
+
+      // Trigger alert processing for bulk categorization changes
+      if (updated > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          alertProcessingService.onBulkTransactionChanges(user.id, [newCategoryId]).catch(error => {
+            console.error('Alert processing failed for bulk recategorization:', error);
+          });
+        }
+      }
+
+      return createApiResponse({ updated, errors });
+    } catch (error) {
+      const errorMessage = handleApiError(error);
+      return createApiResponse({ updated: 0, errors: [errorMessage] }, {
+        code: 'BULK_RECATEGORIZE_ERROR',
         message: errorMessage,
       });
     }

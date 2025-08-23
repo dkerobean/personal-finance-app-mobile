@@ -1,10 +1,15 @@
 interface SyncAccount {
   id: string;
   user_id: string;
-  phone_number: string;
+  phone_number?: string;
   account_name: string;
+  account_type: 'bank' | 'mobile_money';
+  platform_source: 'mono' | 'mtn_momo';
+  mono_account_id?: string;
+  mtn_reference_id?: string;
   last_sync_at: string | null;
   sync_status: string | null;
+  consecutive_sync_failures: number;
 }
 
 interface SyncQueueItem {
@@ -25,6 +30,13 @@ interface SyncMetrics {
   endTime: Date | null;
   notificationsSent: number;
   notificationErrors: number;
+  // Platform-specific metrics
+  monoAccounts: number;
+  mtnMomoAccounts: number;
+  monoSuccessfulSyncs: number;
+  mtnMomoSuccessfulSyncs: number;
+  monoFailedSyncs: number;
+  mtnMomoFailedSyncs: number;
 }
 
 export class SyncOrchestrator {
@@ -32,14 +44,26 @@ export class SyncOrchestrator {
   private syncQueue: SyncQueueItem[] = [];
   private activeSyncs: Map<string, Promise<any>> = new Map();
   private maxConcurrentSyncs: number;
+  private maxConcurrentMonoSyncs: number;
+  private maxConcurrentMtnMomoSyncs: number;
   private metrics: SyncMetrics;
   private notificationService: any;
+  private monoSyncWorker: any;
+  private mtnMomoSyncWorker: any;
 
-  constructor(supabaseClient: any, maxConcurrentSyncs: number = 5) {
+  constructor(
+    supabaseClient: any, 
+    maxConcurrentSyncs: number = 5,
+    maxConcurrentMonoSyncs: number = 3,
+    maxConcurrentMtnMomoSyncs: number = 5
+  ) {
     this.supabaseClient = supabaseClient;
     this.maxConcurrentSyncs = maxConcurrentSyncs;
+    this.maxConcurrentMonoSyncs = maxConcurrentMonoSyncs;
+    this.maxConcurrentMtnMomoSyncs = maxConcurrentMtnMomoSyncs;
     this.metrics = this.initializeMetrics();
     this.initializeNotificationService();
+    this.initializeSyncWorkers();
   }
 
   private async initializeNotificationService(): Promise<void> {
@@ -49,6 +73,20 @@ export class SyncOrchestrator {
     } catch (error) {
       console.error('Failed to initialize notification service:', error);
       this.notificationService = null;
+    }
+  }
+
+  private async initializeSyncWorkers(): Promise<void> {
+    try {
+      const { MonoSyncWorker } = await import('./mono-sync-worker.ts');
+      const { MtnMomoSyncWorker } = await import('./mtn-momo-sync-worker.ts');
+      
+      this.monoSyncWorker = new MonoSyncWorker(this.supabaseClient);
+      this.mtnMomoSyncWorker = new MtnMomoSyncWorker(this.supabaseClient);
+    } catch (error) {
+      console.error('Failed to initialize sync workers:', error);
+      this.monoSyncWorker = null;
+      this.mtnMomoSyncWorker = null;
     }
   }
 
@@ -64,28 +102,32 @@ export class SyncOrchestrator {
       endTime: null,
       notificationsSent: 0,
       notificationErrors: 0,
+      monoAccounts: 0,
+      mtnMomoAccounts: 0,
+      monoSuccessfulSyncs: 0,
+      mtnMomoSuccessfulSyncs: 0,
+      monoFailedSyncs: 0,
+      mtnMomoFailedSyncs: 0,
     };
   }
 
   /**
-   * Load accounts that need syncing into the queue
+   * Load accounts that need syncing into the queue using dual platform function
    */
-  async loadAccountsForSync(forceSync: boolean = false): Promise<void> {
+  async loadAccountsForSync(
+    forceSync: boolean = false,
+    monoHoursThreshold: number = 6,
+    mtnMomoHoursThreshold: number = 4
+  ): Promise<void> {
     try {
-      console.log('Loading accounts for sync...');
+      console.log('Loading dual platform accounts for sync...');
 
-      let query = this.supabaseClient
-        .from('momo_account_links')
-        .select('id, user_id, phone_number, account_name, last_sync_at, sync_status')
-        .eq('is_active', true);
-
-      // If not force sync, only sync accounts that haven't been synced in the last 24 hours
-      if (!forceSync) {
-        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        query = query.or(`last_sync_at.is.null,last_sync_at.lt.${twentyFourHoursAgo}`);
-      }
-
-      const { data: accounts, error } = await query.order('last_sync_at', { ascending: true, nullsFirst: true });
+      // Use the new dual platform function
+      const { data: accounts, error } = await this.supabaseClient
+        .rpc('get_dual_platform_accounts_needing_sync', {
+          mono_hours_threshold: forceSync ? 0 : monoHoursThreshold,
+          mtn_momo_hours_threshold: forceSync ? 0 : mtnMomoHoursThreshold
+        });
 
       if (error) {
         throw new Error(`Failed to load accounts: ${error.message}`);
@@ -98,6 +140,9 @@ export class SyncOrchestrator {
 
       // Clear existing queue and add accounts with priority
       this.syncQueue = [];
+      const monoAccounts = accounts.filter((acc: SyncAccount) => acc.platform_source === 'mono');
+      const mtnMomoAccounts = accounts.filter((acc: SyncAccount) => acc.platform_source === 'mtn_momo');
+
       accounts.forEach((account: SyncAccount) => {
         const priority = this.calculateSyncPriority(account);
         this.syncQueue.push({
@@ -108,11 +153,20 @@ export class SyncOrchestrator {
         });
       });
 
-      // Sort queue by priority (higher priority first)
-      this.syncQueue.sort((a, b) => b.priority - a.priority);
+      // Sort queue by priority (higher priority first), then group by platform for efficiency
+      this.syncQueue.sort((a, b) => {
+        if (a.priority === b.priority) {
+          // Group platforms together for better resource utilization
+          return a.account.platform_source.localeCompare(b.account.platform_source);
+        }
+        return b.priority - a.priority;
+      });
 
       this.metrics.totalAccounts = accounts.length;
-      console.log(`Loaded ${accounts.length} accounts for syncing`);
+      this.metrics.monoAccounts = monoAccounts.length;
+      this.metrics.mtnMomoAccounts = mtnMomoAccounts.length;
+      
+      console.log(`Loaded ${accounts.length} accounts for syncing (${monoAccounts.length} Mono, ${mtnMomoAccounts.length} MTN MoMo)`);
 
     } catch (error) {
       console.error('Failed to load accounts for sync:', error);
@@ -121,10 +175,15 @@ export class SyncOrchestrator {
   }
 
   /**
-   * Calculate sync priority based on account characteristics
+   * Calculate sync priority based on account characteristics and platform
    */
   private calculateSyncPriority(account: SyncAccount): number {
     let priority = 50; // Base priority
+
+    // Platform-specific base priority adjustments
+    if (account.platform_source === 'mono') {
+      priority += 10; // Bank accounts generally have higher priority
+    }
 
     // Higher priority for accounts that have never been synced
     if (!account.last_sync_at) {
@@ -135,13 +194,19 @@ export class SyncOrchestrator {
       priority += Math.min(daysSinceLastSync * 2, 20);
     }
 
+    // Apply exponential backoff for failed accounts
+    const failureCount = account.consecutive_sync_failures || 0;
+    if (failureCount > 0) {
+      priority -= Math.min(failureCount * 5, 25); // Reduce priority for repeatedly failing accounts
+    }
+
     // Lower priority for accounts with authentication errors (they might need manual intervention)
     if (account.sync_status === 'auth_required') {
       priority -= 20;
     }
 
-    // Higher priority for accounts with errors (to retry them)
-    if (account.sync_status === 'error') {
+    // Moderate priority adjustment for accounts with errors (to retry them but not overwhelm)
+    if (account.sync_status === 'error' && failureCount < 3) {
       priority += 10;
     }
 
@@ -149,17 +214,55 @@ export class SyncOrchestrator {
   }
 
   /**
-   * Process the sync queue with concurrency control
+   * Process the sync queue with dual platform concurrency control
    */
   async processQueue(): Promise<SyncMetrics> {
     try {
-      console.log(`Starting queue processing with max concurrency: ${this.maxConcurrentSyncs}`);
+      console.log(`Starting dual platform queue processing - Total: ${this.maxConcurrentSyncs}, Mono: ${this.maxConcurrentMonoSyncs}, MTN MoMo: ${this.maxConcurrentMtnMomoSyncs}`);
 
       while (this.syncQueue.length > 0 || this.activeSyncs.size > 0) {
-        // Start new syncs if we have capacity and items in queue
-        while (this.activeSyncs.size < this.maxConcurrentSyncs && this.syncQueue.length > 0) {
-          const queueItem = this.syncQueue.shift()!;
+        // Count active syncs by platform
+        const activeSyncAccounts = Array.from(this.activeSyncs.keys()).map(id => {
+          const queueItem = this.syncQueue.find(item => item.account.id === id);
+          return queueItem?.account;
+        }).filter(Boolean);
+
+        const activeMonoSyncs = activeSyncAccounts.filter(acc => acc?.platform_source === 'mono').length;
+        const activeMtnMomoSyncs = activeSyncAccounts.filter(acc => acc?.platform_source === 'mtn_momo').length;
+
+        // Start new syncs respecting platform-specific limits
+        while (
+          this.activeSyncs.size < this.maxConcurrentSyncs && 
+          this.syncQueue.length > 0
+        ) {
+          const queueItem = this.syncQueue.find(item => {
+            const platform = item.account.platform_source;
+            
+            if (platform === 'mono') {
+              return activeMonoSyncs < this.maxConcurrentMonoSyncs;
+            } else if (platform === 'mtn_momo') {
+              return activeMtnMomoSyncs < this.maxConcurrentMtnMomoSyncs;
+            }
+            
+            return false;
+          });
+
+          if (!queueItem) {
+            break; // No eligible accounts due to platform limits
+          }
+
+          // Remove the selected item from queue
+          const index = this.syncQueue.indexOf(queueItem);
+          this.syncQueue.splice(index, 1);
+
           await this.startAccountSync(queueItem);
+
+          // Update active sync counts
+          if (queueItem.account.platform_source === 'mono') {
+            activeMonoSyncs++;
+          } else if (queueItem.account.platform_source === 'mtn_momo') {
+            activeMtnMomoSyncs++;
+          }
         }
 
         // Wait for at least one active sync to complete
@@ -179,7 +282,7 @@ export class SyncOrchestrator {
         this.metrics.averageSyncDuration = totalDuration / (this.metrics.successfulSyncs + this.metrics.failedSyncs);
       }
 
-      console.log('Queue processing completed', this.metrics);
+      console.log('Dual platform queue processing completed', this.metrics);
       return this.metrics;
 
     } catch (error) {
@@ -277,17 +380,38 @@ export class SyncOrchestrator {
   }
 
   /**
-   * Handle sync completion/failure
+   * Handle sync completion/failure with platform-specific metrics
    */
   private handleSyncCompletion(accountId: string, result: any, error: any): void {
+    // Determine platform for metrics
+    const account = this.syncQueue.find(item => item.account.id === accountId)?.account ||
+                   Array.from(this.activeSyncs.keys()).find(id => id === accountId);
+    
+    const platform = result?.platform || 'unknown';
+
     if (error) {
       if (this.isAuthenticationError(error)) {
         this.metrics.authErrorSyncs++;
       } else {
         this.metrics.failedSyncs++;
+        
+        // Platform-specific failed sync metrics
+        if (platform === 'mono') {
+          this.metrics.monoFailedSyncs++;
+        } else if (platform === 'mtn_momo') {
+          this.metrics.mtnMomoFailedSyncs++;
+        }
       }
     } else {
       this.metrics.successfulSyncs++;
+      
+      // Platform-specific successful sync metrics
+      if (platform === 'mono') {
+        this.metrics.monoSuccessfulSyncs++;
+      } else if (platform === 'mtn_momo') {
+        this.metrics.mtnMomoSuccessfulSyncs++;
+      }
+      
       if (result?.transactionsSynced) {
         this.metrics.totalTransactionsSynced += result.transactionsSynced;
         // Send sync completion notification if there are new transactions
@@ -363,7 +487,7 @@ export class SyncOrchestrator {
   }
 
   /**
-   * Update account sync status in database
+   * Update account sync status using dual platform function
    */
   private async updateAccountSyncStatus(
     accountId: string, 
@@ -371,20 +495,29 @@ export class SyncOrchestrator {
     error?: any
   ): Promise<void> {
     try {
-      const updateData: any = {
-        sync_status: status,
-        last_sync_attempt: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      // Determine platform for the account
+      const { data: account } = await this.supabaseClient
+        .from('accounts')
+        .select('platform_source')
+        .eq('id', accountId)
+        .single();
 
-      if (status === 'active') {
-        updateData.last_sync_at = new Date().toISOString();
+      if (!account) {
+        console.error(`Account ${accountId} not found for sync status update`);
+        return;
       }
 
-      await this.supabaseClient
-        .from('momo_account_links')
-        .update(updateData)
-        .eq('id', accountId);
+      const platform = account.platform_source || 'mtn_momo'; // Default fallback
+      const errorMessage = error ? (error.message || JSON.stringify(error)) : null;
+
+      await this.supabaseClient.rpc('update_dual_platform_sync_status', {
+        account_id: accountId,
+        platform: platform,
+        new_status: status,
+        transactions_synced: 0,
+        error_message: errorMessage,
+        platform_error: errorMessage
+      });
 
     } catch (updateError) {
       console.error(`Failed to update sync status for account ${accountId}:`, updateError);
@@ -392,93 +525,51 @@ export class SyncOrchestrator {
   }
 
   /**
-   * Perform the actual account sync (reusing existing logic)
+   * Perform the actual account sync using platform-specific workers
    */
   private async performAccountSync(account: SyncAccount): Promise<any> {
-    // This would call the same logic as in accounts-sync function
-    // For now, we'll import/reuse the mtnClient and sync logic
-    const { mtnClient } = await import('./mtn-client.ts');
+    console.log(`Performing ${account.platform_source} sync for account ${account.id}`);
 
-    // Calculate date range for incremental sync
-    const endDate = new Date();
-    const startDate = account.last_sync_at 
-      ? new Date(account.last_sync_at)
-      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default to last 30 days
-
-    // Initialize MTN client
-    await mtnClient.initialize();
-
-    // Fetch transactions from MTN MoMo API
-    const transactions = await mtnClient.getTransactions(
-      account.phone_number,
-      startDate.toISOString(),
-      endDate.toISOString()
-    );
-
-    // Process transactions (similar to accounts-sync logic)
-    let totalTransactions = 0;
-    let newTransactions = 0;
-
-    for (const mtnTransaction of transactions) {
-      // Check if transaction already exists
-      const { data: existingTransaction } = await this.supabaseClient
-        .from('transactions')
-        .select('id')
-        .eq('momo_external_id', mtnTransaction.externalId)
-        .eq('user_id', account.user_id)
-        .single();
-
-      if (!existingTransaction) {
-        // Get default category
-        let categoryId = null;
-        const { data: defaultCategory } = await this.supabaseClient
-          .from('categories')
-          .select('id')
-          .eq('name', 'Uncategorized')
-          .eq('user_id', account.user_id)
-          .single();
-
-        if (defaultCategory) {
-          categoryId = defaultCategory.id;
+    try {
+      if (account.platform_source === 'mono') {
+        if (!this.monoSyncWorker) {
+          throw new Error('Mono sync worker not available');
         }
 
-        // Insert new transaction
-        const transactionData = {
+        return await this.monoSyncWorker.syncAccount({
+          id: account.id,
           user_id: account.user_id,
-          account_id: account.id,
-          category_id: categoryId,
-          amount: parseFloat(mtnTransaction.amount),
-          type: mtnTransaction.amount.startsWith('-') ? 'expense' : 'income',
-          description: mtnTransaction.payerMessage || `MTN MoMo transaction`,
-          transaction_date: mtnTransaction.createdAt || new Date().toISOString(),
-          momo_external_id: mtnTransaction.externalId,
-          momo_reference_id: mtnTransaction.externalId,
-          momo_status: mtnTransaction.status,
-          momo_payer_info: mtnTransaction.payer,
-          momo_financial_transaction_id: mtnTransaction.financialTransactionId,
-          is_synced: true,
-          auto_categorized: false,
-        };
+          account_name: account.account_name,
+          mono_account_id: account.mono_account_id!,
+          last_synced_at: account.last_sync_at,
+          sync_status: account.sync_status,
+          consecutive_sync_failures: account.consecutive_sync_failures
+        });
 
-        const { error: insertError } = await this.supabaseClient
-          .from('transactions')
-          .insert(transactionData);
-
-        if (!insertError) {
-          newTransactions++;
+      } else if (account.platform_source === 'mtn_momo') {
+        if (!this.mtnMomoSyncWorker) {
+          throw new Error('MTN MoMo sync worker not available');
         }
+
+        return await this.mtnMomoSyncWorker.syncAccount({
+          id: account.id,
+          user_id: account.user_id,
+          account_name: account.account_name,
+          phone_number: account.phone_number!,
+          mtn_reference_id: account.mtn_reference_id!,
+          last_synced_at: account.last_sync_at,
+          sync_status: account.sync_status,
+          consecutive_sync_failures: account.consecutive_sync_failures
+        });
+
+      } else {
+        throw new Error(`Unsupported platform source: ${account.platform_source}`);
       }
 
-      totalTransactions++;
+    } catch (error) {
+      console.error(`Platform-specific sync failed for account ${account.id}:`, error);
+      throw error;
     }
-
-    return {
-      accountId: account.id,
-      phoneNumber: account.phone_number,
-      status: 'success',
-      transactionsSynced: newTransactions,
-      totalProcessed: totalTransactions,
-    };
   }
 
   /**

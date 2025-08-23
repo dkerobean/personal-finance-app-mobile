@@ -21,13 +21,17 @@ interface SyncStatusIndicatorProps {
   lastSyncAt?: string | null;
   isOnline?: boolean;
   size?: 'small' | 'medium' | 'large';
+  platformSource?: 'mono' | 'mtn_momo';
+  showPlatformBadge?: boolean;
 }
 
 const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
   syncStatus = 'active',
   lastSyncAt,
   isOnline = true,
-  size = 'medium'
+  size = 'medium',
+  platformSource,
+  showPlatformBadge = false
 }) => {
   const getStatusConfig = () => {
     if (!isOnline) {
@@ -131,18 +135,40 @@ const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
 
   const sizeProps = getSizeProps();
 
-  if (size === 'small') {
+  const getPlatformBadge = () => {
+    if (!showPlatformBadge || !platformSource) return null;
+
+    const platformConfig = {
+      mono: { text: 'Bank', color: '$blue600' },
+      mtn_momo: { text: 'MoMo', color: '$yellow600' }
+    };
+
+    const config = platformConfig[platformSource];
+    
     return (
-      <Badge
-        size={sizeProps.badgeSize}
-        variant={statusConfig.variant}
-        action={statusConfig.action}
-      >
-        <BadgeIcon as={IconComponent} size={sizeProps.iconSize} />
-        <BadgeText size={sizeProps.textSize}>
-          {statusConfig.text}
+      <Badge size="sm" variant="outline" action="muted">
+        <BadgeText size="xs" color={config.color}>
+          {config.text}
         </BadgeText>
       </Badge>
+    );
+  };
+
+  if (size === 'small') {
+    return (
+      <HStack space="xs" alignItems="center">
+        <Badge
+          size={sizeProps.badgeSize}
+          variant={statusConfig.variant}
+          action={statusConfig.action}
+        >
+          <BadgeIcon as={IconComponent} size={sizeProps.iconSize} />
+          <BadgeText size={sizeProps.textSize}>
+            {statusConfig.text}
+          </BadgeText>
+        </Badge>
+        {getPlatformBadge()}
+      </HStack>
     );
   }
 
@@ -159,6 +185,7 @@ const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
             {statusConfig.text}
           </BadgeText>
         </Badge>
+        {getPlatformBadge()}
       </HStack>
       
       {size !== 'small' && lastSyncAt && (
