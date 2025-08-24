@@ -1,43 +1,43 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
+import SplashScreen from '@/components/launch/SplashScreen';
+import OnboardingContainer from '@/components/launch/OnboardingContainer';
+import WelcomeScreen from '@/components/launch/WelcomeScreen';
+
+type LaunchStep = 'splash' | 'onboarding' | 'welcome' | 'navigating';
 
 export default function Index() {
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [currentStep, setCurrentStep] = useState<LaunchStep>('splash');
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated, hydrated, initialize } = useAuthStore();
+  const { isAuthenticated, hasCompletedOnboarding, hydrated, initialize, setOnboardingCompleted } = useAuthStore();
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
         console.log('Starting app initialization...');
         
+        // Show splash screen for at least 2 seconds
+        const splashTimer = setTimeout(() => {
+          setCurrentStep('onboarding');
+        }, 2000);
+        
         // Initialize auth store
         await initialize();
         
-        // Small delay to ensure initialization is complete
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Ensure splash screen shows for at least 2 seconds
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        setIsInitializing(false);
-        
-        // Navigate based on auth state
-        if (isAuthenticated) {
-          console.log('User authenticated, navigating to app');
-          router.replace('/(app)');
-        } else {
-          console.log('User not authenticated, navigating to register');
-          router.replace('/(auth)/register');
-        }
+        return () => clearTimeout(splashTimer);
         
       } catch (initError) {
         console.error('App initialization error:', initError);
         setError(initError instanceof Error ? initError.message : 'Failed to start app');
-        setIsInitializing(false);
         
-        // Fallback to register screen even if there's an error
+        // Fallback to welcome screen even if there's an error
         setTimeout(() => {
-          router.replace('/(auth)/register');
+          setCurrentStep('welcome');
         }, 2000);
       }
     };
@@ -45,63 +45,57 @@ export default function Index() {
     initializeApp();
   }, []);
 
+  useEffect(() => {
+    // Handle navigation after hydration
+    if (hydrated && currentStep === 'navigating') {
+      if (isAuthenticated) {
+        console.log('User authenticated, navigating to app');
+        router.replace('/(app)');
+      } else {
+        console.log('User not authenticated, navigating to register');
+        router.replace('/(auth)/register');
+      }
+    }
+  }, [hydrated, isAuthenticated, currentStep]);
+
+  const handleOnboardingComplete = async () => {
+    await setOnboardingCompleted();
+    setCurrentStep('welcome');
+  };
+
+  const handleWelcomeScreenReady = () => {
+    setCurrentStep('navigating');
+  };
+
   if (error) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Initialization Error</Text>
-        <Text style={styles.errorMessage}>{error}</Text>
-        <Text style={styles.fallbackText}>Redirecting to registration...</Text>
-      </View>
-    );
+    return <WelcomeScreen />;
   }
 
-  if (isInitializing) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#2563eb" />
-        <Text style={styles.loadingText}>Starting Kippo...</Text>
-      </View>
-    );
+  if (currentStep === 'splash') {
+    return <SplashScreen />;
   }
 
-  return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#2563eb" />
-      <Text style={styles.loadingText}>Loading...</Text>
-    </View>
-  );
+  if (currentStep === 'onboarding' && !hasCompletedOnboarding) {
+    return <OnboardingContainer onComplete={handleOnboardingComplete} />;
+  }
+
+  if (currentStep === 'welcome' || currentStep === 'navigating') {
+    // Show welcome screen and trigger navigation when component is ready
+    setTimeout(() => {
+      if (currentStep === 'welcome') {
+        handleWelcomeScreenReady();
+      }
+    }, 100);
+    
+    return <WelcomeScreen />;
+  }
+
+  // Fallback
+  return <SplashScreen />;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  errorText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#dc2626',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  fallbackText: {
-    fontSize: 12,
-    color: '#9ca3af',
-    textAlign: 'center',
   },
 });

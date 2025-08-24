@@ -1,9 +1,10 @@
-export const APP_NAME = 'Kippo';
+export const APP_NAME = 'FinWise';
 
 export const STORAGE_KEYS = {
   AUTH_TOKEN: 'auth_token',
   MTN_MOMO_API_USER: 'mtn_momo_api_user',
   MTN_MOMO_API_KEY: 'mtn_momo_api_key',
+  ONBOARDING_COMPLETED: 'onboarding_completed',
 } as const;
 
 export const VALIDATION_RULES = {

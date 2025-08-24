@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Kippo",
-    "slug": "kippo",
+    "name": "FinWise",
+    "slug": "finwise",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,13 +16,13 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kippo.app",
+      "bundleIdentifier": "com.finwise.app",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera to scan QR codes for bank account verification"
       }
     },
     "android": {
-      "package": "com.kippo.app",
+      "package": "com.finwise.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -33,7 +33,7 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "scheme": "kippo",
+    "scheme": "finwise",
     "plugins": [
       "expo-router",
       "expo-secure-store",
