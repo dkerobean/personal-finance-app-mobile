@@ -5,7 +5,9 @@ import { secureStorage, STORAGE_KEYS } from '@/lib';
 
 interface AuthStore extends AuthState, AuthActions {
   hydrated: boolean;
+  hasCompletedOnboarding: boolean;
   initialize: () => Promise<void>;
+  setOnboardingCompleted: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -14,6 +16,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   isLoading: false,
   isAuthenticated: false,
   hydrated: false,
+  hasCompletedOnboarding: false,
 
   setUser: (user) =>
     set((state) => ({
@@ -37,7 +40,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       session: null,
       isLoading: false,
       isAuthenticated: false,
+      hasCompletedOnboarding: false,
     });
+  },
+
+  setOnboardingCompleted: async () => {
+    try {
+      await secureStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, 'true');
+      set({ hasCompletedOnboarding: true });
+    } catch (error) {
+      console.warn('Failed to save onboarding state:', error);
+    }
   },
 
   initialize: async () => {
@@ -45,6 +58,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
     try {
       console.log('Initializing auth store...');
+      
+      // Check onboarding completion status
+      try {
+        const onboardingCompleted = await secureStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
+        set({ hasCompletedOnboarding: onboardingCompleted === 'true' });
+      } catch (error) {
+        console.warn('Failed to read onboarding state:', error);
+        set({ hasCompletedOnboarding: false });
+      }
       
       // Check for existing session with timeout
       const sessionPromise = supabase.auth.getSession();
