@@ -7,19 +7,19 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import CategorySelector from '@/components/CategorySelector';
 import { Category, CreateBudgetRequest } from '@/types/models';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 
 export default function AddBudgetScreen(): React.ReactElement {
   const { createBudget, isLoading, error, clearError } = useBudgetStore();
-  const { categories, loadCategories } = useCategoryStore();
+  const { categories, loadCategories, isLoading: categoriesLoading, error: categoriesError } = useCategoryStore();
   
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
@@ -31,13 +31,29 @@ export default function AddBudgetScreen(): React.ReactElement {
   const [amountError, setAmountError] = useState<string>('');
   const [categoryError, setCategoryError] = useState<string>('');
 
-  // Filter out categories that already have budgets for this month
-  const availableCategories = categories.filter(category => category.user_id || category.user_id === null);
+  // Show all categories (both user-specific and default/shared categories)
+  const availableCategories = categories;
 
   useEffect(() => {
-    loadCategories();
-    clearError();
+    const loadData = async () => {
+      console.log('AddBudget: Loading categories...');
+      await loadCategories();
+      clearError();
+      console.log('AddBudget: Categories loaded:', categories.length);
+    };
+    
+    loadData();
   }, []);
+  
+  // Debug: Log categories when they change
+  useEffect(() => {
+    console.log('AddBudget: Categories updated:', {
+      count: categories.length,
+      availableCount: availableCategories.length,
+      categoriesLoading,
+      categories: categories.map(c => ({ id: c.id, name: c.name, user_id: c.user_id }))
+    });
+  }, [categories, categoriesLoading]);
 
   const validateForm = (): boolean => {
     let isValid = true;
@@ -124,7 +140,6 @@ export default function AddBudgetScreen(): React.ReactElement {
     return numericValue;
   };
 
-  const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -149,37 +164,51 @@ export default function AddBudgetScreen(): React.ReactElement {
         {/* Category Selection */}
         <View style={styles.section}>
           <Text style={styles.label}>Category *</Text>
-          <View style={[styles.pickerContainer, categoryError && styles.inputError]}>
-            <Picker
-              selectedValue={selectedCategoryId}
-              onValueChange={(itemValue) => {
-                setSelectedCategoryId(itemValue);
-                setCategoryError('');
-              }}
-              style={styles.picker}
-            >
-              <Picker.Item label="Select a category..." value="" />
-              {availableCategories.map((category) => (
-                <Picker.Item
-                  key={category.id}
-                  label={category.name}
-                  value={category.id}
-                />
-              ))}
-            </Picker>
-          </View>
+          <CategorySelector
+            categories={availableCategories}
+            selectedCategoryId={selectedCategoryId}
+            onSelect={(categoryId) => {
+              setSelectedCategoryId(categoryId);
+              setCategoryError('');
+              console.log('AddBudget: Category selected:', categoryId);
+            }}
+            placeholder={
+              categoriesLoading 
+                ? "Loading categories..." 
+                : availableCategories.length === 0 
+                ? "No categories available" 
+                : "Select a category..."
+            }
+            error={!!categoryError}
+            disabled={categoriesLoading}
+          />
+          
+          {/* Loading state */}
+          {categoriesLoading && (
+            <View style={styles.loadingContainer}>
+              <MaterialIcons name="hourglass-empty" size={16} color="#6b7280" />
+              <Text style={styles.loadingText}>Loading categories...</Text>
+            </View>
+          )}
+          
+          {/* Categories error */}
+          {categoriesError && (
+            <View style={styles.errorContainer}>
+              <MaterialIcons name="error-outline" size={16} color="#dc3545" />
+              <Text style={styles.errorText}>{categoriesError}</Text>
+            </View>
+          )}
+          
+          {/* Form validation error */}
           {categoryError && (
             <Text style={styles.errorText}>{categoryError}</Text>
           )}
-          {selectedCategory && (
-            <View style={styles.selectedCategoryPreview}>
-              <MaterialIcons 
-                name={selectedCategory.icon_name as any || 'category'} 
-                size={20} 
-                color="#6b7280" 
-              />
-              <Text style={styles.selectedCategoryText}>{selectedCategory.name}</Text>
-            </View>
+          
+          {/* Debug info */}
+          {!categoriesLoading && availableCategories.length === 0 && !categoriesError && (
+            <Text style={styles.debugText}>
+              Debug: No categories found. Available count: {categories.length}
+            </Text>
           )}
         </View>
 
@@ -306,28 +335,6 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
   },
-  pickerContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  picker: {
-    height: 50,
-  },
-  selectedCategoryPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    padding: 8,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 6,
-  },
-  selectedCategoryText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#374151',
-  },
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -401,5 +408,22 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 50,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  loadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#f59e0b',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 });

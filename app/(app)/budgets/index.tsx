@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
-  SafeAreaView, 
   StyleSheet, 
   ScrollView, 
   RefreshControl, 
   TouchableOpacity,
   Alert
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useBudgetStore } from '@/stores/budgetStore';
@@ -165,8 +165,23 @@ export default function BudgetsScreen(): React.ReactElement {
         {/* Error Display */}
         {error && (
           <View style={styles.errorContainer}>
-            <MaterialIcons name="error-outline" size={24} color="#dc3545" />
-            <Text style={styles.errorText}>{error}</Text>
+            <View style={styles.errorContent}>
+              <MaterialIcons name="error-outline" size={24} color="#dc3545" />
+              <View style={styles.errorTextContainer}>
+                <Text style={styles.errorTitle}>Unable to load budgets</Text>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={styles.retryButton} 
+              onPress={handleRefresh}
+              disabled={isLoading}
+            >
+              <MaterialIcons name="refresh" size={16} color="#2563eb" />
+              <Text style={styles.retryButtonText}>
+                {isLoading ? 'Retrying...' : 'Retry'}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -290,19 +305,50 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#fee2e2',
     padding: 16,
     marginHorizontal: 16,
     marginVertical: 8,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+  },
+  errorContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  errorTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  errorTitle: {
+    color: '#dc2626',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   errorText: {
-    color: '#dc3545',
+    color: '#dc2626',
     fontSize: 14,
-    marginLeft: 8,
-    flex: 1,
+    lineHeight: 20,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2563eb',
+  },
+  retryButtonText: {
+    color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   emptyState: {
     alignItems: 'center',

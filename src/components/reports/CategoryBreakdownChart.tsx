@@ -6,7 +6,6 @@ import {
   Dimensions,
   ScrollView,
 } from 'react-native';
-import { VictoryPie, VictoryContainer, VictoryLabel } from 'victory-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { CategorySpending } from '@/types/models';
 
@@ -144,34 +143,42 @@ const CategoryBreakdownChart: React.FC<CategoryBreakdownChartProps> = ({
       </View>
 
       <View style={styles.chartContainer}>
-        <VictoryPie
-          data={chartData}
-          x="x"
-          y="y"
-          width={chartSize}
-          height={chartSize}
-          innerRadius={chartSize * 0.3}
-          cornerRadius={2}
-          padAngle={2}
-          colorScale={chartData.map(d => d.color)}
-          containerComponent={<VictoryContainer responsive={false} />}
-          labelComponent={<VictoryLabel style={{ fill: "white", fontSize: 14, fontWeight: "bold" }} />}
-          animate={{
-            duration: 1000,
-            onLoad: { duration: 500 }
-          }}
-        />
-        
-        {/* Center label */}
-        <View style={styles.centerLabel}>
-          <MaterialIcons
-            name={type === 'income' ? 'arrow-downward' : 'arrow-upward'}
-            size={24}
-            color={type === 'income' ? '#16a34a' : '#dc2626'}
-          />
-          <Text style={styles.centerLabelText}>
-            {type === 'income' ? 'Income' : 'Expenses'}
-          </Text>
+        <View style={styles.simpleChart}>
+          {chartData.slice(0, 5).map((item, index) => (
+            <View key={`bar-${index}`} style={styles.barContainer}>
+              <View style={styles.barLabelContainer}>
+                <MaterialIcons
+                  name={item.icon as any || 'category'}
+                  size={16}
+                  color={item.color}
+                  style={styles.barIcon}
+                />
+                <Text style={styles.barLabel} numberOfLines={1}>
+                  {item.x}
+                </Text>
+              </View>
+              <View style={styles.barWrapper}>
+                <View
+                  style={[
+                    styles.bar,
+                    {
+                      backgroundColor: item.color,
+                      width: `${(item.y / Math.max(...chartData.map(d => d.y))) * 100}%`,
+                    },
+                  ]}
+                />
+                <Text style={styles.barPercentage}>{item.label}</Text>
+              </View>
+            </View>
+          ))}
+          
+          {chartData.length > 5 && (
+            <View style={styles.moreItemsContainer}>
+              <Text style={styles.moreItemsText}>
+                +{chartData.length - 5} more categories
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -220,26 +227,59 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   chartContainer: {
-    alignItems: 'center',
     paddingVertical: 20,
-    position: 'relative',
+    paddingHorizontal: 20,
   },
-  centerLabel: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [
-      { translateX: -30 },
-      { translateY: -20 }
-    ],
+  simpleChart: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 16,
+  },
+  barContainer: {
+    marginBottom: 16,
+  },
+  barLabelContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 8,
   },
-  centerLabelText: {
+  barIcon: {
+    marginRight: 8,
+  },
+  barLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#374151',
-    marginTop: 4,
+    flex: 1,
+  },
+  barWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 24,
+  },
+  bar: {
+    height: 20,
+    borderRadius: 10,
+    minWidth: 20,
+    flex: 1,
+  },
+  barPercentage: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginLeft: 8,
+    minWidth: 40,
+  },
+  moreItemsContainer: {
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  moreItemsText: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
   legendContainer: {
     maxHeight: 300,
