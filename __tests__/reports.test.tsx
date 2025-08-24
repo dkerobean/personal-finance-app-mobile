@@ -18,12 +18,7 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-// Mock victory-native components
-jest.mock('victory-native', () => ({
-  VictoryPie: () => null,
-  VictoryContainer: () => null,
-  VictoryLabel: () => null,
-}));
+// Victory-native components are no longer used - replaced with custom bar chart
 
 // Mock MaterialIcons
 jest.mock('@expo/vector-icons', () => ({

@@ -7,8 +7,8 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { validateEmail, validatePassword } from '@/lib/validators';
 import { authService } from '@/services/authService';

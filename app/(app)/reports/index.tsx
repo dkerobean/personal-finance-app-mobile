@@ -73,11 +73,11 @@ const ReportsScreen: React.FC = () => {
   const showErrorAlert = () => {
     if (error) {
       Alert.alert(
-        'Error',
-        error,
+        'Unable to Load Financial Report',
+        `We're having trouble loading your financial data. ${error}`,
         [
           {
-            text: 'Retry',
+            text: 'Try Again',
             onPress: handleRefresh,
           },
           {
@@ -102,7 +102,10 @@ const ReportsScreen: React.FC = () => {
       <MaterialIcons name="assessment" size={64} color="#d1d5db" />
       <Text style={styles.emptyTitle}>No Report Data</Text>
       <Text style={styles.emptySubtitle}>
-        Add some transactions to see your monthly financial report
+        Add some transactions to see your monthly financial report and insights.
+      </Text>
+      <Text style={styles.emptyHint}>
+        💡 Connect your bank or mobile money accounts to automatically sync transactions
       </Text>
     </View>
   );
@@ -258,6 +261,14 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 16,
+  },
+  emptyHint: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    lineHeight: 20,
   },
   loadingState: {
     alignItems: 'center',

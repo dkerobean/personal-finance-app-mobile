@@ -17,34 +17,33 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
   clearError: () => set({ error: null }),
 
   loadCategories: async () => {
-    const { setLoading, setError, seedDefaults } = get();
+    const { setLoading, setError } = get();
     
     setLoading(true);
     setError(null);
 
     try {
+      console.log('CategoryStore: Loading categories...');
       const response = await categoriesApi.list();
       
       if (response.error) {
+        console.error('CategoryStore: Failed to load categories:', response.error);
         setError(response.error.message);
         return;
       }
 
       const categories = response.data || [];
+      console.log('CategoryStore: Loaded categories:', categories.length, categories);
       
-      // If no categories exist and not initialized, seed defaults
-      if (categories.length === 0 && !get().initialized) {
-        await seedDefaults();
-        return; // seedDefaults will reload categories
-      }
-
       set({ 
         categories, 
         initialized: true 
       });
+      
+      console.log('CategoryStore: Categories set in store:', categories.length);
     } catch (error) {
+      console.error('CategoryStore: Error loading categories:', error);
       setError('Failed to load categories');
-      console.error('Error loading categories:', error);
     } finally {
       setLoading(false);
     }
@@ -142,18 +141,22 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
     setError(null);
 
     try {
+      console.log('CategoryStore: Seeding default categories...');
       const response = await categoriesApi.seedDefaults();
       
       if (response.error) {
+        console.error('CategoryStore: Failed to seed defaults:', response.error);
         setError(response.error.message);
         return;
       }
 
+      console.log('CategoryStore: Default categories seeded successfully:', response.data?.length || 0);
+      
       // Reload categories to get the seeded categories
       await loadCategories();
     } catch (error) {
+      console.error('CategoryStore: Error seeding default categories:', error);
       setError('Failed to seed default categories');
-      console.error('Error seeding default categories:', error);
     } finally {
       setLoading(false);
     }

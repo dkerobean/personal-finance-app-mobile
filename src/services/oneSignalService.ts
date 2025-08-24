@@ -1,6 +1,9 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
+// Get OneSignal App ID from environment variables
+const ONESIGNAL_APP_ID = Constants.expoConfig?.extra?.oneSignalAppId || process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID;
+
 // Conditional import to avoid native module errors in Expo Go
 let OneSignal: any;
 let isOneSignalAvailable = false;
@@ -10,8 +13,15 @@ try {
   const { OneSignal: OneSignalImport } = require('react-native-onesignal');
   OneSignal = OneSignalImport;
   isOneSignalAvailable = true;
+  
+  // Log configuration status
+  if (ONESIGNAL_APP_ID) {
+    console.log('OneSignal: Configuration found, App ID available');
+  } else {
+    console.warn('OneSignal: App ID not configured in environment variables');
+  }
 } catch (error) {
-  console.warn('OneSignal not available - running in Expo Go or missing native module:', error);
+  console.warn('OneSignal not available - running in Expo Go or missing native module:', error.message || error);
   // Create a mock OneSignal object for development
   OneSignal = {
     initialize: () => {},
@@ -58,13 +68,20 @@ export class OneSignalService {
   private playerId: string | null = null;
 
   private constructor() {
-    // Get OneSignal App ID from environment variable or Expo config
-    const appId = process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID || Constants.expoConfig?.extra?.oneSignalAppId || '';
-    
+    // Use the centralized ONESIGNAL_APP_ID constant
     this.config = {
-      appId,
-      enabled: isOneSignalAvailable && Boolean(appId), // Only enable if OneSignal is available and configured
+      appId: ONESIGNAL_APP_ID || '',
+      enabled: isOneSignalAvailable && Boolean(ONESIGNAL_APP_ID), // Only enable if OneSignal is available and configured
     };
+    
+    // Log configuration status
+    if (this.config.enabled) {
+      console.log('OneSignalService: Initialized successfully with App ID');
+    } else if (!isOneSignalAvailable) {
+      console.warn('OneSignalService: OneSignal SDK not available (running in Expo Go?)');
+    } else if (!ONESIGNAL_APP_ID) {
+      console.warn('OneSignalService: App ID not configured - add EXPO_PUBLIC_ONESIGNAL_APP_ID to your .env file');
+    }
   }
 
   static getInstance(): OneSignalService {

@@ -6,9 +6,30 @@ import { handleApiError, createApiResponse } from '@/services/apiClient';
 export const categoriesApi = {
   async list(): Promise<ApiResponse<Category[]>> {
     try {
+      // Get the current authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        // If not authenticated, only return shared categories
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*')
+          .is('user_id', null)
+          .order('name');
+
+        if (error) {
+          throw error;
+        }
+
+        return createApiResponse(data || []);
+      }
+
+      // Get both user-specific and shared categories
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .or(`user_id.eq.${user.id},user_id.is.null`)
+        .order('user_id', { ascending: false }) // User categories first
         .order('name');
 
       if (error) {

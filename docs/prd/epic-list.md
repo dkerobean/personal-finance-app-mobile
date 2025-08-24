@@ -6,5 +6,7 @@
     * **Goal:** Introduce comprehensive automation through a dual-platform approach: bank accounts via Mono API (leveraging extensive bank coverage) and mobile money via direct MTN MoMo API integration (ensuring authentic mobile money experience).
 * **Epic 3: Budgeting, Reporting & Alerts**
     * **Goal:** Empower users to manage their finances proactively by introducing tools for creating budgets, viewing simple reports, and receiving important financial alerts.
+* **Epic 4: Goal Setting & Savings Management**
+    * **Goal:** Transform the app from a reactive financial management tool into a proactive financial planning platform by introducing savings goals, progress tracking, and intelligent recommendations to build long-term financial health.
 
 ---
