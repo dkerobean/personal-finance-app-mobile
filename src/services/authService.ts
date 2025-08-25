@@ -11,7 +11,7 @@ export interface AuthResult {
 }
 
 export const authService = {
-  async signUp(email: string, password: string, firstName?: string): Promise<AuthResult> {
+  async signUp(email: string, password: string, firstName?: string, mobileNumber?: string): Promise<AuthResult> {
     try {
       console.log('Starting signup for:', email);
       
@@ -23,6 +23,8 @@ export const authService = {
           emailRedirectTo: undefined, // Disable Supabase email confirmation
           data: {
             first_name: firstName, // Store additional user data
+            full_name: firstName,
+            mobile_number: mobileNumber,
           }
         },
       });

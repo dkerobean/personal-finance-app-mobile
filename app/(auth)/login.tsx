@@ -10,9 +10,18 @@ import {
   StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
+import { SvgXml } from 'react-native-svg';
 import { validateEmail } from '@/lib/validators';
 import { authService } from '@/services/authService';
 import { useAuthStore } from '@/stores/authStore';
+
+const EYE_ICON = `<svg width="26" height="20" viewBox="0 0 26 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M13 0C7.5 0 2.73 3.11 1 7.5C2.73 11.89 7.5 15 13 15C18.5 15 23.27 11.89 25 7.5C23.27 3.11 18.5 0 13 0ZM13 12.5C10.24 12.5 8 10.26 8 7.5C8 4.74 10.24 2.5 13 2.5C15.76 2.5 18 4.74 18 7.5C18 10.26 15.76 12.5 13 12.5ZM13 4.5C11.34 4.5 10 5.84 10 7.5C10 9.16 11.34 10.5 13 10.5C14.66 10.5 16 9.16 16 7.5C16 5.84 14.66 4.5 13 4.5Z" fill="#0E3E3E"/>
+</svg>`;
+
+const EYE_OFF_ICON = `<svg width="26" height="11" viewBox="0 0 26 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2.65582 0.82533C8.20704 8.21776 17.0805 8.44331 22.8328 1.49836C23.0127 1.28372 23.1855 1.05816 23.3618 0.82533M13.0071 6.54428V9.9047M18.6112 5.06361L20.4416 8.31235M22.8293 1.49836L25.1746 3.6848M7.39235 5.06361L5.56192 8.31235M3.17073 1.49836L0.825392 3.6848" stroke="#0E3E3E" stroke-width="1.63636" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
 
 interface FormData {
   email: string;
@@ -119,17 +128,7 @@ export default function LoginScreen(): React.ReactElement {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#7C57FF" barStyle="light-content" />
-      
-      {/* Status Bar */}
-      <View style={styles.statusBar}>
-        <Text style={styles.timeText}>16:04</Text>
-        <View style={styles.statusIcons}>
-          <View style={styles.signalIcon} />
-          <View style={styles.wifiIcon} />
-          <View style={styles.batteryIcon} />
-        </View>
-      </View>
+      <StatusBar backgroundColor="#00D09E" barStyle="light-content" />
 
       {/* Green Header Section */}
       <View style={styles.greenHeader}>
@@ -145,7 +144,7 @@ export default function LoginScreen(): React.ReactElement {
               <TextInput
                 style={[styles.input, errors.email ? styles.inputError : null]}
                 placeholder="example@example.com"
-                placeholderTextColor="#093030"
+                placeholderTextColor="#999"
                 value={formData.email}
                 onChangeText={(value) => updateFormData('email', value)}
                 keyboardType="email-address"
@@ -161,8 +160,8 @@ export default function LoginScreen(): React.ReactElement {
             <View style={styles.inputContainer}>
               <TextInput
                 style={[styles.input, styles.passwordInput, errors.password ? styles.inputError : null]}
-                placeholder="●●●●●●●●"
-                placeholderTextColor="#0E3E3E"
+                placeholder="●●●●●●"
+                placeholderTextColor="#999"
                 value={formData.password}
                 onChangeText={(value) => updateFormData('password', value)}
                 secureTextEntry={!showPassword.password}
@@ -173,7 +172,11 @@ export default function LoginScreen(): React.ReactElement {
                 style={styles.eyeButton}
                 onPress={() => togglePasswordVisibility('password')}
               >
-                <View style={styles.eyeIcon} />
+                <SvgXml 
+                  xml={showPassword.password ? EYE_OFF_ICON : EYE_ICON} 
+                  width={24} 
+                  height={16} 
+                />
               </TouchableOpacity>
             </View>
             {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
@@ -205,15 +208,6 @@ export default function LoginScreen(): React.ReactElement {
             <Text style={styles.signUpButtonText}>Sign Up</Text>
           </TouchableOpacity>
 
-          {/* Biometric Text */}
-          <Text style={styles.biometricText}>Use fingerprint to access</Text>
-
-          {/* Social Login Section */}
-          <Text style={styles.socialText}>or sign up with</Text>
-          <View style={styles.socialButtonsContainer}>
-            <View style={styles.socialButton} />
-            <View style={styles.socialButton} />
-          </View>
 
           {/* Footer */}
           <TouchableOpacity onPress={navigateToRegister} style={styles.footerContainer}>
@@ -229,47 +223,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#00D09E',
-  },
-  statusBar: {
-    height: 32,
-    backgroundColor: '#7C57FF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 37,
-  },
-  timeText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    fontFamily: 'League Spartan',
-  },
-  statusIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  signalIcon: {
-    width: 13,
-    height: 11,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 2,
-  },
-  wifiIcon: {
-    width: 15,
-    height: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 58,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  batteryIcon: {
-    width: 17,
-    height: 9,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 1,
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
   },
   greenHeader: {
     paddingTop: 68,
@@ -335,12 +288,6 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -12 }],
     padding: 4,
   },
-  eyeIcon: {
-    width: 24,
-    height: 12,
-    backgroundColor: '#0E3E3E',
-    borderRadius: 2,
-  },
   errorText: {
     color: '#ef4444',
     fontSize: 12,
@@ -395,36 +342,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0E3E3E',
     fontFamily: 'Poppins',
-  },
-  biometricText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0E3E3E',
-    fontFamily: 'Poppins',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  socialText: {
-    fontSize: 13,
-    fontWeight: '300',
-    color: '#093030',
-    fontFamily: 'League Spartan',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  socialButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 32,
-  },
-  socialButton: {
-    width: 33,
-    height: 33,
-    backgroundColor: '#DFF7E2',
-    borderRadius: 16,
-    borderWidth: 1.3,
-    borderColor: '#0E3E3E',
   },
   footerContainer: {
     alignItems: 'center',

@@ -7,7 +7,7 @@ interface OnboardingContainerProps {
 
 const onboardingData = [
   {
-    title: 'Welcome to FinWise',
+    title: 'Welcome to Kippo',
     subtitle: 'Your Smart Finance Companion',
     description: 'Track your expenses effortlessly and take control of your financial future with our intuitive and powerful tools.',
     illustration: require('../../assets/images/hand-money-3d.png'),
