@@ -123,14 +123,9 @@ export default function DashboardScreen(): React.ReactElement {
           </View>
         )}
 
-        {/* Bottom spacing */}
+        {/* Bottom spacing for navigation */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
-
-      {/* Floating Action Button */}
-      <TouchableOpacity style={styles.fab} onPress={handleAddTransaction}>
-        <MaterialIcons name="add" size={28} color="#ffffff" />
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -270,25 +265,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bottomSpacing: {
-    height: 100,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#2563eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
+    height: 120,
   },
 });
