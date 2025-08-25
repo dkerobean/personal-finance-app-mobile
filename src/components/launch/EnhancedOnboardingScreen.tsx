@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity, Image, StatusBar } from 'react-native';
-import { Text } from '@gluestack-ui/themed';
+import { StyleSheet, Image, StatusBar } from 'react-native';
+import { Text, Button, ButtonText, Box, VStack, HStack } from '@gluestack-ui/themed';
 
 interface OnboardingData {
   title: string;
@@ -30,72 +30,74 @@ export default function EnhancedOnboardingScreen({
   const isLastScreen = currentIndex === totalScreens - 1;
 
   return (
-    <View style={styles.container}>
+    <Box style={styles.container}>
       <StatusBar backgroundColor="#7C57FF" barStyle="light-content" />
       
       {/* Status Bar */}
-      <View style={styles.statusBar}>
+      <HStack style={styles.statusBar}>
         <Text style={styles.timeText}>16:04</Text>
-        <View style={styles.statusIcons}>
-          <View style={styles.signalIcon} />
-          <View style={styles.wifiIcon} />
-          <View style={styles.batteryIcon} />
-        </View>
-      </View>
+        <HStack style={styles.statusIcons}>
+          <Box style={styles.signalIcon} />
+          <Box style={styles.wifiIcon} />
+          <Box style={styles.batteryIcon} />
+        </HStack>
+      </HStack>
 
       {/* Header with Skip button */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft} />
+      <HStack style={styles.header}>
+        <Box style={styles.headerLeft} />
         <Text style={styles.screenCounter}>{currentIndex + 1}/{totalScreens}</Text>
-        <TouchableOpacity onPress={onSkip} style={styles.skipButton}>
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
-      </View>
+        <Button onPress={onSkip} style={styles.skipButton} variant="ghost">
+          <ButtonText style={styles.skipText}>Skip</ButtonText>
+        </Button>
+      </HStack>
       
       {/* Main Content */}
-      <View style={styles.content}>
+      <VStack style={styles.content}>
         <Text style={styles.heading}>{data.title}</Text>
         <Text style={styles.subtitle}>{data.subtitle}</Text>
         
-        <View style={styles.curvedBackground}>
-          <View style={styles.illustrationContainer}>
-            <View style={styles.backgroundCircle} />
+        <VStack style={styles.curvedBackground}>
+          <VStack style={styles.illustrationContainer}>
+            <Box style={styles.backgroundCircle} />
             <Image
               source={data.illustration}
               style={styles.illustration}
               resizeMode="contain"
             />
-          </View>
+          </VStack>
           
           <Text style={styles.description}>{data.description}</Text>
           
-          <View style={styles.bottomSection}>
+          <VStack style={styles.bottomSection}>
             {/* Navigation Controls */}
-            <View style={styles.navigationContainer}>
-              <TouchableOpacity 
+            <HStack style={styles.navigationContainer}>
+              <Button 
                 style={[styles.navButton, isFirstScreen && styles.navButtonDisabled]}
                 onPress={onPrevious}
-                disabled={isFirstScreen}
+                isDisabled={isFirstScreen}
+                variant="outline"
               >
-                <Text style={[styles.navButtonText, isFirstScreen && styles.navButtonTextDisabled]}>
+                <ButtonText style={[styles.navButtonText, isFirstScreen && styles.navButtonTextDisabled]}>
                   Previous
-                </Text>
-              </TouchableOpacity>
+                </ButtonText>
+              </Button>
               
-              <TouchableOpacity 
+              <Button 
                 style={styles.nextButton} 
                 onPress={onNext}
+                variant="solid"
               >
-                <Text style={styles.nextButtonText}>
+                <ButtonText style={styles.nextButtonText}>
                   {isLastScreen ? 'Get Started' : 'Next'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+                </ButtonText>
+              </Button>
+            </HStack>
             
             {/* Pagination Dots */}
-            <View style={styles.pagination}>
+            <HStack style={styles.pagination}>
               {Array.from({ length: totalScreens }, (_, index) => (
-                <View 
+                <Box 
                   key={index}
                   style={[
                     styles.dot, 
@@ -103,11 +105,11 @@ export default function EnhancedOnboardingScreen({
                   ]} 
                 />
               ))}
-            </View>
-          </View>
-        </View>
-      </View>
-    </View>
+            </HStack>
+          </VStack>
+        </VStack>
+      </VStack>
+    </Box>
   );
 }
 
