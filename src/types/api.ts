@@ -43,7 +43,7 @@ export interface CreateTransactionRequest {
   amount: number;
   type: 'income' | 'expense';
   category_id: string;
-  transaction_date: string;
+  transaction_date: string; // ISO 8601 datetime string (e.g., "2024-03-15T14:30:00.000Z")
   description?: string;
 }
 
@@ -51,7 +51,7 @@ export interface UpdateTransactionRequest {
   amount?: number;
   type?: 'income' | 'expense';
   category_id?: string;
-  transaction_date?: string;
+  transaction_date?: string; // ISO 8601 datetime string (e.g., "2024-03-15T14:30:00.000Z")
   description?: string;
 }
 
@@ -61,7 +61,7 @@ export interface TransactionResponse {
   amount: number;
   type: 'income' | 'expense';
   category_id: string;
-  transaction_date: string;
+  transaction_date: string; // ISO 8601 datetime string (e.g., "2024-03-15T14:30:00.000Z")
   description?: string;
   created_at: string;
   updated_at: string;

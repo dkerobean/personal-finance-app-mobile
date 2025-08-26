@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -14,14 +14,18 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { isSyncedTransaction } from '@/services/api/transactions';
-import SyncedTransactionBadge from '@/components/SyncedTransactionBadge';
-import InstitutionBadge from '@/components/InstitutionBadge';
-import PlatformSourceIndicator from '@/components/PlatformSourceIndicator';
-import CategorySuggestionBadge from '@/components/transactions/CategorySuggestionBadge';
+import TransactionSummaryCards from '@/components/transactions/TransactionSummaryCards';
+import TotalBalanceCard from '@/components/transactions/TotalBalanceCard';
+import TransactionItem from '@/components/transactions/TransactionItem';
+import NotableTransactions from '@/components/transactions/NotableTransactions';
+import AverageTransactions from '@/components/transactions/AverageTransactions';
 import type { Transaction, TransactionWithAccount } from '@/types/models';
+import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 
 export default function TransactionsScreen() {
   const router = useRouter();
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  
   const {
     transactions,
     isLoading,
@@ -37,8 +41,17 @@ export default function TransactionsScreen() {
 
   useEffect(() => {
     loadTransactions();
-    loadCategories(); // Ensure categories are loaded for display
+    loadCategories();
   }, []);
+
+  // Set default selected month to current month when transactions load
+  useEffect(() => {
+    if (transactions.length > 0 && !selectedMonth) {
+      const currentDate = new Date();
+      const currentMonth = currentDate.toLocaleDateString('en-US', { month: 'long' });
+      setSelectedMonth(currentMonth);
+    }
+  }, [transactions, selectedMonth]);
 
   const handleDeletePress = (transaction: Transaction) => {
     if (isSyncedTransaction(transaction)) {
@@ -83,6 +96,72 @@ export default function TransactionsScreen() {
   const toggleSortOrder = () => {
     setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
   };
+
+  // Calculate summary data and group transactions by month
+  const summaryData = useMemo(() => {
+    const filteredTransactions = selectedMonth
+      ? transactions.filter(t => {
+          const transactionMonth = new Date(t.transaction_date).toLocaleDateString('en-US', { month: 'long' });
+          return transactionMonth === selectedMonth;
+        })
+      : transactions;
+
+    const totalIncome = filteredTransactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalExpense = filteredTransactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalBalance = totalIncome - totalExpense;
+
+    // Group transactions by month
+    const groupedTransactions = filteredTransactions.reduce((groups, transaction) => {
+      const month = new Date(transaction.transaction_date).toLocaleDateString('en-US', { month: 'long' });
+      if (!groups[month]) {
+        groups[month] = [];
+      }
+      groups[month].push(transaction);
+      return groups;
+    }, {} as Record<string, Transaction[]>);
+
+    // Sort months by most recent first
+    const sortedMonths = Object.keys(groupedTransactions).sort((a, b) => {
+      const monthOrder = ['January', 'February', 'March', 'April', 'May', 'June', 
+                         'July', 'August', 'September', 'October', 'November', 'December'];
+      return monthOrder.indexOf(b) - monthOrder.indexOf(a);
+    });
+
+    return { totalIncome, totalExpense, totalBalance, filteredTransactions, groupedTransactions, sortedMonths };
+  }, [transactions, selectedMonth]);
+
+  // Get available months from transactions
+  const availableMonths = useMemo(() => {
+    const monthsWithDates = transactions.map(t => {
+      const date = new Date(t.transaction_date);
+      return {
+        month: date.toLocaleDateString('en-US', { month: 'long' }),
+        year: date.getFullYear(),
+        monthIndex: date.getMonth(),
+      };
+    });
+
+    // Remove duplicates by month-year combination and sort by most recent
+    const uniqueMonths = Array.from(
+      new Map(
+        monthsWithDates.map(item => [`${item.month}-${item.year}`, item])
+      ).values()
+    );
+
+    return uniqueMonths
+      .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.monthIndex - a.monthIndex;
+      })
+      .slice(0, 6) // Show max 6 recent months
+      .map(item => item.month);
+  }, [transactions]);
 
   // Helper functions for platform-specific information
   const getTransactionPlatformName = (transaction: Transaction): string => {
@@ -134,193 +213,155 @@ export default function TransactionsScreen() {
 
   if (isLoading && transactions.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007bff" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading transactions...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Transactions</Text>
-        <TouchableOpacity onPress={toggleSortOrder} style={styles.sortButton}>
-          <MaterialIcons 
-            name={sortOrder === 'desc' ? 'arrow-downward' : 'arrow-upward'} 
-            size={24} 
-            color="#007bff" 
-          />
-          <Text style={styles.sortText}>Date</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <MaterialIcons name="arrow-back-ios" size={19} color={COLORS.primaryLight} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Transaction</Text>
+        <TouchableOpacity style={styles.notificationButton}>
+          <MaterialIcons name="notifications-none" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity onPress={clearError} style={styles.errorCloseButton}>
-                <MaterialIcons name="close" size={20} color="#dc3545" />
-              </TouchableOpacity>
-            </View>
-          )}
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity onPress={clearError} style={styles.errorCloseButton}>
+              <MaterialIcons name="close" size={20} color="#dc3545" />
+            </TouchableOpacity>
+          </View>
+        )}
 
-          {transactions.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <MaterialIcons name="receipt-long" size={64} color="#9ca3af" />
-              <Text style={styles.emptyText}>
-                No transactions yet.{'\n'}Add your first transaction to get started.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.transactionsList}>
-              {transactions.map((transaction) => (
-                <TouchableOpacity 
-                  key={transaction.id} 
-                  style={styles.transactionItem}
-                  onPress={() => handleTransactionPress(transaction.id)}
-                >
-                  <View style={styles.transactionInfo}>
-                    <View style={styles.iconContainer}>
-                      <MaterialIcons
-                        name={transaction.category?.icon_name as any || 'category'}
-                        size={24}
-                        color={transaction.type === 'income' ? '#059669' : '#dc3545'}
+        {/* Summary Cards */}
+        <TransactionSummaryCards 
+          totalIncome={summaryData.totalIncome}
+          totalExpense={summaryData.totalExpense}
+        />
+
+        {/* Total Balance Card */}
+        <TotalBalanceCard totalBalance={summaryData.totalBalance} />
+
+        {/* Month Filter - Hidden for now, calendar icon handles selection */}
+
+        {/* Light Background Container */}
+        <View style={styles.transactionsContainer}>
+          {/* Calendar Icon - Top Right */}
+          <TouchableOpacity 
+            style={styles.calendarIconButton}
+            onPress={() => {
+              const currentIndex = availableMonths.indexOf(selectedMonth);
+              const nextIndex = (currentIndex + 1) % availableMonths.length;
+              setSelectedMonth(availableMonths[nextIndex] || availableMonths[0]);
+            }}
+          >
+            <MaterialIcons name="event" size={24} color={COLORS.white} />
+          </TouchableOpacity>
+
+          {/* All Transactions List - Moved to top */}
+          <View style={styles.transactionsList}>
+            {summaryData.filteredTransactions.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <MaterialIcons name="receipt-long" size={64} color={COLORS.textTertiary} />
+                <Text style={styles.emptyText}>
+                  {selectedMonth ? `No transactions in ${selectedMonth}` : 'No transactions yet.'}{'\n'}
+                  {!selectedMonth && 'Add your first transaction to get started.'}
+                </Text>
+              </View>
+            ) : (
+              <>
+                {summaryData.sortedMonths.map((month) => (
+                  <View key={month} style={styles.monthGroup}>
+                    <Text style={styles.monthHeader}>{month}</Text>
+                    {summaryData.groupedTransactions[month].map((transaction, index) => (
+                      <TransactionItem
+                        key={transaction.id}
+                        transaction={transaction}
+                        onPress={handleTransactionPress}
+                        showSeparator={index < summaryData.groupedTransactions[month].length - 1}
                       />
-                    </View>
-                    <View style={styles.transactionDetails}>
-                      <View style={styles.categoryRow}>
-                        <Text style={styles.transactionCategory}>
-                          {transaction.category?.name || 'Unknown Category'}
-                        </Text>
-                        <View style={styles.badgeRow}>
-                          <InstitutionBadge 
-                            institutionName={getInstitutionDisplayName(transaction)}
-                            accountType={getTransactionAccountType(transaction)}
-                            size="small"
-                          />
-                          <PlatformSourceIndicator 
-                            accountType={getTransactionAccountType(transaction)}
-                            size="small"
-                          />
-                          <CategorySuggestionBadge 
-                            isAutoCategorized={!!transaction.auto_categorized}
-                            confidence={transaction.categorization_confidence ? transaction.categorization_confidence * 100 : undefined}
-                            size="small"
-                          />
-                        </View>
-                      </View>
-                      <Text style={styles.transactionDate}>
-                        {formatDate(transaction.transaction_date)}
-                      </Text>
-                      {transaction.description && (
-                        <Text style={styles.transactionDescription} numberOfLines={1}>
-                          {transaction.description}
-                        </Text>
-                      )}
-                    </View>
+                    ))}
                   </View>
+                ))}
+              </>
+            )}
+          </View>
 
-                  <View style={styles.amountContainer}>
-                    <Text 
-                      style={[
-                        styles.transactionAmount,
-                        { color: transaction.type === 'income' ? '#059669' : '#dc3545' }
-                      ]}
-                    >
-                      {formatAmount(transaction.amount, transaction.type)}
-                    </Text>
-                    {!isSyncedTransaction(transaction) ? (
-                      <TouchableOpacity 
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          handleDeletePress(transaction);
-                        }}
-                        style={styles.deleteButton}
-                      >
-                        <MaterialIcons name="delete" size={16} color="#dc3545" />
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity 
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          handleDeletePress(transaction);
-                        }}
-                        style={styles.editButton}
-                      >
-                        <MaterialIcons name="edit" size={16} color="#6b7280" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+          {/* Notable Transactions - Moved to bottom */}
+          <NotableTransactions 
+            transactions={summaryData.filteredTransactions}
+            onTransactionPress={handleTransactionPress}
+          />
+
+          {/* Average Transactions - Moved to bottom */}
+          <View style={styles.bottomSection}>
+            <AverageTransactions 
+              transactions={summaryData.filteredTransactions}
+              selectedMonth={selectedMonth}
+            />
+          </View>
         </View>
       </ScrollView>
 
+      {/* FAB */}
       <TouchableOpacity style={styles.fab} onPress={handleCreatePress}>
-        <MaterialIcons name="add" size={24} color="#fff" />
+        <MaterialIcons name="add" size={24} color={COLORS.white} />
       </TouchableOpacity>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: COLORS.backgroundMain,
+    paddingTop: 44, // Status bar height
   },
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: 37,
+    paddingVertical: 16,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  backButton: {
     padding: 8,
   },
-  sortText: {
-    marginLeft: 4,
-    color: '#007bff',
-    fontSize: 14,
-    fontWeight: '500',
+  title: {
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    fontFamily: 'Poppins',
+  },
+  notificationButton: {
+    width: 30,
+    height: 30,
+    backgroundColor: COLORS.backgroundInput,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,
-  },
-  content: {
-    padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
   },
   errorContainer: {
     backgroundColor: '#fee2e2',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 16,
+    marginHorizontal: 37,
+    marginVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -332,97 +373,87 @@ const styles = StyleSheet.create({
   errorCloseButton: {
     padding: 4,
   },
+  transactionsContainer: {
+    marginTop: 30,
+    marginHorizontal: 0,
+    backgroundColor: COLORS.primaryLight, // Light mint/cream background
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    paddingTop: 30,
+    paddingHorizontal: 0,
+    minHeight: 400,
+    position: 'relative',
+  },
+  calendarIconButton: {
+    position: 'absolute',
+    top: 20,
+    right: 30,
+    width: 40,
+    height: 40,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  transactionsList: {
+    marginBottom: 20, // Reduced since we have sections below
+  },
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    fontFamily: 'Poppins',
+    paddingHorizontal: 37,
+    marginBottom: SPACING.md,
+  },
+  monthGroup: {
+    marginBottom: 30,
+  },
+  monthHeader: {
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    fontFamily: 'Poppins',
+    paddingHorizontal: 37,
+    marginBottom: 20,
+    marginTop: 10,
+  },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 64,
+    paddingHorizontal: 37,
   },
   emptyText: {
-    color: '#9ca3af',
+    color: COLORS.textTertiary,
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.sizes.lg,
     marginTop: 16,
+    fontFamily: 'Poppins',
   },
-  transactionsList: {
-    gap: 8,
-  },
-  transactionItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  transactionInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  loadingContainer: {
     flex: 1,
-  },
-  iconContainer: {
-    backgroundColor: '#eff6ff',
-    padding: 8,
-    borderRadius: 20,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
-  },
-  transactionDetails: {
-    flex: 1,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  badgeRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    flexWrap: 'wrap',
   },
-  transactionCategory: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
+  loadingText: {
+    marginTop: 16,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    color: COLORS.textSecondary,
+    fontFamily: 'Poppins',
   },
-  transactionDate: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  transactionDescription: {
-    fontSize: 14,
-    color: '#9ca3af',
-    marginTop: 2,
-  },
-  amountContainer: {
-    alignItems: 'flex-end',
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    marginTop: 4,
-    padding: 4,
-  },
-  editButton: {
-    marginTop: 4,
-    padding: 4,
+  bottomSection: {
+    marginBottom: 140, // Space for FAB and bottom navigation
   },
   fab: {
     position: 'absolute',
-    right: 20,
-    bottom: 20,
+    right: 37,
+    bottom: 120, // Above bottom navigation
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#007bff',
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 8,

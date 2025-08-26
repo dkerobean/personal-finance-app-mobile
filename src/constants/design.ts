@@ -126,3 +126,49 @@ export const MODAL = {
   backdropOpacity: 0.5,
   backdropColor: '#000000',
 };
+
+export const TRANSACTIONS = {
+  // Summary cards
+  summaryCard: {
+    width: 171,
+    height: 101,
+    borderRadius: 14.888,
+    padding: 16,
+    gap: 8,
+  },
+  
+  // Balance card
+  balanceCard: {
+    width: 357,
+    height: 75,
+    borderRadius: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+  },
+  
+  // Transaction item
+  transactionItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 37,
+    iconSize: 57,
+    iconBorderRadius: 22,
+    separatorColor: '#00D09E',
+    separatorWidth: 1,
+  },
+  
+  // Category icon colors
+  categoryColors: {
+    salary: '#6DB6FE',
+    groceries: '#3299FF', 
+    rent: '#0068FF',
+    transport: '#3299FF',
+    food: '#6DB6FE',
+  },
+  
+  // Month filter
+  monthFilter: {
+    buttonPadding: 12,
+    borderRadius: 8,
+    gap: 16,
+  },
+};
