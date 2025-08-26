@@ -28,8 +28,10 @@ export default function CreateTransactionScreen() {
   const [type, setType] = useState<TransactionType>('expense');
   const [categoryId, setCategoryId] = useState('');
   const [date, setDate] = useState(new Date());
+  const [time, setTime] = useState(new Date());
   const [description, setDescription] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   // Form validation errors
@@ -76,11 +78,21 @@ export default function CreateTransactionScreen() {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    // Combine date and time into a single datetime
+    const combinedDateTime = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      time.getHours(),
+      time.getMinutes(),
+      time.getSeconds()
+    );
+
     const success = await createTransaction(
       parseFloat(amount),
       type,
       categoryId,
-      date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+      combinedDateTime.toISOString(), // Full ISO datetime string
       description.trim() || undefined
     );
     
@@ -117,11 +129,26 @@ export default function CreateTransactionScreen() {
     }
   };
 
+  const handleTimeChange = (event: any, selectedTime?: Date) => {
+    setShowTimePicker(Platform.OS === 'ios');
+    if (selectedTime) {
+      setTime(selectedTime);
+    }
+  };
+
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
+    });
+  };
+
+  const formatTime = (time: Date) => {
+    return time.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
     });
   };
 
@@ -218,19 +245,31 @@ export default function CreateTransactionScreen() {
               )}
             </View>
 
-            {/* Date Picker */}
+            {/* Date & Time Pickers */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Date</Text>
-              <TouchableOpacity
-                style={styles.pickerButton}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <View style={styles.pickerContent}>
-                  <MaterialIcons name="event" size={20} color="#007bff" />
-                  <Text style={styles.pickerText}>{formatDate(date)}</Text>
-                </View>
-                <MaterialIcons name="keyboard-arrow-down" size={24} color="#666" />
-              </TouchableOpacity>
+              <Text style={styles.label}>Date & Time</Text>
+              <View style={styles.dateTimeContainer}>
+                <TouchableOpacity
+                  style={[styles.pickerButton, styles.dateTimeButton]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <View style={styles.pickerContent}>
+                    <MaterialIcons name="event" size={20} color="#007bff" />
+                    <Text style={styles.pickerText}>{formatDate(date)}</Text>
+                  </View>
+                  <MaterialIcons name="keyboard-arrow-down" size={20} color="#666" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.pickerButton, styles.dateTimeButton]}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <View style={styles.pickerContent}>
+                    <MaterialIcons name="access-time" size={20} color="#007bff" />
+                    <Text style={styles.pickerText}>{formatTime(time)}</Text>
+                  </View>
+                  <MaterialIcons name="keyboard-arrow-down" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Description (Optional) */}
@@ -287,6 +326,16 @@ export default function CreateTransactionScreen() {
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={handleDateChange}
+        />
+      )}
+
+      {/* Time Picker Modal */}
+      {showTimePicker && (
+        <DateTimePicker
+          value={time}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleTimeChange}
         />
       )}
 
@@ -456,6 +505,13 @@ const styles = StyleSheet.create({
   pickerPlaceholder: {
     fontSize: 16,
     color: '#9ca3af',
+  },
+  dateTimeContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dateTimeButton: {
+    flex: 1,
   },
   buttonContainer: {
     gap: 12,

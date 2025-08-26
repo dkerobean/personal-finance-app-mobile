@@ -24,15 +24,17 @@ export default function TotalBalanceCard({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 37,
-    marginTop: 20,
+    marginTop: 25,
+    marginBottom: 20,
+    alignItems: 'center',
   },
   card: {
-    width: TRANSACTIONS.balanceCard.width,
-    height: TRANSACTIONS.balanceCard.height,
+    width: '100%',
+    height: 100,
     backgroundColor: COLORS.primaryLight,
-    borderRadius: TRANSACTIONS.balanceCard.borderRadius,
-    paddingVertical: TRANSACTIONS.balanceCard.paddingVertical,
-    paddingHorizontal: TRANSACTIONS.balanceCard.paddingHorizontal,
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
     ...SHADOWS.sm,
@@ -45,10 +47,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   amount: {
-    fontSize: TYPOGRAPHY.sizes.xxxl,
+    fontSize: 32,
     fontWeight: TYPOGRAPHY.weights.bold,
     color: COLORS.textPrimary,
     fontFamily: 'Poppins',
-    lineHeight: 36,
+    lineHeight: 40,
   },
 });

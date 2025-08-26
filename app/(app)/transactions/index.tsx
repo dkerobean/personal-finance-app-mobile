@@ -7,7 +7,8 @@ import {
   Alert, 
   ActivityIndicator, 
   StyleSheet,
-  SafeAreaView 
+  SafeAreaView,
+  Modal 
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -25,6 +26,7 @@ import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 export default function TransactionsScreen() {
   const router = useRouter();
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [showMonthSelector, setShowMonthSelector] = useState(false);
   
   const {
     transactions,
@@ -245,30 +247,31 @@ export default function TransactionsScreen() {
           </View>
         )}
 
+        {/* Total Balance Card */}
+        <TotalBalanceCard totalBalance={summaryData.totalBalance} />
+
         {/* Summary Cards */}
         <TransactionSummaryCards 
           totalIncome={summaryData.totalIncome}
           totalExpense={summaryData.totalExpense}
         />
 
-        {/* Total Balance Card */}
-        <TotalBalanceCard totalBalance={summaryData.totalBalance} />
-
         {/* Month Filter - Hidden for now, calendar icon handles selection */}
 
         {/* Light Background Container */}
         <View style={styles.transactionsContainer}>
-          {/* Calendar Icon - Top Right */}
-          <TouchableOpacity 
-            style={styles.calendarIconButton}
-            onPress={() => {
-              const currentIndex = availableMonths.indexOf(selectedMonth);
-              const nextIndex = (currentIndex + 1) % availableMonths.length;
-              setSelectedMonth(availableMonths[nextIndex] || availableMonths[0]);
-            }}
-          >
-            <MaterialIcons name="event" size={24} color={COLORS.white} />
-          </TouchableOpacity>
+          {/* Month Header with Calendar Icon */}
+          <View style={styles.monthHeaderContainer}>
+            <Text style={styles.monthHeaderText}>
+              {selectedMonth || 'All Transactions'}
+            </Text>
+            <TouchableOpacity 
+              style={styles.calendarIconButton}
+              onPress={() => setShowMonthSelector(true)}
+            >
+              <MaterialIcons name="event" size={24} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
 
           {/* All Transactions List - Moved to top */}
           <View style={styles.transactionsList}>
@@ -284,7 +287,6 @@ export default function TransactionsScreen() {
               <>
                 {summaryData.sortedMonths.map((month) => (
                   <View key={month} style={styles.monthGroup}>
-                    <Text style={styles.monthHeader}>{month}</Text>
                     {summaryData.groupedTransactions[month].map((transaction, index) => (
                       <TransactionItem
                         key={transaction.id}
@@ -319,6 +321,74 @@ export default function TransactionsScreen() {
       <TouchableOpacity style={styles.fab} onPress={handleCreatePress}>
         <MaterialIcons name="add" size={24} color={COLORS.white} />
       </TouchableOpacity>
+
+      {/* Month Selection Modal */}
+      <Modal
+        visible={showMonthSelector}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMonthSelector(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Month</Text>
+              <TouchableOpacity onPress={() => setShowMonthSelector(false)}>
+                <MaterialIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.monthList}>
+              {/* All Transactions Option */}
+              <TouchableOpacity
+                style={[
+                  styles.monthItem,
+                  !selectedMonth && styles.monthItemSelected
+                ]}
+                onPress={() => {
+                  setSelectedMonth('');
+                  setShowMonthSelector(false);
+                }}
+              >
+                <Text style={[
+                  styles.monthText,
+                  !selectedMonth && styles.monthTextSelected
+                ]}>
+                  All Transactions
+                </Text>
+                {!selectedMonth && (
+                  <MaterialIcons name="check" size={20} color={COLORS.primary} />
+                )}
+              </TouchableOpacity>
+              
+              {/* Available Months */}
+              {availableMonths.map((month) => (
+                <TouchableOpacity
+                  key={month}
+                  style={[
+                    styles.monthItem,
+                    selectedMonth === month && styles.monthItemSelected
+                  ]}
+                  onPress={() => {
+                    setSelectedMonth(month);
+                    setShowMonthSelector(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.monthText,
+                    selectedMonth === month && styles.monthTextSelected
+                  ]}>
+                    {month}
+                  </Text>
+                  {selectedMonth === month && (
+                    <MaterialIcons name="check" size={20} color={COLORS.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -384,17 +454,27 @@ const styles = StyleSheet.create({
     minHeight: 400,
     position: 'relative',
   },
+  monthHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 37,
+    paddingVertical: 20,
+    paddingTop: 30,
+  },
+  monthHeaderText: {
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    fontFamily: 'Poppins',
+  },
   calendarIconButton: {
-    position: 'absolute',
-    top: 20,
-    right: 30,
     width: 40,
     height: 40,
     backgroundColor: COLORS.primary,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1,
   },
   transactionsList: {
     marginBottom: 20, // Reduced since we have sections below
@@ -461,5 +541,54 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '60%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    fontFamily: 'Poppins',
+  },
+  monthList: {
+    maxHeight: 300,
+  },
+  monthItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  monthItemSelected: {
+    backgroundColor: '#eff6ff',
+  },
+  monthText: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
+    fontFamily: 'Poppins',
+  },
+  monthTextSelected: {
+    color: COLORS.primary,
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
 });

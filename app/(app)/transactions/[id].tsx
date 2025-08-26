@@ -99,6 +99,23 @@ export default function TransactionDetailScreen() {
     });
   };
 
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return {
+      date: date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }),
+      time: date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    };
+  };
+
   const formatAmount = (amount: number, type: 'income' | 'expense') => {
     const sign = type === 'income' ? '+' : '-';
     return `${sign}$${amount.toFixed(2)}`;
@@ -179,11 +196,16 @@ export default function TransactionDetailScreen() {
             <View style={styles.detailItem}>
               <View style={styles.detailLabel}>
                 <MaterialIcons name="event" size={20} color="#666" />
-                <Text style={styles.detailLabelText}>Date</Text>
+                <Text style={styles.detailLabelText}>Date & Time</Text>
               </View>
-              <Text style={styles.detailValueText}>
-                {formatDate(transaction.transaction_date)}
-              </Text>
+              <View style={styles.dateTimeValue}>
+                <Text style={styles.detailValueText}>
+                  {formatDateTime(transaction.transaction_date).date}
+                </Text>
+                <Text style={styles.timeText}>
+                  {formatDateTime(transaction.transaction_date).time}
+                </Text>
+              </View>
             </View>
 
             {transaction.description && (
@@ -332,6 +354,14 @@ const styles = StyleSheet.create({
   detailValueText: {
     fontSize: 16,
     color: '#111827',
+  },
+  dateTimeValue: {
+    gap: 4,
+  },
+  timeText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
   },
   actionSection: {
     gap: 12,

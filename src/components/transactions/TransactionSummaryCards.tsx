@@ -42,16 +42,19 @@ export default function TransactionSummaryCards({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: 15,
     paddingHorizontal: 37,
+    marginBottom: 10,
   },
   card: {
-    width: TRANSACTIONS.summaryCard.width,
-    height: TRANSACTIONS.summaryCard.height,
-    borderRadius: TRANSACTIONS.summaryCard.borderRadius,
-    padding: TRANSACTIONS.summaryCard.padding,
+    flex: 1,
+    height: 80,
+    borderRadius: 16,
+    padding: 16,
     justifyContent: 'space-between',
+    maxWidth: 160,
     ...SHADOWS.sm,
   },
   incomeCard: {
