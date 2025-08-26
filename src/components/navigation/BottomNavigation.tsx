@@ -3,6 +3,7 @@ import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, usePathname } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '@/constants/design';
 
 interface TabItem {
   key: string;
@@ -49,9 +50,21 @@ export default function BottomNavigation(): React.ReactElement {
   const pathname = usePathname();
 
   const isActiveTab = (route: string): boolean => {
+    // Handle home route specifically
     if (route === '/') {
-      return pathname === '/' || pathname === '/index';
+      return pathname === '/' || pathname === '/index' || pathname === '/(app)' || pathname === '/(app)/index';
     }
+    
+    // Handle nested routes more precisely
+    if (route === '/settings/categories') {
+      return pathname.includes('/categories');
+    }
+    
+    if (route === '/settings') {
+      return pathname === '/settings' || (pathname.includes('/settings') && !pathname.includes('/categories'));
+    }
+    
+    // For other routes, check if pathname starts with the route
     return pathname.startsWith(route);
   };
 
@@ -64,7 +77,7 @@ export default function BottomNavigation(): React.ReactElement {
   };
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom + 10 }]}>
+    <View style={[styles.floatingContainer, { bottom: 0 }]}>
       <View style={styles.tabBar}>
         {tabs.map((tab) => {
           const isActive = isActiveTab(tab.route);
@@ -79,12 +92,9 @@ export default function BottomNavigation(): React.ReactElement {
               <View style={[styles.tabContent, isActive && styles.activeTabContent]}>
                 <MaterialIcons
                   name={tab.icon}
-                  size={24}
-                  color={isActive ? '#00D09E' : '#9CA3AF'}
+                  size={35}
+                  color={COLORS.textPrimary}
                 />
-                <Text style={[styles.tabLabel, isActive && styles.activeTabLabel]}>
-                  {tab.label}
-                </Text>
               </View>
             </TouchableOpacity>
           );
@@ -95,49 +105,52 @@ export default function BottomNavigation(): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
+  floatingContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 108,
+    backgroundColor: COLORS.backgroundInput,
+    borderTopLeftRadius: 70,
+    borderTopRightRadius: 70,
+    ...SHADOWS.lg,
+    elevation: 8,
   },
   tabBar: {
+    flex: 1,
     flexDirection: 'row',
-    paddingTop: 12,
-    paddingHorizontal: 8,
+    paddingHorizontal: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 25,
   },
   tabItem: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    minHeight: 56,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
   },
   activeTabContent: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: COLORS.primary,
+    borderRadius: 22,
+    width: 65,
+    height: 61,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#9CA3AF',
+    fontSize: 10,
+    fontWeight: '400',
+    color: COLORS.textPrimary,
     marginTop: 4,
     textAlign: 'center',
   },
   activeTabLabel: {
-    color: '#00D09E',
+    color: COLORS.white,
     fontWeight: '600',
   },
 });

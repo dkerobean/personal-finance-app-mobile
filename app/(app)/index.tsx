@@ -9,6 +9,7 @@ import { authService } from '@/services/authService';
 import TotalBalanceCard from '@/components/dashboard/TotalBalanceCard';
 import RecentTransactions from '@/components/dashboard/RecentTransactions';
 import AccountsOverviewCard from '@/components/dashboard/AccountsOverviewCard';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '@/constants/design';
 
 export default function DashboardScreen(): React.ReactElement {
   const { user, logout } = useAuthStore();
@@ -58,27 +59,30 @@ export default function DashboardScreen(): React.ReactElement {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
-        }
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.title}>Dashboard</Text>
-            <Text style={styles.welcomeText}>Welcome back, {user?.email?.split('@')[0] || 'User'}!</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.settingsButton} onPress={handleSettings}>
-              <MaterialIcons name="settings" size={24} color="#6b7280" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.profileButton} onPress={handleSignOut}>
-              <MaterialIcons name="account-circle" size={32} color="#6b7280" />
-            </TouchableOpacity>
-          </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.title}>Hi, Welcome Back</Text>
+          <Text style={styles.welcomeText}>Good Morning</Text>
         </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.notificationButton} onPress={() => console.log('Notifications')}>
+            <View style={styles.notificationIconContainer}>
+              <MaterialIcons name="notifications-none" size={20} color={COLORS.textPrimary} />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Main Content Container */}
+      <View style={styles.contentContainer}>
+        <ScrollView 
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
+          }
+        >
 
         {/* Total Balance Card */}
         <TotalBalanceCard transactions={transactions} isLoading={isLoading} />
@@ -123,9 +127,11 @@ export default function DashboardScreen(): React.ReactElement {
           </View>
         )}
 
-        {/* Bottom spacing for navigation */}
-        <View style={styles.bottomSpacing} />
-      </ScrollView>
+          {/* Bottom spacing for navigation */}
+          <View style={styles.bottomSpacing} />
+        </ScrollView>
+      </View>
+
     </SafeAreaView>
   );
 }
@@ -133,138 +139,156 @@ export default function DashboardScreen(): React.ReactElement {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-  },
-  scrollView: {
-    flex: 1,
+    backgroundColor: COLORS.backgroundMain,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.lg,
   },
   headerLeft: {
     flex: 1,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontSize: TYPOGRAPHY.sizes.xxxl,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   welcomeText: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
+    fontWeight: TYPOGRAPHY.weights.normal,
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: BORDER_RADIUS.huge,
+    borderTopRightRadius: BORDER_RADIUS.huge,
+    marginTop: SPACING.md,
+  },
+  scrollView: {
+    flex: 1,
+    paddingTop: SPACING.xxxl,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  settingsButton: {
-    padding: 8,
-    marginRight: 4,
+  notificationButton: {
+    padding: SPACING.sm,
   },
-  profileButton: {
-    padding: 8,
+  notificationIconContainer: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: COLORS.backgroundInput,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   quickActions: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginVertical: 8,
-    gap: 12,
+    paddingHorizontal: SPACING.xl,
+    marginVertical: SPACING.md,
+    gap: SPACING.md,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: COLORS.primary,
     paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+    ...SHADOWS.md,
   },
   actionButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    marginLeft: SPACING.sm,
   },
   actionButtonSecondary: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.backgroundCard,
     borderWidth: 2,
-    borderColor: '#2563eb',
+    borderColor: COLORS.primary,
     paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+    ...SHADOWS.sm,
   },
   actionButtonSecondaryText: {
-    color: '#2563eb',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    marginLeft: SPACING.sm,
   },
   budgetActions: {
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    gap: 12,
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.md,
+    gap: SPACING.md,
   },
   budgetButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.backgroundCard,
     borderWidth: 2,
-    borderColor: '#059669',
+    borderColor: COLORS.success,
     paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+    ...SHADOWS.sm,
   },
   budgetButtonText: {
-    color: '#059669',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    color: COLORS.success,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    marginLeft: SPACING.sm,
   },
   reportsButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.backgroundCard,
     borderWidth: 2,
-    borderColor: '#7c3aed',
+    borderColor: COLORS.accent,
     paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+    ...SHADOWS.sm,
   },
   reportsButtonText: {
-    color: '#7c3aed',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    color: COLORS.accent,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    marginLeft: SPACING.sm,
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fee2e2',
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
+    padding: SPACING.xl,
+    marginHorizontal: SPACING.xl,
+    marginVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    ...SHADOWS.sm,
   },
   errorText: {
-    color: '#dc3545',
-    fontSize: 14,
-    marginLeft: 8,
+    color: COLORS.error,
+    fontSize: TYPOGRAPHY.sizes.md,
+    marginLeft: SPACING.sm,
     flex: 1,
   },
   bottomSpacing: {
-    height: 120,
+    height: 130,
   },
 });

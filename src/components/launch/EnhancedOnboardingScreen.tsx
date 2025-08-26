@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Image, StatusBar } from 'react-native';
+import { StyleSheet, Image } from 'react-native';
 import { Text, Button, ButtonText, Box, VStack, HStack } from '@gluestack-ui/themed';
 
 interface OnboardingData {
@@ -31,18 +31,6 @@ export default function EnhancedOnboardingScreen({
 
   return (
     <Box style={styles.container}>
-      <StatusBar backgroundColor="#7C57FF" barStyle="light-content" />
-      
-      {/* Status Bar */}
-      <HStack style={styles.statusBar}>
-        <Text style={styles.timeText}>16:04</Text>
-        <HStack style={styles.statusIcons}>
-          <Box style={styles.signalIcon} />
-          <Box style={styles.wifiIcon} />
-          <Box style={styles.batteryIcon} />
-        </HStack>
-      </HStack>
-
       {/* Header with Skip button */}
       <HStack style={styles.header}>
         <Box style={styles.headerLeft} />
@@ -118,53 +106,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#00D09E',
   },
-  statusBar: {
-    height: 32,
-    backgroundColor: '#7C57FF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 37,
-  },
-  timeText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    fontFamily: 'League Spartan',
-  },
-  statusIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  signalIcon: {
-    width: 13,
-    height: 11,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 2,
-  },
-  wifiIcon: {
-    width: 15,
-    height: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 58,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  batteryIcon: {
-    width: 17,
-    height: 9,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 1,
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 60,
     paddingBottom: 10,
   },
   headerLeft: {
