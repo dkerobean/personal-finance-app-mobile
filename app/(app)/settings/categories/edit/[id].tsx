@@ -8,36 +8,39 @@ import {
   ScrollView,
   StyleSheet,
   SafeAreaView,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useCategoryStore } from '@/stores/categoryStore';
+import GradientHeader from '@/components/budgets/GradientHeader';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import CustomAlert from '@/components/ui/CustomAlert';
 import type { Category } from '@/types/models';
+import { COLORS, BORDER_RADIUS, SPACING, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 
-const AVAILABLE_ICONS = [
-  'restaurant',
-  'car',
-  'attach-money',
-  'movie',
-  'shopping-bag',
-  'receipt',
-  'local-hospital',
-  'school',
-  'home',
-  'fitness-center',
-  'pets',
-  'travel-explore',
-  'phone',
-  'computer',
-  'coffee',
-  'sports-soccer',
-];
+const ICON_CATEGORIES = {
+  'Financial': ['attach-money', 'payment', 'account-balance', 'savings', 'credit-card', 'account-balance-wallet'],
+  'Food & Dining': ['restaurant', 'fastfood', 'local-cafe', 'local-pizza', 'cake', 'local-bar', 'coffee', 'local-dining'],
+  'Transportation': ['directions-car', 'local-gas-station', 'train', 'directions-bus', 'flight', 'motorcycle', 'local-taxi', 'commute'],
+  'Shopping': ['shopping-cart', 'shopping-bag', 'local-mall', 'storefront', 'local-grocery-store', 'receipt', 'redeem'],
+  'Entertainment': ['movie', 'music-note', 'sports-soccer', 'videogame-asset', 'camera-alt', 'beach-access', 'casino'],
+  'Health': ['local-hospital', 'local-pharmacy', 'fitness-center', 'spa', 'healing', 'favorite', 'medical-services'],
+  'Education': ['school', 'library-books', 'menu-book', 'science', 'psychology', 'graduation-cap'],
+  'Home': ['home', 'bed', 'kitchen', 'lightbulb', 'plumbing', 'construction', 'cleaning-services'],
+  'Technology': ['phone', 'computer', 'laptop', 'tablet', 'watch', 'headphones', 'wifi', 'memory'],
+  'Personal Care': ['face', 'cut', 'spa', 'brush', 'checkroom', 'local-laundry-service'],
+  'Travel': ['travel-explore', 'hotel', 'local-activity', 'map', 'luggage', 'flight-takeoff'],
+  'Pets': ['pets', 'cruelty-free'],
+  'Other': ['category', 'work', 'business', 'event', 'star', 'flag', 'schedule', 'place']
+};
+
+const AVAILABLE_ICONS = Object.values(ICON_CATEGORIES).flat();
 
 export default function EditCategoryScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { categories, updateCategory, isLoading, error } = useCategoryStore();
+  const { alert, alertProps } = useCustomAlert();
 
   const [category, setCategory] = useState<Category | null>(null);
   const [name, setName] = useState('');
@@ -81,10 +84,11 @@ export default function EditCategoryScreen() {
     );
     
     if (success) {
-      Alert.alert('Success', 'Category updated successfully');
-      router.back();
+      alert('Success', 'Category updated successfully', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
     } else if (error) {
-      Alert.alert('Error', error);
+      alert('Error', error);
     }
   };
 
@@ -94,25 +98,45 @@ export default function EditCategoryScreen() {
 
   if (!category) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007bff" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading category...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Gradient Header Section */}
+        <GradientHeader
+          title="Edit Category"
+          subtitle="Update your category details"
+          onBackPress={handleCancel}
+          onCalendarPress={() => {
+            // Handle calendar press
+          }}
+          onNotificationPress={() => {
+            // Handle notification press
+          }}
+          showCalendar={false}
+        />
+
+        {/* Content Card */}
         <View style={styles.content}>
           <View style={styles.form}>
+            {/* Category Name Input */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Category Name</Text>
               <TextInput
-                style={[styles.input, nameError ? styles.inputError : null]}
+                style={[styles.mintInput, nameError ? styles.inputError : null]}
                 placeholder="Enter category name"
+                placeholderTextColor={COLORS.textSecondary}
                 value={name}
                 onChangeText={(text) => {
                   setName(text);
@@ -126,13 +150,15 @@ export default function EditCategoryScreen() {
               )}
             </View>
 
+            {/* Icon Selection */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Select Icon</Text>
               
-              <View style={styles.iconGrid}>
-                {Array.from({ length: Math.ceil(AVAILABLE_ICONS.length / 4) }, (_, rowIndex) => (
-                  <View key={rowIndex} style={styles.iconRow}>
-                    {AVAILABLE_ICONS.slice(rowIndex * 4, (rowIndex + 1) * 4).map((iconName) => (
+              {Object.entries(ICON_CATEGORIES).map(([categoryName, icons]) => (
+                <View key={categoryName} style={styles.iconCategorySection}>
+                  <Text style={styles.iconCategoryTitle}>{categoryName}</Text>
+                  <View style={styles.iconGrid}>
+                    {icons.map((iconName) => (
                       <TouchableOpacity
                         key={iconName}
                         onPress={() => setSelectedIcon(iconName)}
@@ -143,14 +169,14 @@ export default function EditCategoryScreen() {
                       >
                         <MaterialIcons
                           name={iconName as any}
-                          size={32}
-                          color={selectedIcon === iconName ? '#007bff' : '#666'}
+                          size={24}
+                          color={selectedIcon === iconName ? COLORS.primary : COLORS.textSecondary}
                         />
                       </TouchableOpacity>
                     ))}
                   </View>
-                ))}
-              </View>
+                </View>
+              ))}
             </View>
 
             {error && (
@@ -158,33 +184,29 @@ export default function EditCategoryScreen() {
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
-          </View>
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.primaryButton,
-                (isLoading || !name.trim()) && styles.disabledButton
-              ]}
-              onPress={handleSubmit}
-              disabled={isLoading || !name.trim()}
-            >
-              <Text style={styles.primaryButtonText}>
-                {isLoading ? 'Updating...' : 'Update Category'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, styles.secondaryButton]}
-              onPress={handleCancel}
-              disabled={isLoading}
-            >
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            {/* Save Button */}
+            <View style={styles.saveButtonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  (isLoading || !name.trim()) && styles.disabledButton
+                ]}
+                onPress={handleSubmit}
+                disabled={isLoading || !name.trim()}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isLoading ? 'Updating...' : 'Update Category'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Bottom spacing for navigation */}
+            <View style={styles.bottomSpacing} />
           </View>
         </View>
       </ScrollView>
+      
+      <CustomAlert {...alertProps} />
     </SafeAreaView>
   );
 }
@@ -192,13 +214,18 @@ export default function EditCategoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: BUDGET.gradientColors.start,
   },
-  scrollView: {
+  mainScrollView: {
     flex: 1,
   },
   content: {
-    padding: 16,
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: 20,
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -206,91 +233,109 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+    marginTop: SPACING.md,
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textSecondary,
+    fontFamily: 'Poppins',
   },
   form: {
-    gap: 24,
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.xl,
   },
   formGroup: {
-    gap: 8,
+    marginBottom: SPACING.lg,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.medium,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+    fontFamily: 'Poppins',
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
+  mintInput: {
+    backgroundColor: COLORS.backgroundInput,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontFamily: 'Poppins',
+    color: COLORS.textPrimary,
+    borderWidth: 0,
   },
   inputError: {
-    borderColor: '#dc3545',
+    borderWidth: 1,
+    borderColor: COLORS.error,
   },
   errorText: {
-    color: '#dc3545',
-    fontSize: 14,
+    color: COLORS.error,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    marginTop: SPACING.xs,
+    fontFamily: 'Poppins',
   },
   errorContainer: {
-    backgroundColor: '#fee2e2',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.backgroundCard,
+    marginHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.error,
+    marginTop: SPACING.md,
+    ...SHADOWS.sm,
+  },
+  iconCategorySection: {
+    marginBottom: SPACING.lg,
+  },
+  iconCategoryTitle: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.primary,
+    marginBottom: SPACING.sm,
+    fontFamily: 'Poppins',
+    textTransform: 'uppercase',
   },
   iconGrid: {
-    gap: 8,
-    marginTop: 8,
-  },
-  iconRow: {
     flexDirection: 'row',
-    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    gap: SPACING.sm,
   },
   iconButton: {
-    flex: 1,
+    width: '18%',
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.backgroundCard,
+    marginBottom: SPACING.sm,
+    ...SHADOWS.sm,
   },
   iconButtonSelected: {
-    borderColor: '#007bff',
-    backgroundColor: '#eff6ff',
+    backgroundColor: COLORS.backgroundInput,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
   },
-  buttonContainer: {
-    gap: 12,
-    marginTop: 48,
+  saveButtonContainer: {
+    paddingVertical: SPACING.lg,
   },
-  button: {
-    padding: 16,
-    borderRadius: 8,
+  bottomSpacing: {
+    height: 150,
+  },
+  saveButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.huge,
+    paddingVertical: SPACING.lg,
     alignItems: 'center',
-  },
-  primaryButton: {
-    backgroundColor: '#007bff',
+    justifyContent: 'center',
+    minHeight: 36,
   },
   disabledButton: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: COLORS.textTertiary,
   },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
-  secondaryButtonText: {
-    color: '#374151',
-    fontSize: 16,
-    fontWeight: '600',
+  saveButtonText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontFamily: 'Poppins',
+    textTransform: 'uppercase',
   },
 });

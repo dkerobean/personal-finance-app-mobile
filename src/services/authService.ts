@@ -44,8 +44,8 @@ export const authService = {
         
         if (data.session) {
           console.log('Session created, storing...');
-          // Store only the access token
-          await secureStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.session.access_token);
+          // Store session data using enhanced storage
+          await secureStorage.storeSession(data.session.access_token, data.session.refresh_token);
 
           return {
             success: true,
@@ -103,7 +103,7 @@ export const authService = {
       }
 
       if (data.session) {
-        await secureStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.session.access_token);
+        await secureStorage.storeSession(data.session.access_token, data.session.refresh_token);
       }
 
       return {
@@ -234,7 +234,7 @@ export const authService = {
         };
       }
 
-      await secureStorage.clear();
+      await secureStorage.clearAuthData();
 
       return {
         success: true,

@@ -4,7 +4,6 @@ import {
   Text, 
   ScrollView, 
   TouchableOpacity, 
-  Alert, 
   ActivityIndicator, 
   StyleSheet,
   SafeAreaView 
@@ -12,6 +11,8 @@ import {
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useCategoryStore } from '@/stores/categoryStore';
+import GradientHeader from '@/components/budgets/GradientHeader';
+import { COLORS, BORDER_RADIUS, SPACING, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 import type { Category } from '@/types/models';
 
 export default function CategoriesScreen() {
@@ -25,36 +26,11 @@ export default function CategoriesScreen() {
     clearError,
   } = useCategoryStore();
 
-  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
-
   useEffect(() => {
     loadCategories();
   }, []);
 
-  const handleDeletePress = (category: Category) => {
-    Alert.alert(
-      'Delete Category',
-      `Are you sure you want to delete "${category.name}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => handleDeleteConfirm(category.id)
-        }
-      ]
-    );
-  };
-
-  const handleDeleteConfirm = async (categoryId: string) => {
-    const success = await deleteCategory(categoryId);
-    if (!success && error) {
-      Alert.alert('Error', error);
-    }
-  };
-
-  const handleEditPress = (categoryId: string) => {
+  const handleCategoryPress = (categoryId: string) => {
     router.push(`/settings/categories/edit/${categoryId}`);
   };
 
@@ -62,11 +38,23 @@ export default function CategoriesScreen() {
     router.push('/settings/categories/create');
   };
 
+  const defaultCategories = [
+    { name: 'Food', icon: 'restaurant', color: COLORS.primary },
+    { name: 'Transport', icon: 'directions-car', color: COLORS.lightBlue },
+    { name: 'Medicine', icon: 'local-pharmacy', color: COLORS.accent },
+    { name: 'Groceries', icon: 'shopping-cart', color: COLORS.lightBlue },
+    { name: 'Rent', icon: 'home', color: COLORS.accent },
+    { name: 'Gifts', icon: 'card-giftcard', color: COLORS.primary },
+    { name: 'Savings', icon: 'savings', color: COLORS.lightBlue },
+    { name: 'Entertainment', icon: 'movie', color: COLORS.accent },
+    { name: 'More', icon: 'more-horiz', color: COLORS.primary },
+  ];
+
   if (isLoading && categories.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007bff" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading categories...</Text>
         </View>
       </SafeAreaView>
@@ -75,75 +63,96 @@ export default function CategoriesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Gradient Header Section */}
+        <GradientHeader
+          title="Categories"
+          subtitle="Manage your transaction categories"
+          onBackPress={() => router.back()}
+          onCalendarPress={() => {
+            // Handle calendar press
+          }}
+          onNotificationPress={() => {
+            // Handle notification press
+          }}
+          showCalendar={false}
+        />
+
+        {/* Content Card */}
         <View style={styles.content}>
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity onPress={clearError} style={styles.errorCloseButton}>
-                <MaterialIcons name="close" size={20} color="#dc3545" />
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* Add Category Button */}
+          <View style={styles.addCategoryHeader}>
+            <TouchableOpacity style={styles.addCategoryButton} onPress={handleCreatePress}>
+              <MaterialIcons name="add" size={24} color={COLORS.white} />
+              <Text style={styles.addCategoryButtonText}>Add Category</Text>
+            </TouchableOpacity>
+          </View>
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity onPress={clearError} style={styles.errorCloseButton}>
+              <MaterialIcons name="close" size={20} color={COLORS.error} />
+            </TouchableOpacity>
+          </View>
+        )}
 
-          {categories.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                No categories found.{'\n'}Create your first category or load default categories.
+        {categories.length === 0 && !isLoading ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              No categories found.{'\n'}Create your first category or load default categories.
+            </Text>
+            <TouchableOpacity 
+              style={styles.seedButton}
+              onPress={async () => {
+                const { seedDefaults } = useCategoryStore.getState();
+                await seedDefaults();
+              }}
+              disabled={isLoading}
+            >
+              <Text style={styles.seedButtonText}>
+                {isLoading ? 'Loading...' : 'Create Default Categories'}
               </Text>
-              <TouchableOpacity 
-                style={styles.seedButton}
-                onPress={async () => {
-                  const { seedDefaults } = useCategoryStore.getState();
-                  await seedDefaults();
-                }}
-                disabled={isLoading}
-              >
-                <Text style={styles.seedButtonText}>
-                  {isLoading ? 'Loading...' : 'Create Default Categories'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.categoriesList}>
-              {categories.map((category) => (
-                <View key={category.id} style={styles.categoryItem}>
-                  <View style={styles.categoryInfo}>
-                    <View style={styles.iconContainer}>
-                      <MaterialIcons
-                        name={category.icon_name as any}
-                        size={24}
-                        color="#007bff"
-                      />
-                    </View>
-                    <Text style={styles.categoryName}>{category.name}</Text>
-                  </View>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.categoriesGrid}>
+            {(categories.length > 0 ? categories : defaultCategories).map((category, index) => {
+              const isCategory = 'id' in category;
+              const categoryColor = isCategory 
+                ? COLORS.primary 
+                : category.color;
+              const categoryIcon = isCategory 
+                ? category.icon_name as any
+                : category.icon as any;
+              const categoryName = category.name;
 
-                  <View style={styles.categoryActions}>
-                    <TouchableOpacity 
-                      onPress={() => handleEditPress(category.id)}
-                      style={styles.actionButton}
-                    >
-                      <MaterialIcons name="edit" size={20} color="#666" />
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      onPress={() => handleDeletePress(category)}
-                      style={styles.actionButton}
-                    >
-                      <MaterialIcons name="delete" size={20} color="#dc3545" />
-                    </TouchableOpacity>
+              return (
+                <TouchableOpacity
+                  key={isCategory ? category.id : index}
+                  style={styles.categoryItem}
+                  onPress={() => isCategory ? handleCategoryPress(category.id) : handleCreatePress()}
+                >
+                  <View style={[styles.categoryCircle, { backgroundColor: categoryColor }]}>
+                    <MaterialIcons
+                      name={categoryIcon}
+                      size={32}
+                      color={COLORS.white}
+                    />
                   </View>
-                </View>
-              ))}
-            </View>
+                  <Text style={styles.categoryName}>{categoryName}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           )}
+          
+          {/* Bottom spacing for navigation */}
+          <View style={styles.bottomSpacing} />
         </View>
       </ScrollView>
-
-      <TouchableOpacity style={styles.fab} onPress={handleCreatePress}>
-        <MaterialIcons name="add" size={24} color="#fff" />
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -151,36 +160,67 @@ export default function CategoriesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: BUDGET.gradientColors.start,
   },
-  scrollView: {
+  mainScrollView: {
     flex: 1,
-  },
-  content: {
-    padding: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.backgroundContent,
   },
   loadingText: {
     marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+    fontSize: TYPOGRAPHY.sizes.lg,
+    color: COLORS.textTertiary,
+    fontFamily: 'Poppins',
+  },
+  addCategoryHeader: {
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.lg,
+  },
+  addCategoryButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.huge,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    ...SHADOWS.md,
+  },
+  addCategoryButtonText: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.white,
+  },
+  content: {
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: 20,
+    flex: 1,
   },
   errorContainer: {
-    backgroundColor: '#fee2e2',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    backgroundColor: COLORS.backgroundCard,
+    marginHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.error,
+    marginBottom: SPACING.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    ...SHADOWS.sm,
   },
   errorText: {
-    color: '#dc3545',
+    color: COLORS.error,
     flex: 1,
+    fontFamily: 'Poppins',
   },
   errorCloseButton: {
     padding: 4,
@@ -188,78 +228,58 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 64,
+    paddingVertical: SPACING.xxxl * 2,
+    paddingHorizontal: SPACING.xl,
   },
   emptyText: {
-    color: '#9ca3af',
+    color: COLORS.textTertiary,
     textAlign: 'center',
-    fontSize: 16,
-    marginBottom: 24,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    marginBottom: SPACING.xxl,
+    fontFamily: 'Poppins',
   },
   seedButton: {
-    backgroundColor: '#007bff',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.xxl,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
+  },
+  bottomSpacing: {
+    height: 150,
   },
   seedButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontFamily: 'Poppins',
   },
-  categoriesList: {
-    gap: 8,
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    paddingHorizontal: SPACING.xl,
+    gap: SPACING.sm,
   },
   categoryItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    flexDirection: 'row',
+    width: '31%',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    marginBottom: SPACING.xxl,
+    flexShrink: 0,
   },
-  categoryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  iconContainer: {
-    backgroundColor: '#eff6ff',
-    padding: 8,
-    borderRadius: 20,
+  categoryCircle: {
+    width: 105,
+    height: 98,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginBottom: SPACING.md,
   },
   categoryName: {
-    fontSize: 16,
-    fontWeight: '500',
-    flex: 1,
-  },
-  categoryActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 8,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#007bff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.medium,
+    color: COLORS.textPrimary,
+    fontFamily: 'Poppins',
+    textAlign: 'center',
   },
 });

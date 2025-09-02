@@ -14,8 +14,31 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useTransactionStore } from '@/stores/transactionStore';
+import { useAuthStore } from '@/stores/authStore';
+
+// Using existing API services instead of MCP functions
 import EditBudgetModal from '@/components/budgets/EditBudgetModal';
 import BudgetsList from '@/components/budgets/BudgetsList';
+import GradientHeader from '@/components/budgets/GradientHeader';
+import CircularProgressIndicator from '@/components/budgets/CircularProgressIndicator';
+import BudgetSummaryCard from '@/components/budgets/BudgetSummaryCard';
+import ProgressBarWithStatus from '@/components/budgets/ProgressBarWithStatus';
+import BudgetTransactionsList from '@/components/budgets/BudgetTransactionsList';
+import BudgetProgressCard from '@/components/budgets/BudgetProgressCard';
+
+// Interface for budget data from Supabase
+interface BudgetData {
+  id: string;
+  user_id: string;
+  category_id: string;
+  amount: string;
+  month: string;
+  created_at: string;
+  updated_at: string;
+  category_name: string;
+  category_icon_name: string;
+  spent: string;
+}
 
 export default function BudgetsScreen(): React.ReactElement {
   const { 
@@ -34,9 +57,10 @@ export default function BudgetsScreen(): React.ReactElement {
   
   const { categories, loadCategories } = useCategoryStore();
   const { onTransactionChanged } = useBudgetStore();
+  const { user } = useAuthStore();
   
   // Get transaction count to trigger refresh when transactions change
-  const transactions = useTransactionStore(state => state.transactions);
+  const { transactions, loadTransactions } = useTransactionStore();
   
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<any>(null);
@@ -44,26 +68,73 @@ export default function BudgetsScreen(): React.ReactElement {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
   });
+  const [budgetTransactions, setBudgetTransactions] = useState<any[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
 
   useEffect(() => {
     loadBudgets();
     loadCategories();
     fetchBudgetTracking(currentMonth);
   }, []);
+  
+  useEffect(() => {
+    if (transactions.length > 0 && currentMonthBudgets.length > 0) {
+      fetchBudgetTransactions();
+    }
+  }, [transactions, user, currentMonthBudgets, currentMonth]);
+
+  const fetchBudgetTransactions = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setTransactionsLoading(true);
+      
+      // Get budget category IDs for filtering
+      const budgetCategoryIds = currentMonthBudgets.map(budget => budget.category_id);
+      
+      // Get current month transactions for budget categories only
+      const currentMonthTransactions = transactions.filter(tx => {
+        const txDate = new Date(tx.transaction_date);
+        const currentDate = new Date(currentMonth);
+        return txDate.getMonth() === currentDate.getMonth() && 
+               txDate.getFullYear() === currentDate.getFullYear() &&
+               tx.type === 'expense' &&
+               budgetCategoryIds.includes(tx.category_id);
+      });
+      
+      // Sort by date (most recent first)
+      const sortedTransactions = currentMonthTransactions.sort((a, b) => 
+        new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
+      );
+      
+      setBudgetTransactions(sortedTransactions.slice(0, 10));
+    } catch (error) {
+      console.error('Error fetching budget transactions:', error);
+    } finally {
+      setTransactionsLoading(false);
+    }
+  };
 
   // Listen for transaction changes and refresh budget tracking
   useEffect(() => {
     if (transactions.length > 0) {
       onTransactionChanged();
+      // Recalculate budget tracking when transactions change
+      fetchBudgetTracking(currentMonth);
     }
-  }, [transactions.length]);
+  }, [transactions.length, currentMonth]);
 
   const handleRefresh = async (): Promise<void> => {
     clearError();
     await Promise.all([
       loadBudgets(),
-      fetchBudgetTracking(currentMonth)
+      fetchBudgetTracking(currentMonth),
+      loadTransactions()
     ]);
+    // Refresh transactions after loading
+    if (transactions.length > 0) {
+      fetchBudgetTransactions();
+    }
   };
 
   const handleCreateBudget = (): void => {
@@ -102,111 +173,150 @@ export default function BudgetsScreen(): React.ReactElement {
     router.back();
   };
 
+  // Use store data for budget information
   const currentMonthBudgets = getBudgetsForMonth(currentMonth);
   const currentMonthBudgetsWithSpending = getBudgetsWithSpendingForMonth(currentMonth);
+  
   const totalBudget = currentMonthBudgets.reduce((sum, budget) => sum + budget.amount, 0);
   const totalSpent = currentMonthBudgetsWithSpending.reduce((sum, budget) => sum + budget.spent, 0);
+  
+  // Calculate progress for the main budget item (we'll use the first budget as example)
+  const mainBudget = currentMonthBudgetsWithSpending[0] || { spent: 0, amount: totalBudget };
+  const progress = totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0;
+  
+  // Ensure we have a meaningful progress value to display
+  const displayProgress = progress > 0 ? progress : (currentMonthBudgetsWithSpending.length > 0 ? 5 : 0);
+  
+  // Get the main category for display
+  const mainCategoryName = currentMonthBudgets.length > 0
+    ? currentMonthBudgets[0].category_name
+    : "Budget";
+    
+  const mainIconName = currentMonthBudgets.length > 0 && currentMonthBudgets[0].category_icon_name
+    ? currentMonthBudgets[0].category_icon_name
+    : "directions-car";
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
-          <MaterialIcons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.title}>Budgets</Text>
-          <Text style={styles.subtitle}>
-            {new Date(currentMonth).toLocaleDateString('en-US', { 
-              month: 'long', 
-              year: 'numeric' 
-            })}
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.addButton} onPress={handleCreateBudget}>
-          <MaterialIcons name="add" size={24} color="#2563eb" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Budget Summary */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>Monthly Budget Overview</Text>
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryAmount}>₵{totalBudget.toFixed(2)}</Text>
-            <Text style={styles.summaryItemLabel}>Total Budget</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryAmount, { color: '#dc2626' }]}>₵{totalSpent.toFixed(2)}</Text>
-            <Text style={styles.summaryItemLabel}>Total Spent</Text>
-          </View>
-        </View>
-        <Text style={styles.summarySubtext}>
-          {currentMonthBudgets.length} {currentMonthBudgets.length === 1 ? 'category' : 'categories'}
-        </Text>
-      </View>
-
       <ScrollView 
-        style={styles.scrollView}
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
         }
       >
-        {/* Budget List */}
-        <BudgetsList
-          budgets={currentMonthBudgets}
-          budgetsWithSpending={currentMonthBudgetsWithSpending}
-          isLoading={isLoading || isTrackingLoading}
-          onEdit={handleEditBudget}
-          onDelete={handleDeleteBudget}
-          showProgress={currentMonthBudgetsWithSpending.length > 0}
+        {/* Gradient Header Section */}
+        <GradientHeader
+          title={mainCategoryName}
+          onBackPress={handleGoBack}
+          onCalendarPress={() => {
+            // Handle calendar press
+          }}
+          onNotificationPress={() => {
+            // Handle notification press
+          }}
         />
 
-        {/* Error Display */}
-        {error && (
-          <View style={styles.errorContainer}>
-            <View style={styles.errorContent}>
-              <MaterialIcons name="error-outline" size={24} color="#dc3545" />
-              <View style={styles.errorTextContainer}>
-                <Text style={styles.errorTitle}>Unable to load budgets</Text>
-                <Text style={styles.errorText}>{error}</Text>
+        {/* Content Card */}
+        <View style={styles.contentCard}>
+          {/* Circular Progress Section */}
+          <View style={styles.progressSection}>
+            <CircularProgressIndicator
+              progress={displayProgress}
+              iconName={mainIconName as any}
+            />
+            <Text style={styles.categoryLabel}>{mainCategoryName}</Text>
+          </View>
+
+          {/* Summary Cards */}
+          <BudgetSummaryCard
+            goalAmount={totalBudget}
+            savedAmount={totalSpent}
+          />
+
+          {/* Progress Bar */}
+          <ProgressBarWithStatus
+            percentage={displayProgress}
+            goalAmount={totalBudget}
+            statusMessage={`${Math.round(displayProgress)}% Of Your Expenses, Looks Good.`}
+          />
+
+          {/* Budget List with Progress Cards */}
+          <View style={styles.budgetCardsContainer}>
+            {currentMonthBudgetsWithSpending.length > 0 ? (
+              currentMonthBudgetsWithSpending.map((budget) => (
+                <BudgetProgressCard
+                  key={budget.id}
+                  budget={budget}
+                  onPress={() => {
+                    // Navigate to budget detail screen with transactions
+                    router.push(`/(app)/budgets/${budget.id}/transactions`);
+                  }}
+                  onEdit={() => handleEditBudget(budget)}
+                  onDelete={() => handleDeleteBudget(budget)}
+                />
+              ))
+            ) : (
+              <BudgetsList
+                budgets={currentMonthBudgets}
+                budgetsWithSpending={currentMonthBudgetsWithSpending}
+                isLoading={isLoading || isTrackingLoading}
+                onEdit={handleEditBudget}
+                onDelete={handleDeleteBudget}
+                showProgress={false}
+              />
+            )}
+          </View>
+
+          {/* Budget Transactions List */}
+          <BudgetTransactionsList
+            transactions={budgetTransactions}
+            isLoading={transactionsLoading}
+          />
+
+          {/* Error Display */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <View style={styles.errorContent}>
+                <MaterialIcons name="error-outline" size={24} color="#dc3545" />
+                <View style={styles.errorTextContainer}>
+                  <Text style={styles.errorTitle}>Unable to load budgets</Text>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
               </View>
+              <TouchableOpacity 
+                style={styles.retryButton} 
+                onPress={handleRefresh}
+                disabled={isLoading}
+              >
+                <MaterialIcons name="refresh" size={16} color="#2563eb" />
+                <Text style={styles.retryButtonText}>
+                  {isLoading ? 'Retrying...' : 'Retry'}
+                </Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-              style={styles.retryButton} 
-              onPress={handleRefresh}
-              disabled={isLoading}
-            >
-              <MaterialIcons name="refresh" size={16} color="#2563eb" />
-              <Text style={styles.retryButtonText}>
-                {isLoading ? 'Retrying...' : 'Retry'}
+          )}
+
+          {/* Empty State */}
+          {!isLoading && currentMonthBudgets.length === 0 && (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="account-balance-wallet" size={64} color="#d1d5db" />
+              <Text style={styles.emptyStateTitle}>No Budgets Yet</Text>
+              <Text style={styles.emptyStateText}>
+                Create your first budget to start tracking your spending limits.
               </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+            </View>
+          )}
 
-        {/* Empty State */}
-        {!isLoading && currentMonthBudgets.length === 0 && (
-          <View style={styles.emptyState}>
-            <MaterialIcons name="account-balance-wallet" size={64} color="#d1d5db" />
-            <Text style={styles.emptyStateTitle}>No Budgets Yet</Text>
-            <Text style={styles.emptyStateText}>
-              Create your first budget to start tracking your spending limits.
-            </Text>
-            <TouchableOpacity style={styles.emptyStateButton} onPress={handleCreateBudget}>
-              <Text style={styles.emptyStateButtonText}>Add Budget</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          {/* Add Budget Button */}
+          <TouchableOpacity style={styles.addBudgetButton} onPress={handleCreateBudget}>
+            <Text style={styles.addBudgetButtonText}>Add Budget</Text>
+          </TouchableOpacity>
 
-        {/* Bottom spacing */}
-        <View style={styles.bottomSpacing} />
+          {/* Bottom spacing */}
+          <View style={styles.bottomSpacing} />
+        </View>
       </ScrollView>
-
-      {/* Floating Action Button */}
-      <TouchableOpacity style={styles.fab} onPress={handleCreateBudget}>
-        <MaterialIcons name="add" size={28} color="#ffffff" />
-      </TouchableOpacity>
 
       {/* Edit Modal */}
       <EditBudgetModal
@@ -224,85 +334,29 @@ export default function BudgetsScreen(): React.ReactElement {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#00D09E', // Match gradient background
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  backButton: {
-    padding: 8,
-    marginRight: 8,
-  },
-  headerCenter: {
+  mainScrollView: {
     flex: 1,
+  },
+  contentCard: {
+    backgroundColor: '#F1FFF3',
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20, // Slight overlap with header
+    paddingTop: 20,
+    flex: 1,
+  },
+  progressSection: {
     alignItems: 'center',
+    paddingVertical: 30,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  addButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  summaryCard: {
-    backgroundColor: '#ffffff',
-    margin: 16,
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 8,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 16,
-  },
-  summaryItem: {
-    alignItems: 'center',
-  },
-  summaryAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  summaryItemLabel: {
-    fontSize: 12,
-    color: '#6b7280',
+  categoryLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#093030',
+    marginTop: 20,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  summarySubtext: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  scrollView: {
-    flex: 1,
   },
   errorContainer: {
     backgroundColor: '#fee2e2',
@@ -369,37 +423,25 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 24,
   },
-  emptyStateButton: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  emptyStateButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  bottomSpacing: {
-    height: 100,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 60,
-    height: 60,
+  addBudgetButton: {
+    backgroundColor: '#00D09E',
     borderRadius: 30,
-    backgroundColor: '#2563eb',
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
+    marginHorizontal: 123,
+    marginVertical: 20,
+  },
+  addBudgetButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#093030',
+    textTransform: 'capitalize',
+  },
+  budgetCardsContainer: {
+    paddingTop: 20,
+  },
+  bottomSpacing: {
+    height: 150, // Account for bottom navigation
   },
 });

@@ -1,221 +1,269 @@
-import React, { useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  RefreshControl,
-  Alert,
+import React, { useEffect, useState } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  RefreshControl, 
+  TouchableOpacity,
+  Alert
 } from 'react-native';
-import { Stack } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useReportsStore } from '@/stores/reportsStore';
-import { reportsApi } from '@/services/api/reports';
-import MonthlySummaryCard from '@/components/reports/MonthlySummaryCard';
-import CategoryBreakdownChart from '@/components/reports/CategoryBreakdownChart';
-import MonthPicker from '@/components/reports/MonthPicker';
+import { useAuthStore } from '@/stores/authStore';
+import GradientHeader from '@/components/budgets/GradientHeader';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 
-const ReportsScreen: React.FC = () => {
-  const {
+export default function ReportsScreen(): React.ReactElement {
+  const { 
     currentReport,
     selectedMonth,
-    availableMonths,
-    isLoading,
-    error,
+    isLoading, 
+    error, 
     setSelectedMonth,
     fetchMonthlyReport,
     refreshCurrentReport,
     clearError,
-    setError,
+    fetchReportComparison
   } = useReportsStore();
+  
+  const { user } = useAuthStore();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Load available months on component mount
   useEffect(() => {
-    loadAvailableMonths();
-  }, []);
-
-  // Load report for selected month
-  useEffect(() => {
-    if (selectedMonth) {
+    if (user) {
       fetchMonthlyReport(selectedMonth);
     }
-  }, [selectedMonth, fetchMonthlyReport]);
+  }, [user, selectedMonth]);
 
-  const loadAvailableMonths = async () => {
-    try {
-      const response = await reportsApi.getAvailableMonths(12);
-      if (response.error) {
-        setError(response.error.message);
-        return;
-      }
-
-      const months = response.data?.map(item => item.month) || [];
-      // Note: In a real implementation, you'd update the store with available months
-      // For now, we'll work with the current selectedMonth
-    } catch (error) {
-      console.error('Error loading available months:', error);
-      setError('Failed to load available months');
-    }
-  };
-
-  const handleRefresh = async () => {
+  const handleRefresh = async (): Promise<void> => {
+    if (!user) return;
+    
+    setIsRefreshing(true);
     clearError();
-    await Promise.all([
-      refreshCurrentReport(),
-      loadAvailableMonths(),
-    ]);
-  };
-
-  const handleMonthSelect = (month: string) => {
-    setSelectedMonth(month);
-  };
-
-  const showErrorAlert = () => {
-    if (error) {
-      Alert.alert(
-        'Unable to Load Financial Report',
-        `We're having trouble loading your financial data. ${error}`,
-        [
-          {
-            text: 'Try Again',
-            onPress: handleRefresh,
-          },
-          {
-            text: 'Dismiss',
-            style: 'cancel',
-            onPress: clearError,
-          },
-        ]
-      );
+    
+    try {
+      await refreshCurrentReport();
+    } catch (error) {
+      console.error('Error during refresh:', error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
-  // Show error alert when error occurs
-  useEffect(() => {
-    if (error) {
-      showErrorAlert();
+  const handleGoBack = (): void => {
+    router.back();
+  };
+
+  const handleMonthNavigation = (direction: 'prev' | 'next'): void => {
+    const currentDate = new Date(selectedMonth + '-01');
+    
+    if (direction === 'prev') {
+      currentDate.setMonth(currentDate.getMonth() - 1);
+    } else {
+      currentDate.setMonth(currentDate.getMonth() + 1);
     }
-  }, [error]);
+    
+    const newMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    setSelectedMonth(newMonth);
+  };
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <MaterialIcons name="assessment" size={64} color="#d1d5db" />
-      <Text style={styles.emptyTitle}>No Report Data</Text>
-      <Text style={styles.emptySubtitle}>
-        Add some transactions to see your monthly financial report and insights.
-      </Text>
-      <Text style={styles.emptyHint}>
-        💡 Connect your bank or mobile money accounts to automatically sync transactions
-      </Text>
-    </View>
-  );
+  const formatMonthYear = (monthString: string): string => {
+    const date = new Date(monthString + '-01');
+    return date.toLocaleDateString('en-US', { 
+      month: 'long', 
+      year: 'numeric' 
+    });
+  };
 
-  const renderLoadingState = () => (
-    <View style={styles.loadingState}>
-      <MaterialIcons name="hourglass-empty" size={48} color="#9ca3af" />
-      <Text style={styles.loadingText}>Loading your financial report...</Text>
-    </View>
-  );
+  const handleExportReport = (): void => {
+    Alert.alert('Export Report', 'Report export functionality will be available soon.');
+  };
+
+  const handleCompareMonths = (): void => {
+    Alert.alert('Compare Months', 'Month comparison functionality will be available soon.');
+  };
+
+  const combinedLoading = isLoading || isRefreshing;
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: 'Financial Reports',
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: '#ffffff',
-          },
-          headerTitleStyle: {
-            color: '#111827',
-            fontWeight: 'bold',
-          },
-          headerTintColor: '#6b7280',
-        }}
-      />
-
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}
+    <SafeAreaView style={styles.container}>
+      <ScrollView 
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
+          <RefreshControl 
+            refreshing={combinedLoading} 
             onRefresh={handleRefresh}
-            tintColor="#3b82f6"
-            colors={['#3b82f6']}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
           />
         }
-        showsVerticalScrollIndicator={false}
       >
-        {/* Month Picker */}
-        <MonthPicker
-          selectedMonth={selectedMonth}
-          availableMonths={availableMonths}
-          onMonthSelect={handleMonthSelect}
-          isLoading={isLoading}
+        {/* Gradient Header Section */}
+        <GradientHeader
+          title="Financial Reports"
+          onBackPress={handleGoBack}
+          onCalendarPress={() => {
+            // Handle calendar press
+          }}
+          onNotificationPress={() => {
+            // Handle notification press
+          }}
         />
 
-        {/* Content */}
-        {isLoading && !currentReport ? (
-          renderLoadingState()
-        ) : !currentReport ? (
-          renderEmptyState()
-        ) : (
-          <>
-            {/* Monthly Summary */}
-            <MonthlySummaryCard
-              report={currentReport}
-              isLoading={isLoading}
-            />
+        {/* Content Card */}
+        <View style={styles.contentCard}>
+          {/* Error Display */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <MaterialIcons name="error-outline" size={20} color={COLORS.error} />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity 
+                style={styles.errorRetryButton}
+                onPress={handleRefresh}
+              >
+                <Text style={styles.errorRetryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-            {/* Expense Breakdown Chart */}
-            {currentReport.categoryBreakdown.length > 0 && (
-              <CategoryBreakdownChart
-                categoryData={currentReport.categoryBreakdown}
-                type="expense"
-                isLoading={isLoading}
-              />
-            )}
+          {/* Month Navigation */}
+          <View style={styles.monthNavigationContainer}>
+            <TouchableOpacity 
+              style={styles.monthNavButton}
+              onPress={() => handleMonthNavigation('prev')}
+            >
+              <MaterialIcons name="chevron-left" size={24} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+            
+            <View style={styles.monthDisplayContainer}>
+              <Text style={styles.monthDisplayText}>
+                {formatMonthYear(selectedMonth)}
+              </Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.monthNavButton}
+              onPress={() => handleMonthNavigation('next')}
+            >
+              <MaterialIcons name="chevron-right" size={24} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+          </View>
 
-            {/* Income Breakdown Chart */}
-            {currentReport.categoryBreakdown.some(item => item.type === 'income') && (
-              <CategoryBreakdownChart
-                categoryData={currentReport.categoryBreakdown}
-                type="income"
-                isLoading={isLoading}
-              />
-            )}
-
-            {/* Insights Section */}
-            {currentReport.topCategories.length > 0 && (
-              <View style={styles.insightsCard}>
-                <Text style={styles.insightsTitle}>Key Insights</Text>
-                
-                <View style={styles.insightItem}>
-                  <MaterialIcons name="trending-up" size={20} color="#dc2626" />
-                  <Text style={styles.insightText}>
-                    Top spending category: {currentReport.topCategories[0]?.categoryName} 
-                    (₵{currentReport.topCategories[0]?.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })})
-                  </Text>
-                </View>
-
-                {currentReport.avgTransactionAmount > 0 && (
-                  <View style={styles.insightItem}>
-                    <MaterialIcons name="receipt" size={20} color="#3b82f6" />
-                    <Text style={styles.insightText}>
-                      Average transaction: ₵{currentReport.avgTransactionAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          {/* Report Summary Section */}
+          <View style={styles.summarySection}>
+            <Text style={styles.sectionTitle}>Monthly Summary</Text>
+            {currentReport ? (
+              <View style={styles.summaryCard}>
+                <View style={styles.summaryRow}>
+                  <View style={styles.summaryItem}>
+                    <MaterialIcons name="trending-up" size={24} color={COLORS.success} />
+                    <Text style={styles.summaryLabel}>Income</Text>
+                    <Text style={styles.summaryValue}>
+                      ₵{currentReport.totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
                   </View>
-                )}
+                  
+                  <View style={styles.summaryItem}>
+                    <MaterialIcons name="trending-down" size={24} color={COLORS.error} />
+                    <Text style={styles.summaryLabel}>Expenses</Text>
+                    <Text style={styles.summaryValue}>
+                      ₵{currentReport.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.netIncomeContainer}>
+                  <MaterialIcons 
+                    name={currentReport.netIncome >= 0 ? "account-balance" : "warning"} 
+                    size={28} 
+                    color={currentReport.netIncome >= 0 ? COLORS.success : COLORS.error} 
+                  />
+                  <Text style={styles.netIncomeLabel}>Net Income</Text>
+                  <Text style={[
+                    styles.netIncomeValue,
+                    { color: currentReport.netIncome >= 0 ? COLORS.success : COLORS.error }
+                  ]}>
+                    ₵{currentReport.netIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryCardTitle}>No Data Available</Text>
+                <Text style={styles.summaryCardText}>
+                  No financial data available for the selected month
+                </Text>
+              </View>
+            )}
+          </View>
 
+          {/* Quick Insights Grid */}
+          <View style={styles.insightsSection}>
+            <Text style={styles.sectionTitle}>Quick Insights</Text>
+            <View style={styles.insightsGrid}>
+              <View style={styles.insightCard}>
+                <MaterialIcons name="category" size={24} color={COLORS.primary} />
+                <Text style={styles.insightCardTitle}>Top Category</Text>
+                <Text style={styles.insightCardValue}>
+                  {currentReport?.topCategories[0]?.categoryName || '--'}
+                </Text>
+              </View>
+              
+              <View style={styles.insightCard}>
+                <MaterialIcons name="receipt" size={24} color={COLORS.accent} />
+                <Text style={styles.insightCardTitle}>Transactions</Text>
+                <Text style={styles.insightCardValue}>
+                  {currentReport?.transactionCount || '--'}
+                </Text>
+              </View>
+              
+              <View style={styles.insightCard}>
+                <MaterialIcons name="analytics" size={24} color={COLORS.success} />
+                <Text style={styles.insightCardTitle}>Avg Amount</Text>
+                <Text style={styles.insightCardValue}>
+                  {currentReport ? `₵${currentReport.avgTransactionAmount.toFixed(0)}` : '--'}
+                </Text>
+              </View>
+              
+              <View style={styles.insightCard}>
+                <MaterialIcons name="savings" size={24} color={COLORS.warning} />
+                <Text style={styles.insightCardTitle}>Savings Rate</Text>
+                <Text style={styles.insightCardValue}>
+                  {currentReport && currentReport.totalIncome > 0 
+                    ? `${((currentReport.netIncome / currentReport.totalIncome) * 100).toFixed(1)}%`
+                    : '--'
+                  }
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Detailed Insights */}
+          {currentReport && currentReport.topCategories.length > 0 && (
+            <View style={styles.detailsSection}>
+              <Text style={styles.sectionTitle}>Key Insights</Text>
+              <View style={styles.detailsCard}>
+                {currentReport.topCategories.slice(0, 3).map((category, index) => (
+                  <View key={category.categoryName} style={styles.detailItem}>
+                    <MaterialIcons name="trending-up" size={20} color={COLORS.error} />
+                    <Text style={styles.detailItemText}>
+                      #{index + 1} spending: {category.categoryName} - ₵{category.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </Text>
+                  </View>
+                ))}
+                
                 {currentReport.netIncome !== 0 && (
-                  <View style={styles.insightItem}>
+                  <View style={styles.detailItem}>
                     <MaterialIcons 
                       name={currentReport.netIncome > 0 ? "savings" : "warning"}
                       size={20} 
-                      color={currentReport.netIncome > 0 ? "#16a34a" : "#f59e0b"}
+                      color={currentReport.netIncome > 0 ? COLORS.success : COLORS.warning}
                     />
-                    <Text style={styles.insightText}>
+                    <Text style={styles.detailItemText}>
                       {currentReport.netIncome > 0 
                         ? `You saved ₵${currentReport.netIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })} this month`
                         : `You overspent by ₵${Math.abs(currentReport.netIncome).toLocaleString('en-US', { minimumFractionDigits: 2 })} this month`
@@ -224,97 +272,304 @@ const ReportsScreen: React.FC = () => {
                   </View>
                 )}
               </View>
-            )}
-          </>
-        )}
+            </View>
+          )}
 
-        {/* Bottom spacing */}
-        <View style={styles.bottomSpacing} />
+          {/* Action Buttons */}
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity style={styles.primaryActionButton} onPress={handleExportReport}>
+              <MaterialIcons name="file-download" size={18} color={COLORS.textSecondary} />
+              <Text style={styles.primaryActionButtonText}>Export Report</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.secondaryActionButton} onPress={handleCompareMonths}>
+              <MaterialIcons name="compare-arrows" size={18} color={COLORS.primary} />
+              <Text style={styles.secondaryActionButtonText}>Compare Months</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Loading State */}
+          {combinedLoading && (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading report data...</Text>
+            </View>
+          )}
+
+          {/* Empty State */}
+          {!combinedLoading && !currentReport && !error && (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="assessment" size={64} color="#d1d5db" />
+              <Text style={styles.emptyStateTitle}>No Report Data</Text>
+              <Text style={styles.emptyStateText}>
+                No financial data available for the selected month.
+              </Text>
+            </View>
+          )}
+
+          {/* Bottom spacing for navigation */}
+          <View style={styles.bottomSpacing} />
+        </View>
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: BUDGET.gradientColors.start,
   },
-  contentContainer: {
-    paddingBottom: 20,
+  mainScrollView: {
+    flex: 1,
   },
-  emptyState: {
+  contentCard: {
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: 20,
+    flex: 1,
+  },
+  errorContainer: {
+    backgroundColor: COLORS.backgroundCard,
+    marginHorizontal: SPACING.xl,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.error,
+    ...SHADOWS.sm,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
+    marginLeft: SPACING.sm,
+    marginRight: SPACING.md,
+  },
+  errorRetryButton: {
+    backgroundColor: COLORS.error,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  errorRetryText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.medium,
+  },
+  monthNavigationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  monthNavButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: BORDER_RADIUS.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
-    paddingHorizontal: 40,
+    ...SHADOWS.sm,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginTop: 16,
-    marginBottom: 8,
+  monthDisplayContainer: {
+    flex: 1,
+    alignItems: 'center',
   },
-  emptySubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
+  monthDisplayText: {
+    fontSize: TYPOGRAPHY.sizes.xl,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+  },
+  summarySection: {
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.xl,
+  },
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
+  },
+  summaryCard: {
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.xl,
+    ...SHADOWS.md,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.lg,
+  },
+  summaryItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  summaryLabel: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  summaryValue: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    color: COLORS.textPrimary,
+  },
+  netIncomeContainer: {
+    alignItems: 'center',
+    paddingTop: SPACING.lg,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray100,
+  },
+  netIncomeLabel: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textTertiary,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  netIncomeValue: {
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    fontWeight: TYPOGRAPHY.weights.bold,
+  },
+  summaryCardTitle: {
+    fontSize: TYPOGRAPHY.sizes.xl,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 16,
   },
-  emptyHint: {
-    fontSize: 14,
-    color: '#9ca3af',
+  summaryCardText: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textTertiary,
     textAlign: 'center',
-    fontStyle: 'italic',
     lineHeight: 20,
   },
-  loadingState: {
+  insightsSection: {
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.xl,
+  },
+  insightsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -SPACING.sm,
+  },
+  insightCard: {
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
+    width: '47%',
+    marginHorizontal: '1.5%',
+    marginBottom: SPACING.md,
+    ...SHADOWS.sm,
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
-    marginTop: 16,
+  insightCardTitle: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xs,
+    textAlign: 'center',
   },
-  insightsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    margin: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+  insightCardValue: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
   },
-  insightsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 16,
+  detailsSection: {
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.xl,
   },
-  insightItem: {
+  detailsCard: {
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    ...SHADOWS.sm,
+  },
+  detailItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
-  insightText: {
-    fontSize: 14,
-    color: '#374151',
-    marginLeft: 12,
+  detailItemText: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
+    marginLeft: SPACING.sm,
     flex: 1,
     lineHeight: 20,
   },
+  actionsContainer: {
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.xl,
+    gap: SPACING.md,
+  },
+  primaryActionButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.huge,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    ...SHADOWS.md,
+  },
+  primaryActionButtonText: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textSecondary,
+  },
+  secondaryActionButton: {
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: BORDER_RADIUS.huge,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    ...SHADOWS.sm,
+  },
+  secondaryActionButtonText: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.primary,
+  },
+  loadingContainer: {
+    padding: SPACING.xl,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textTertiary,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: SPACING.huge,
+    marginTop: SPACING.xl,
+  },
+  emptyStateTitle: {
+    fontSize: TYPOGRAPHY.sizes.xl,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    color: COLORS.textPrimary,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.sm,
+  },
+  emptyStateText: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textTertiary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   bottomSpacing: {
-    height: 20,
+    height: 150,
   },
 });
-
-export default ReportsScreen;

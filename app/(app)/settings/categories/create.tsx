@@ -7,37 +7,120 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
-  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useCategoryStore } from '@/stores/categoryStore';
+import GradientHeader from '@/components/budgets/GradientHeader';
+import { COLORS, BORDER_RADIUS, SPACING, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import CustomAlert from '@/components/ui/CustomAlert';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const AVAILABLE_ICONS = [
-  'restaurant',
-  'car',
+  // Financial & Money
   'attach-money',
-  'movie',
-  'shopping-bag',
+  'savings',
+  'account-balance',
+  'credit-card',
+  'payment',
   'receipt',
+  
+  // Food & Dining
+  'restaurant',
+  'local-pizza',
+  'local-cafe',
+  'coffee',
+  'wine-bar',
+  'fastfood',
+  
+  // Transportation
+  'car',
+  'directions-bus',
+  'local-taxi',
+  'flight',
+  'local-gas-station',
+  'motorcycle',
+  
+  // Shopping & Retail
+  'shopping-bag',
+  'shopping-cart',
+  'store',
+  'local-grocery-store',
+  'card-giftcard',
+  'local-mall',
+  
+  // Health & Medical
   'local-hospital',
-  'school',
-  'home',
+  'local-pharmacy',
+  'favorite',
+  'spa',
+  'medical-services',
   'fitness-center',
-  'pets',
-  'travel-explore',
+  
+  // Entertainment & Leisure
+  'movie',
+  'music-note',
+  'games',
+  'photo-camera',
+  'sports-soccer',
+  'sports-basketball',
+  
+  // Home & Living
+  'home',
+  'build',
+  'electrical-services',
+  'plumbing',
+  'cleaning-services',
+  'bed',
+  
+  // Education & Work
+  'school',
+  'work',
+  'business-center',
+  'laptop-mac',
+  'library-books',
+  'calculate',
+  
+  // Technology & Communication
   'phone',
   'computer',
-  'coffee',
-  'sports-soccer',
+  'smartphone',
+  'wifi',
+  'router',
+  'headphones',
+  
+  // Travel & Adventure
+  'travel-explore',
+  'flight-takeoff',
+  'hotel',
+  'luggage',
+  'map',
+  'beach-access',
+  
+  // Utilities & Services
+  'electric-bolt',
+  'water-drop',
+  'local-laundry-service',
+  'local-post-office',
+  'local-shipping',
+  'support-agent',
+  
+  // Miscellaneous
+  'pets',
+  'child-care',
+  'elderly',
+  'volunteer-activism',
+  'celebration',
+  'more-horiz',
 ];
 
 export default function CreateCategoryScreen() {
   const router = useRouter();
   const { createCategory, isLoading, error } = useCategoryStore();
+  const { alert, alertProps } = useCustomAlert();
 
   const [name, setName] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState('restaurant');
+  const [selectedIcon, setSelectedIcon] = useState('attach-money');
   const [nameError, setNameError] = useState('');
 
   const validateForm = () => {
@@ -62,10 +145,11 @@ export default function CreateCategoryScreen() {
     const success = await createCategory(name.trim(), selectedIcon);
     
     if (success) {
-      Alert.alert('Success', 'Category created successfully');
-      router.back();
+      alert('Success', 'Category created successfully', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
     } else if (error) {
-      Alert.alert('Error', error);
+      alert('Error', error);
     }
   };
 
@@ -75,7 +159,25 @@ export default function CreateCategoryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Gradient Header Section */}
+        <GradientHeader
+          title="Create Category"
+          subtitle="Add a new transaction category"
+          onBackPress={handleCancel}
+          onCalendarPress={() => {
+            // Handle calendar press
+          }}
+          onNotificationPress={() => {
+            // Handle notification press
+          }}
+          showCalendar={false}
+        />
+
+        {/* Content Card */}
         <View style={styles.content}>
           <View style={styles.form}>
             <View style={styles.formGroup}>
@@ -83,6 +185,7 @@ export default function CreateCategoryScreen() {
               <TextInput
                 style={[styles.input, nameError ? styles.inputError : null]}
                 placeholder="Enter category name"
+                placeholderTextColor={COLORS.textTertiary}
                 value={name}
                 onChangeText={(text) => {
                   setName(text);
@@ -100,9 +203,9 @@ export default function CreateCategoryScreen() {
               <Text style={styles.label}>Select Icon</Text>
               
               <View style={styles.iconGrid}>
-                {Array.from({ length: Math.ceil(AVAILABLE_ICONS.length / 4) }, (_, rowIndex) => (
+                {Array.from({ length: Math.ceil(AVAILABLE_ICONS.length / 5) }, (_, rowIndex) => (
                   <View key={rowIndex} style={styles.iconRow}>
-                    {AVAILABLE_ICONS.slice(rowIndex * 4, (rowIndex + 1) * 4).map((iconName) => (
+                    {AVAILABLE_ICONS.slice(rowIndex * 5, (rowIndex + 1) * 5).map((iconName) => (
                       <TouchableOpacity
                         key={iconName}
                         onPress={() => setSelectedIcon(iconName)}
@@ -113,8 +216,8 @@ export default function CreateCategoryScreen() {
                       >
                         <MaterialIcons
                           name={iconName as any}
-                          size={32}
-                          color={selectedIcon === iconName ? '#007bff' : '#666'}
+                          size={24}
+                          color={selectedIcon === iconName ? COLORS.white : COLORS.textPrimary}
                         />
                       </TouchableOpacity>
                     ))}
@@ -128,33 +231,38 @@ export default function CreateCategoryScreen() {
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
-          </View>
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.primaryButton,
-                (isLoading || !name.trim()) && styles.disabledButton
-              ]}
-              onPress={handleSubmit}
-              disabled={isLoading || !name.trim()}
-            >
-              <Text style={styles.primaryButtonText}>
-                {isLoading ? 'Creating...' : 'Create Category'}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  styles.primaryButton,
+                  (isLoading || !name.trim()) && styles.disabledButton
+                ]}
+                onPress={handleSubmit}
+                disabled={isLoading || !name.trim()}
+              >
+                <Text style={styles.primaryButtonText}>
+                  {isLoading ? 'Creating...' : 'Create Category'}
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.button, styles.secondaryButton]}
-              onPress={handleCancel}
-              disabled={isLoading}
-            >
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.secondaryButton]}
+                onPress={handleCancel}
+                disabled={isLoading}
+              >
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Bottom spacing for navigation */}
+            <View style={styles.bottomSpacing} />
           </View>
         </View>
       </ScrollView>
+      
+      <CustomAlert {...alertProps} />
     </SafeAreaView>
   );
 }
@@ -162,95 +270,116 @@ export default function CreateCategoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: BUDGET.gradientColors.start,
   },
-  scrollView: {
+  mainScrollView: {
     flex: 1,
   },
   content: {
-    padding: 16,
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: 20,
+    flex: 1,
   },
   form: {
-    gap: 24,
+    gap: SPACING.xxl,
+    paddingHorizontal: SPACING.xl,
   },
   formGroup: {
-    gap: 8,
+    gap: SPACING.sm,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    fontFamily: 'Poppins',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
+    borderColor: COLORS.gray100,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.lg,
+    fontSize: TYPOGRAPHY.sizes.md,
+    backgroundColor: COLORS.white,
+    fontFamily: 'Poppins',
+    color: COLORS.textPrimary,
   },
   inputError: {
-    borderColor: '#dc3545',
+    borderColor: COLORS.error,
   },
   errorText: {
-    color: '#dc3545',
-    fontSize: 14,
+    color: COLORS.error,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: 'Poppins',
   },
   errorContainer: {
-    backgroundColor: '#fee2e2',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.backgroundCard,
+    marginHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.error,
+    ...SHADOWS.sm,
   },
   iconGrid: {
-    gap: 8,
-    marginTop: 8,
+    gap: SPACING.md,
+    marginTop: SPACING.sm,
   },
   iconRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: SPACING.md,
   },
   iconButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
+    width: 56,
+    height: 56,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.white,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderColor: COLORS.gray100,
+    marginHorizontal: 2,
   },
   iconButtonSelected: {
-    borderColor: '#007bff',
-    backgroundColor: '#eff6ff',
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
   },
   buttonContainer: {
-    gap: 12,
-    marginTop: 48,
+    gap: SPACING.md,
+    marginTop: SPACING.huge,
+  },
+  bottomSpacing: {
+    height: 150,
   },
   button: {
-    padding: 16,
-    borderRadius: 8,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',
   },
   primaryButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: COLORS.primary,
   },
   disabledButton: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: COLORS.textTertiary,
   },
   primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontFamily: 'Poppins',
   },
   secondaryButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: COLORS.gray100,
   },
   secondaryButtonText: {
-    color: '#374151',
-    fontSize: 16,
-    fontWeight: '600',
+    color: COLORS.textPrimary,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontFamily: 'Poppins',
   },
 });

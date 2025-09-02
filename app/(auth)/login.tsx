@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ScrollView,
   StatusBar,
 } from 'react-native';
@@ -14,6 +13,8 @@ import { SvgXml } from 'react-native-svg';
 import { validateEmail } from '@/lib/validators';
 import { authService } from '@/services/authService';
 import { useAuthStore } from '@/stores/authStore';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import CustomAlert from '@/components/ui/CustomAlert';
 
 const EYE_ICON = `<svg width="26" height="20" viewBox="0 0 26 20" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M13 0C7.5 0 2.73 3.11 1 7.5C2.73 11.89 7.5 15 13 15C18.5 15 23.27 11.89 25 7.5C23.27 3.11 18.5 0 13 0ZM13 12.5C10.24 12.5 8 10.26 8 7.5C8 4.74 10.24 2.5 13 2.5C15.76 2.5 18 4.74 18 7.5C18 10.26 15.76 12.5 13 12.5ZM13 4.5C11.34 4.5 10 5.84 10 7.5C10 9.16 11.34 10.5 13 10.5C14.66 10.5 16 9.16 16 7.5C16 5.84 14.66 4.5 13 4.5Z" fill="#0E3E3E"/>
@@ -49,6 +50,7 @@ export default function LoginScreen(): React.ReactElement {
     password: false,
   });
   const { setUser, setSession } = useAuthStore();
+  const { alert, alertProps } = useCustomAlert();
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -78,7 +80,7 @@ export default function LoginScreen(): React.ReactElement {
 
       if (!result.success) {
         setErrors({ general: result.message });
-        Alert.alert('Login Failed', result.message);
+        alert('Login Failed', result.message);
         return;
       }
 
@@ -89,7 +91,7 @@ export default function LoginScreen(): React.ReactElement {
         setUser(session.user);
       }
 
-      Alert.alert('Success', 'Welcome back!', [
+      alert('Success', 'Welcome back!', [
         {
           text: 'OK',
           onPress: () => {
@@ -100,7 +102,7 @@ export default function LoginScreen(): React.ReactElement {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unexpected error occurred';
       setErrors({ general: message });
-      Alert.alert('Error', message);
+      alert('Error', message);
     } finally {
       setIsLoading(false);
     }
@@ -123,7 +125,7 @@ export default function LoginScreen(): React.ReactElement {
 
   const handleForgotPassword = (): void => {
     // TODO: Implement forgot password functionality
-    Alert.alert('Forgot Password', 'This feature will be available soon.');
+    alert('Forgot Password', 'This feature will be available soon.');
   };
 
   return (
@@ -215,6 +217,8 @@ export default function LoginScreen(): React.ReactElement {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      
+      <CustomAlert {...alertProps} />
     </View>
   );
 }

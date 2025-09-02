@@ -21,7 +21,7 @@ try {
     console.warn('OneSignal: App ID not configured in environment variables');
   }
 } catch (error) {
-  console.warn('OneSignal not available - running in Expo Go or missing native module:', error.message || error);
+  console.warn('OneSignal not available - running in Expo Go or missing native module:', (error as Error).message || error);
   // Create a mock OneSignal object for development
   OneSignal = {
     initialize: () => {},
@@ -252,7 +252,7 @@ export class OneSignalService {
       // Get the OneSignal player/subscription ID for this device
       // For OneSignal v5, we need to get the subscription ID differently
       return new Promise((resolve) => {
-        OneSignal.User.pushSubscription.addEventListener('change', (event) => {
+        OneSignal.User.pushSubscription.addEventListener('change', (event: any) => {
           const subscriptionId = event.current?.id;
           if (subscriptionId) {
             this.playerId = subscriptionId;
@@ -359,7 +359,7 @@ export class OneSignalService {
   private setupEventListeners(): void {
     try {
       // Listen for notification clicks
-      OneSignal.Notifications.addEventListener('click', (event) => {
+      OneSignal.Notifications.addEventListener('click', (event: any) => {
         console.log('OneSignal notification clicked:', event.notification);
         
         // Handle deep linking for budget alerts
@@ -371,7 +371,7 @@ export class OneSignalService {
       });
 
       // Listen for notification received (when app is in foreground)
-      OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event) => {
+      OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event: any) => {
         console.log('OneSignal notification received in foreground:', event.notification);
         // Allow the notification to show by default
         event.preventDefault();
@@ -379,7 +379,7 @@ export class OneSignalService {
       });
 
       // Listen for subscription changes
-      OneSignal.User.pushSubscription.addEventListener('change', (event) => {
+      OneSignal.User.pushSubscription.addEventListener('change', (event: any) => {
         console.log('OneSignal subscription changed:', event.current);
         
         // Update stored player ID

@@ -10,9 +10,11 @@ import {
   Alert 
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { supabase } from '@/services/supabaseClient';
 import { useAuthStore } from '@/stores/authStore';
+import GradientHeader from '@/components/budgets/GradientHeader';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 
 interface LinkedAccount {
   id: string;
@@ -78,6 +80,10 @@ export default function AccountsScreen() {
     router.push(`/accounts/${account.id}`);
   };
 
+  const handleGoBack = (): void => {
+    router.back();
+  };
+
   const getPlatformIcon = (platform: string) => {
     switch (platform) {
       case 'mono':
@@ -92,11 +98,11 @@ export default function AccountsScreen() {
   const getPlatformColor = (platform: string) => {
     switch (platform) {
       case 'mono':
-        return '#2563eb';
+        return COLORS.accent;
       case 'mtn_momo':
-        return '#f59e0b';
+        return COLORS.warning;
       default:
-        return '#6b7280';
+        return COLORS.textTertiary;
     }
   };
 
@@ -114,15 +120,15 @@ export default function AccountsScreen() {
   const getSyncStatusColor = (status?: string) => {
     switch (status) {
       case 'active':
-        return '#059669';
+        return COLORS.success;
       case 'auth_required':
-        return '#f59e0b';
+        return COLORS.warning;
       case 'error':
-        return '#dc2626';
+        return COLORS.error;
       case 'in_progress':
-        return '#2563eb';
+        return COLORS.accent;
       default:
-        return '#6b7280';
+        return COLORS.textTertiary;
     }
   };
 
@@ -159,47 +165,53 @@ export default function AccountsScreen() {
   };
 
   return (
-    <>
-      <Stack.Screen 
-        options={{ 
-          title: 'Manage Accounts',
-          headerStyle: { backgroundColor: '#2563eb' },
-          headerTintColor: '#ffffff',
-          headerTitleStyle: { fontWeight: '600' },
-          headerShown: true,
-        }} 
-      />
-      
-      <SafeAreaView style={styles.container}>
-        <ScrollView 
-          style={styles.scrollView}
-          refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
-          }
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <Text style={styles.title}>Your Accounts</Text>
-              <Text style={styles.subtitle}>
-                {linkedAccounts.length} account{linkedAccounts.length !== 1 ? 's' : ''} connected
-              </Text>
-            </View>
+    <SafeAreaView style={styles.container}>
+      <ScrollView 
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={isLoading} 
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
+        {/* Gradient Header Section */}
+        <GradientHeader
+          title="Your Accounts"
+          subtitle={`${linkedAccounts.length} account${linkedAccounts.length !== 1 ? 's' : ''} connected`}
+          onBackPress={handleGoBack}
+          onCalendarPress={() => {
+            // Handle calendar press
+          }}
+          onNotificationPress={() => {
+            // Handle notification press
+          }}
+          showCalendar={false}
+        />
+
+        {/* Content Card */}
+        <View style={styles.contentCard}>
+          {/* Add Account Button */}
+          <View style={styles.addAccountHeader}>
             <TouchableOpacity style={styles.addButton} onPress={handleAddAccount}>
-              <MaterialIcons name="add" size={24} color="#ffffff" />
+              <MaterialIcons name="add" size={24} color={COLORS.white} />
+              <Text style={styles.addButtonText}>Add Account</Text>
             </TouchableOpacity>
           </View>
 
           {/* Accounts List */}
           {linkedAccounts.length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialIcons name="account-balance-wallet" size={64} color="#d1d5db" />
+              <MaterialIcons name="account-balance-wallet" size={64} color={COLORS.textTertiary} />
               <Text style={styles.emptyTitle}>No Accounts Connected</Text>
               <Text style={styles.emptySubtitle}>
                 Connect your bank or mobile money accounts to start tracking your finances automatically
               </Text>
               <TouchableOpacity style={styles.emptyAddButton} onPress={handleAddAccount}>
-                <MaterialIcons name="add" size={20} color="#ffffff" />
+                <MaterialIcons name="add" size={20} color={COLORS.white} />
                 <Text style={styles.emptyAddButtonText}>Add Your First Account</Text>
               </TouchableOpacity>
             </View>
@@ -219,7 +231,7 @@ export default function AccountsScreen() {
                       <MaterialIcons 
                         name={getPlatformIcon(account.platform_source)}
                         size={24} 
-                        color="#ffffff" 
+                        color={COLORS.white} 
                       />
                     </View>
                     
@@ -255,12 +267,12 @@ export default function AccountsScreen() {
 
                   <View style={styles.accountFooter}>
                     <View style={styles.lastSyncInfo}>
-                      <MaterialIcons name="sync" size={16} color="#6b7280" />
+                      <MaterialIcons name="sync" size={16} color={COLORS.textTertiary} />
                       <Text style={styles.lastSyncText}>
                         Last sync: {formatLastSync(account.last_synced_at)}
                       </Text>
                     </View>
-                    <MaterialIcons name="chevron-right" size={20} color="#d1d5db" />
+                    <MaterialIcons name="chevron-right" size={20} color={COLORS.textTertiary} />
                   </View>
                 </TouchableOpacity>
               ))}
@@ -272,7 +284,7 @@ export default function AccountsScreen() {
             <View style={styles.addAccountSection}>
               <TouchableOpacity style={styles.addAccountCard} onPress={handleAddAccount}>
                 <View style={styles.addAccountContent}>
-                  <MaterialIcons name="add-circle-outline" size={32} color="#2563eb" />
+                  <MaterialIcons name="add-circle-outline" size={32} color={COLORS.primary} />
                   <Text style={styles.addAccountTitle}>Add Another Account</Text>
                   <Text style={styles.addAccountSubtitle}>
                     Connect more bank or mobile money accounts
@@ -282,197 +294,188 @@ export default function AccountsScreen() {
             </View>
           )}
 
+          {/* Bottom spacing for navigation */}
           <View style={styles.bottomSpacing} />
-        </ScrollView>
-      </SafeAreaView>
-    </>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: BUDGET.gradientColors.start,
   },
-  scrollView: {
+  mainScrollView: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  headerLeft: {
+  contentCard: {
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: 20,
     flex: 1,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6b7280',
+  addAccountHeader: {
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
   addButton: {
-    backgroundColor: '#2563eb',
-    width: 48,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.huge,
     height: 48,
-    borderRadius: 24,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#2563eb',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    gap: SPACING.sm,
+    ...SHADOWS.md,
+  },
+  addButtonText: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.white,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 32,
+    paddingVertical: SPACING.xxxl * 2,
+    paddingHorizontal: SPACING.xxxl,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
-    marginBottom: 8,
+    fontSize: TYPOGRAPHY.sizes.xl,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.sm,
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.lg,
+    color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 24,
+    marginBottom: SPACING.xl,
   },
   emptyAddButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
   },
   emptyAddButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    marginLeft: SPACING.sm,
   },
   accountsList: {
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACING.lg,
   },
   accountCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    ...SHADOWS.md,
   },
   accountHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   accountIcon: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: BORDER_RADIUS.round,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: SPACING.md,
   },
   accountInfo: {
     flex: 1,
   },
   accountName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.xs,
   },
   accountType: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textSecondary,
     marginBottom: 2,
   },
   accountDetail: {
-    fontSize: 12,
-    color: '#9ca3af',
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
   },
   accountMeta: {
     alignItems: 'flex-end',
   },
   accountBalance: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.lg,
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#ffffff',
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.white,
     textTransform: 'uppercase',
   },
   accountFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 8,
+    paddingTop: SPACING.sm,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: COLORS.border,
   },
   lastSyncInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   lastSyncText: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginLeft: 6,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textSecondary,
+    marginLeft: SPACING.xs,
   },
   addAccountSection: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
   },
   addAccountCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.xl,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderColor: COLORS.border,
     borderStyle: 'dashed',
   },
   addAccountContent: {
     alignItems: 'center',
   },
   addAccountTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 12,
-    marginBottom: 4,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.xs,
   },
   addAccountSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textSecondary,
     textAlign: 'center',
   },
   bottomSpacing: {
-    height: 40,
+    height: 150,
   },
 });

@@ -4,11 +4,11 @@ import {
   Text, 
   ScrollView, 
   TouchableOpacity, 
-  Alert, 
   ActivityIndicator, 
   StyleSheet,
   SafeAreaView,
-  Modal 
+  Modal,
+  RefreshControl 
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -20,13 +20,17 @@ import TotalBalanceCard from '@/components/transactions/TotalBalanceCard';
 import TransactionItem from '@/components/transactions/TransactionItem';
 import NotableTransactions from '@/components/transactions/NotableTransactions';
 import AverageTransactions from '@/components/transactions/AverageTransactions';
+import GradientHeader from '@/components/budgets/GradientHeader';
 import type { Transaction, TransactionWithAccount } from '@/types/models';
-import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
+import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, BUDGET } from '@/constants/design';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import CustomAlert from '@/components/ui/CustomAlert';
 
 export default function TransactionsScreen() {
   const router = useRouter();
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [showMonthSelector, setShowMonthSelector] = useState(false);
+  const { alert, alertProps } = useCustomAlert();
   
   const {
     transactions,
@@ -58,7 +62,7 @@ export default function TransactionsScreen() {
   const handleDeletePress = (transaction: Transaction) => {
     if (isSyncedTransaction(transaction)) {
       const platformName = getTransactionPlatformName(transaction);
-      Alert.alert(
+      alert(
         'Cannot Delete Synced Transaction',
         `This transaction was automatically synced from your ${platformName} account and cannot be deleted. You can only change its category.`,
         [{ text: 'OK', style: 'default' }]
@@ -66,7 +70,7 @@ export default function TransactionsScreen() {
       return;
     }
 
-    Alert.alert(
+    alert(
       'Delete Transaction',
       `Are you sure you want to delete this ${transaction.type} of $${transaction.amount.toFixed(2)}? This action cannot be undone.`,
       [
@@ -83,7 +87,7 @@ export default function TransactionsScreen() {
   const handleDeleteConfirm = async (transactionId: string) => {
     const success = await deleteTransaction(transactionId);
     if (!success && error) {
-      Alert.alert('Error', error);
+      alert('Error', error);
     }
   };
 
@@ -97,6 +101,14 @@ export default function TransactionsScreen() {
 
   const toggleSortOrder = () => {
     setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
+  };
+
+  const handleRefresh = async (): Promise<void> => {
+    await loadTransactions();
+  };
+
+  const handleGoBack = (): void => {
+    router.back();
   };
 
   // Calculate summary data and group transactions by month
@@ -225,41 +237,53 @@ export default function TransactionsScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialIcons name="arrow-back-ios" size={19} color={COLORS.primaryLight} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Transaction</Text>
-        <TouchableOpacity style={styles.notificationButton}>
-          <MaterialIcons name="notifications-none" size={24} color={COLORS.textPrimary} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={clearError} style={styles.errorCloseButton}>
-              <MaterialIcons name="close" size={20} color="#dc3545" />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Total Balance Card */}
-        <TotalBalanceCard totalBalance={summaryData.totalBalance} />
-
-        {/* Summary Cards */}
-        <TransactionSummaryCards 
-          totalIncome={summaryData.totalIncome}
-          totalExpense={summaryData.totalExpense}
+    <SafeAreaView style={styles.container}>
+      <ScrollView 
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={isLoading} 
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
+        {/* Gradient Header Section */}
+        <GradientHeader
+          title="Transactions"
+          onBackPress={handleGoBack}
+          onCalendarPress={() => {
+            setShowMonthSelector(true);
+          }}
+          onNotificationPress={() => {
+            // Handle notification press
+          }}
         />
 
-        {/* Month Filter - Hidden for now, calendar icon handles selection */}
+        {/* Content Card */}
+        <View style={styles.contentCard}>
+          {/* Error Display */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <MaterialIcons name="error-outline" size={20} color={COLORS.error} />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity onPress={clearError} style={styles.errorRetryButton}>
+                <Text style={styles.errorRetryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-        {/* Light Background Container */}
-        <View style={styles.transactionsContainer}>
+          {/* Total Balance Card */}
+          <TotalBalanceCard totalBalance={summaryData.totalBalance} />
+
+          {/* Summary Cards */}
+          <TransactionSummaryCards 
+            totalIncome={summaryData.totalIncome}
+            totalExpense={summaryData.totalExpense}
+          />
+
           {/* Month Header with Calendar Icon */}
           <View style={styles.monthHeaderContainer}>
             <Text style={styles.monthHeaderText}>
@@ -273,7 +297,7 @@ export default function TransactionsScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* All Transactions List - Moved to top */}
+          {/* Transactions List */}
           <View style={styles.transactionsList}>
             {summaryData.filteredTransactions.length === 0 ? (
               <View style={styles.emptyContainer}>
@@ -301,19 +325,22 @@ export default function TransactionsScreen() {
             )}
           </View>
 
-          {/* Notable Transactions - Moved to bottom */}
+          {/* Notable Transactions */}
           <NotableTransactions 
             transactions={summaryData.filteredTransactions}
             onTransactionPress={handleTransactionPress}
           />
 
-          {/* Average Transactions - Moved to bottom */}
+          {/* Average Transactions */}
           <View style={styles.bottomSection}>
             <AverageTransactions 
               transactions={summaryData.filteredTransactions}
               selectedMonth={selectedMonth}
             />
           </View>
+
+          {/* Bottom spacing for navigation */}
+          <View style={styles.bottomSpacing} />
         </View>
       </ScrollView>
 
@@ -389,92 +416,80 @@ export default function TransactionsScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+      
+      <CustomAlert {...alertProps} />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundMain,
-    paddingTop: 44, // Status bar height
+    backgroundColor: BUDGET.gradientColors.start,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 37,
-    paddingVertical: 16,
+  mainScrollView: {
+    flex: 1,
   },
-  backButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.sizes.xxl,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-  },
-  notificationButton: {
-    width: 30,
-    height: 30,
-    backgroundColor: COLORS.backgroundInput,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollView: {
+  contentCard: {
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: 20,
     flex: 1,
   },
   errorContainer: {
-    backgroundColor: '#fee2e2',
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 37,
-    marginVertical: 16,
+    backgroundColor: COLORS.backgroundCard,
+    marginHorizontal: SPACING.xl,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.error,
+    ...SHADOWS.sm,
   },
   errorText: {
-    color: '#dc3545',
     flex: 1,
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
+    marginLeft: SPACING.sm,
+    marginRight: SPACING.md,
   },
-  errorCloseButton: {
-    padding: 4,
+  errorRetryButton: {
+    backgroundColor: COLORS.error,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
   },
-  transactionsContainer: {
-    marginTop: 30,
-    marginHorizontal: 0,
-    backgroundColor: COLORS.primaryLight, // Light mint/cream background
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    paddingTop: 30,
-    paddingHorizontal: 0,
-    minHeight: 400,
-    position: 'relative',
+  errorRetryText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.medium,
   },
   monthHeaderContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 37,
-    paddingVertical: 20,
-    paddingTop: 30,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   monthHeaderText: {
-    fontSize: TYPOGRAPHY.sizes.xxl,
+    fontSize: TYPOGRAPHY.sizes.xl,
     fontWeight: TYPOGRAPHY.weights.semibold,
     color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
   },
   calendarIconButton: {
     width: 40,
     height: 40,
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.xl,
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOWS.sm,
   },
   transactionsList: {
     marginBottom: 20, // Reduced since we have sections below
@@ -524,7 +539,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins',
   },
   bottomSection: {
-    marginBottom: 140, // Space for FAB and bottom navigation
+    marginBottom: SPACING.md,
+  },
+  bottomSpacing: {
+    height: 150, // Account for bottom navigation
   },
   fab: {
     position: 'absolute',
@@ -549,24 +567,23 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: COLORS.backgroundCard,
+    borderTopLeftRadius: BORDER_RADIUS.xl,
+    borderTopRightRadius: BORDER_RADIUS.xl,
     maxHeight: '60%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: SPACING.xl,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: COLORS.gray100,
   },
   modalTitle: {
     fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: TYPOGRAPHY.weights.semibold,
     color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
   },
   monthList: {
     maxHeight: 300,
@@ -575,17 +592,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: SPACING.xl,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: COLORS.gray100,
   },
   monthItemSelected: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: COLORS.primaryLight,
   },
   monthText: {
     fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
   },
   monthTextSelected: {
     color: COLORS.primary,

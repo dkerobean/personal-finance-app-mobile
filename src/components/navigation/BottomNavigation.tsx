@@ -119,10 +119,9 @@ const styles = StyleSheet.create({
   tabBar: {
     flex: 1,
     flexDirection: 'row',
-    paddingHorizontal: 40,
-    justifyContent: 'center',
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 25,
   },
   tabItem: {
     alignItems: 'center',

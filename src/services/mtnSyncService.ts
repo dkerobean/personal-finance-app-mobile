@@ -55,7 +55,7 @@ class MTNSyncService {
       
       if (sessionError || !session) {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'AUTH_ERROR',
             message: 'Not authenticated. Please log in again.',
@@ -81,7 +81,7 @@ class MTNSyncService {
 
       if (!response.ok || !responseData.success) {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: responseData.error?.code || 'SYNC_ERROR',
             message: responseData.error?.message || 'Failed to sync transactions',
@@ -101,7 +101,7 @@ class MTNSyncService {
     } catch (error) {
       console.error('MTN sync service error:', error);
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'SYNC_ERROR',
           message: handleApiError(error),
@@ -174,7 +174,7 @@ class MTNSyncService {
       });
 
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'SYNC_ERROR',
           message: errorMessage,

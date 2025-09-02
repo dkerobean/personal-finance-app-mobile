@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react-native';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { budgetsApi } from '@/services/api/budgets';
 import type { BudgetWithSpending } from '@/types/models';

@@ -66,7 +66,7 @@ class BackgroundSyncService {
       
       if (sessionError || !session) {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'AUTH_ERROR',
             message: 'Not authenticated. Please log in again.',
@@ -99,7 +99,7 @@ class BackgroundSyncService {
     } catch (error) {
       console.error('Failed to get sync status:', error);
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'SYNC_STATUS_ERROR',
           message: handleApiError(error),
@@ -117,7 +117,7 @@ class BackgroundSyncService {
       
       if (sessionError || !session) {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'AUTH_ERROR',
             message: 'Not authenticated. Please log in again.',
@@ -173,7 +173,7 @@ class BackgroundSyncService {
     } catch (error) {
       console.error('Failed to get account sync statuses:', error);
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'ACCOUNT_STATUS_ERROR',
           message: handleApiError(error),
@@ -191,7 +191,7 @@ class BackgroundSyncService {
       
       if (sessionError || !session) {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'AUTH_ERROR',
             message: 'Not authenticated. Please log in again.',
@@ -236,7 +236,7 @@ class BackgroundSyncService {
     } catch (error) {
       console.error('Failed to trigger background sync:', error);
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'BACKGROUND_SYNC_ERROR',
           message: handleApiError(error),
@@ -258,7 +258,7 @@ class BackgroundSyncService {
       
       if (sessionError || !session) {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'AUTH_ERROR',
             message: 'Not authenticated. Please log in again.',
@@ -294,7 +294,7 @@ class BackgroundSyncService {
     } catch (error) {
       console.error('Failed to update sync configuration:', error);
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'CONFIG_UPDATE_ERROR',
           message: handleApiError(error),
@@ -322,7 +322,7 @@ class BackgroundSyncService {
       
       if (sessionError || !session) {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'AUTH_ERROR',
             message: 'Not authenticated. Please log in again.',
@@ -374,7 +374,7 @@ class BackgroundSyncService {
     } catch (error) {
       console.error('Failed to get sync history:', error);
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'SYNC_HISTORY_ERROR',
           message: handleApiError(error),
@@ -451,7 +451,7 @@ class BackgroundSyncService {
     } catch (error) {
       console.error('Failed to check sync health:', error);
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'HEALTH_CHECK_ERROR',
           message: handleApiError(error),

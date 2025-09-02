@@ -263,3 +263,129 @@ export interface ReportComparison {
   changeExpenses: number; // percentage change
   changeNet: number; // percentage change
 }
+
+// Net Worth Types
+export type AssetCategory = 'property' | 'investments' | 'cash' | 'vehicles' | 'personal' | 'business' | 'other';
+export type AssetType = 
+  | 'real_estate' | 'land' | 'rental_property'
+  | 'stocks' | 'bonds' | 'mutual_funds' | 'etf' | 'cryptocurrency' | 'retirement_account'
+  | 'savings' | 'checking' | 'money_market' | 'cd' | 'foreign_currency'
+  | 'car' | 'motorcycle' | 'boat' | 'rv'
+  | 'jewelry' | 'art' | 'collectibles' | 'electronics'
+  | 'business_equity' | 'business_assets' | 'intellectual_property'
+  | 'other';
+
+export type LiabilityCategory = 'loans' | 'credit_cards' | 'mortgages' | 'business_debt' | 'other';
+export type LiabilityType = 'mortgage' | 'auto_loan' | 'personal_loan' | 'credit_card' | 'student_loan' | 'business_loan' | 'other';
+
+export interface Asset {
+  id: string;
+  user_id: string;
+  name: string;
+  category: AssetCategory;
+  asset_type: AssetType;
+  current_value: number;
+  original_value?: number;
+  purchase_date?: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Liability {
+  id: string;
+  user_id: string;
+  name: string;
+  category: LiabilityCategory;
+  liability_type: LiabilityType;
+  current_balance: number;
+  original_balance?: number;
+  interest_rate?: number;
+  monthly_payment?: number;
+  due_date?: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NetWorthSnapshot {
+  id: string;
+  user_id: string;
+  snapshot_date: string;
+  total_assets: number;
+  total_liabilities: number;
+  net_worth: number;
+  connected_accounts_value: number;
+  manual_assets_value: number;
+  manual_liabilities_value: number;
+  created_at: string;
+}
+
+export interface NetWorthCalculation {
+  total_assets: number;
+  total_liabilities: number;
+  net_worth: number;
+  connected_accounts_balance: number;
+  manual_assets_total: number;
+  manual_liabilities_total: number;
+  calculation_date: string;
+  assets_breakdown: {
+    category: AssetCategory;
+    total: number;
+    count: number;
+  }[];
+  liabilities_breakdown: {
+    category: LiabilityCategory;
+    total: number;
+    count: number;
+  }[];
+}
+
+// Net Worth Request Types
+export interface CreateAssetRequest {
+  name: string;
+  category: AssetCategory;
+  asset_type: AssetType;
+  current_value: number;
+  original_value?: number;
+  purchase_date?: string;
+  description?: string;
+}
+
+export interface UpdateAssetRequest {
+  name?: string;
+  category?: AssetCategory;
+  asset_type?: AssetType;
+  current_value?: number;
+  original_value?: number;
+  purchase_date?: string;
+  description?: string;
+  is_active?: boolean;
+}
+
+export interface CreateLiabilityRequest {
+  name: string;
+  category: LiabilityCategory;
+  liability_type: LiabilityType;
+  current_balance: number;
+  original_balance?: number;
+  interest_rate?: number;
+  monthly_payment?: number;
+  due_date?: string;
+  description?: string;
+}
+
+export interface UpdateLiabilityRequest {
+  name?: string;
+  category?: LiabilityCategory;
+  liability_type?: LiabilityType;
+  current_balance?: number;
+  original_balance?: number;
+  interest_rate?: number;
+  monthly_payment?: number;
+  due_date?: string;
+  description?: string;
+  is_active?: boolean;
+}

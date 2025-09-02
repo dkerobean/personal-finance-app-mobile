@@ -60,7 +60,7 @@ describe('AccountAggregatorService - Sync Functionality', () => {
       
       mockMonoSyncService.syncBankAccount.mockResolvedValue({
         data: mockSyncResult,
-        error: undefined,
+        error: null,
       });
 
       const result = await accountAggregator.syncAccount('bank-account-id');
@@ -86,7 +86,7 @@ describe('AccountAggregatorService - Sync Functionality', () => {
       
       mockMtnSyncService.syncAccount.mockResolvedValue({
         data: mockSyncResult,
-        error: undefined,
+        error: null,
       });
 
       const result = await accountAggregator.syncAccount('momo-account-id');
@@ -144,7 +144,7 @@ describe('AccountAggregatorService - Sync Functionality', () => {
           institutionName: 'GCB Bank',
           errors: [],
         },
-        error: undefined,
+        error: null,
       });
 
       await accountAggregator.syncAccount('bank-account-id', dateRange);
@@ -169,7 +169,7 @@ describe('AccountAggregatorService - Sync Functionality', () => {
       
       mockMonoSyncService.syncBankAccountWithProgress.mockResolvedValue({
         data: mockSyncResult,
-        error: undefined,
+        error: null,
       });
 
       const result = await accountAggregator.syncAccountWithProgress(
@@ -200,7 +200,7 @@ describe('AccountAggregatorService - Sync Functionality', () => {
       
       mockMtnSyncService.syncAccountWithProgress.mockResolvedValue({
         data: mockSyncResult,
-        error: undefined,
+        error: null,
       });
 
       const result = await accountAggregator.syncAccountWithProgress(
@@ -245,7 +245,7 @@ describe('AccountAggregatorService - Sync Functionality', () => {
       
       mockMonoSyncService.validateBankAccount.mockResolvedValue({
         data: true,
-        error: undefined,
+        error: null,
       });
 
       const result = await accountAggregator.validateAccountSync('bank-account-id');
@@ -260,7 +260,7 @@ describe('AccountAggregatorService - Sync Functionality', () => {
       
       mockMtnSyncService.validateAccount.mockResolvedValue({
         data: { isValid: true, message: 'Valid account' },
-        error: undefined,
+        error: null,
       });
 
       const result = await accountAggregator.validateAccountSync('momo-account-id');
@@ -286,7 +286,7 @@ describe('AccountAggregatorService - Sync Functionality', () => {
       
       mockMonoSyncService.getSyncHistory.mockResolvedValue({
         data: mockHistory,
-        error: undefined,
+        error: null,
       });
 
       const result = await accountAggregator.getSyncHistory('bank-account-id', 5);
@@ -309,7 +309,7 @@ describe('AccountAggregatorService - Sync Functionality', () => {
       
       mockMtnSyncService.getSyncHistory.mockResolvedValue({
         data: mockHistory,
-        error: undefined,
+        error: null,
       });
 
       const result = await accountAggregator.getSyncHistory('momo-account-id');

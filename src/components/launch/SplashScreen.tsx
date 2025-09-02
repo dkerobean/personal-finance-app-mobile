@@ -9,7 +9,7 @@ export default function SplashScreen(): React.ReactElement {
         {/* Using a colored circle as placeholder since SVG may have compatibility issues */}
         <View style={styles.logoPlaceholder} />
       </View>
-      <Text style={styles.brandText}>FinWise</Text>
+      <Text style={styles.brandText}>kippo</Text>
     </View>
   );
 }

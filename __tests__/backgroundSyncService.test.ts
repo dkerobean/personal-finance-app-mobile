@@ -324,7 +324,7 @@ describe('BackgroundSyncService', () => {
           lastRunAt: new Date().toISOString(),
           nextRunAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
         },
-        error: undefined
+        error: null
       });
 
       // Mock getAccountSyncStatuses
@@ -340,7 +340,7 @@ describe('BackgroundSyncService', () => {
             lastSyncAttempt: new Date().toISOString()
           }
         ],
-        error: undefined
+        error: null
       });
 
       const result = await backgroundSyncService.checkSyncHealth();
@@ -367,7 +367,7 @@ describe('BackgroundSyncService', () => {
           lastRunAt: null,
           nextRunAt: null
         },
-        error: undefined
+        error: null
       });
 
       // Mock getAccountSyncStatuses
@@ -392,7 +392,7 @@ describe('BackgroundSyncService', () => {
             errorMessage: 'Network error'
           }
         ],
-        error: undefined
+        error: null
       });
 
       const result = await backgroundSyncService.checkSyncHealth();

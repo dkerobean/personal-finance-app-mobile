@@ -213,7 +213,7 @@ export class AccountAggregatorService {
       const account = await this.getAccountById(accountId);
       if (!account) {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'ACCOUNT_NOT_FOUND',
             message: 'Account not found',
@@ -228,7 +228,7 @@ export class AccountAggregatorService {
         return await mtnSyncService.syncAccount(accountId, dateRange);
       } else {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'UNSUPPORTED_ACCOUNT_TYPE',
             message: `Unsupported account type: ${account.account_type}`,
@@ -238,7 +238,7 @@ export class AccountAggregatorService {
     } catch (error) {
       console.error('AccountAggregator: Error syncing account:', error);
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'SYNC_ERROR',
           message: 'An unexpected error occurred during sync',
@@ -268,7 +268,7 @@ export class AccountAggregatorService {
           error: 'Account not found',
         });
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'ACCOUNT_NOT_FOUND',
             message: 'Account not found',
@@ -296,7 +296,7 @@ export class AccountAggregatorService {
           error: `Unsupported account type: ${account.account_type}`,
         });
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'UNSUPPORTED_ACCOUNT_TYPE',
             message: `Unsupported account type: ${account.account_type}`,
@@ -314,7 +314,7 @@ export class AccountAggregatorService {
       });
 
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'SYNC_ERROR',
           message: errorMessage,
@@ -350,7 +350,7 @@ export class AccountAggregatorService {
         }
         return {
           data: { isValid: !!result.data, message: result.data ? 'Bank account is valid' : 'Bank account validation failed' },
-          error: undefined,
+          error: null,
         };
       } else if (account.account_type === 'mobile_money') {
         return await mtnSyncService.validateAccount(accountId);

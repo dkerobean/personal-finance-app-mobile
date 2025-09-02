@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FinWise is a React Native mobile application built with Expo for managing personal finances in Ghana. The app connects to local bank and mobile money accounts for automated transaction syncing, provides expense tracking, budgeting, and financial insights.
+kippo is a React Native mobile application built with Expo for managing personal finances in Ghana. The app connects to local bank and mobile money accounts for automated transaction syncing, provides expense tracking, budgeting, and financial insights.
 
 ## Technology Stack
 

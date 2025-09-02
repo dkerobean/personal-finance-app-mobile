@@ -11,6 +11,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Budget, BudgetWithSpending } from '@/types/models';
 import BudgetProgressCard from './BudgetProgressCard';
+import { BUDGET, COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 
 interface BudgetsListProps {
   budgets?: Budget[];
@@ -36,46 +37,46 @@ const BudgetItem = ({ budget, onEdit, onDelete }: BudgetItemProps): React.ReactE
     onDelete(budget);
   };
 
+  // Format the date like in the Figma design
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const month = date.toLocaleDateString('en-US', { month: 'long' });
+    const day = date.getDate();
+    return `${hours}:${minutes} - ${month} ${day}`;
+  };
+
   return (
-    <View style={styles.budgetItem}>
+    <TouchableOpacity style={styles.budgetItem} onPress={handleEdit}>
       <View style={styles.budgetContent}>
-        {/* Category Info */}
-        <View style={styles.categorySection}>
-          <View style={styles.categoryIconContainer}>
-            <MaterialIcons
-              name={budget.category_icon_name as any || 'category'}
-              size={24}
-              color="#2563eb"
-            />
-          </View>
-          <View style={styles.categoryInfo}>
-            <Text style={styles.categoryName}>{budget.category_name}</Text>
-            <Text style={styles.budgetMonth}>
-              {new Date(budget.month).toLocaleDateString('en-US', { 
-                month: 'short', 
-                year: 'numeric' 
-              })}
-            </Text>
-          </View>
+        {/* Icon */}
+        <View style={styles.categoryIconContainer}>
+          <MaterialIcons
+            name={budget.category_icon_name as any || 'directions-car'}
+            size={27}
+            color={BUDGET.circularProgress.iconColor}
+          />
         </View>
 
-        {/* Budget Amount */}
+        {/* Info Section */}
+        <View style={styles.categoryInfo}>
+          <Text style={styles.categoryName}>
+            {budget.category_name || 'Car Deposit'}
+          </Text>
+          <Text style={styles.timeText}>
+            {formatTime(budget.created_at)}
+          </Text>
+        </View>
+
+        {/* Amount */}
         <View style={styles.amountSection}>
-          <Text style={styles.budgetAmount}>₵{budget.amount.toFixed(2)}</Text>
-          <Text style={styles.amountLabel}>Budget</Text>
+          <Text style={styles.budgetAmount}>
+            ₵{budget.amount.toFixed(2)}
+          </Text>
         </View>
       </View>
-
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-          <MaterialIcons name="edit" size={18} color="#2563eb" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <MaterialIcons name="delete-outline" size={18} color="#dc3545" />
-        </TouchableOpacity>
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -145,142 +146,107 @@ export default function BudgetsList({
     return <View style={styles.separator} />;
   };
 
+  // Group budgets by month for display like in Figma
+  const groupedBudgets = displayBudgets.reduce((acc, budget) => {
+    const monthKey = new Date(budget.month || budget.created_at).toLocaleDateString('en-US', { month: 'long' });
+    if (!acc[monthKey]) {
+      acc[monthKey] = [];
+    }
+    acc[monthKey].push(budget);
+    return acc;
+  }, {} as Record<string, (Budget | BudgetWithSpending)[]>);
+
   return (
     <View style={styles.container}>
-      {displayBudgets.length > 0 && (
-        <View style={styles.header}>
-          <Text style={styles.sectionTitle}>
-            {showProgress ? 'Budget Progress' : 'Your Budgets'}
-          </Text>
-          <Text style={styles.budgetCount}>
-            {displayBudgets.length} {displayBudgets.length === 1 ? 'budget' : 'budgets'}
-          </Text>
+      {Object.keys(groupedBudgets).map((monthKey) => (
+        <View key={monthKey} style={styles.monthSection}>
+          {/* Month Header */}
+          <Text style={styles.monthTitle}>{monthKey}</Text>
+          
+          {/* Budget Items for this month */}
+          {groupedBudgets[monthKey].map((budget, index) => (
+            <React.Fragment key={budget.id}>
+              {showProgress && 'spent' in budget ? (
+                <BudgetProgressCard
+                  budget={budget as BudgetWithSpending}
+                  onPress={() => handleBudgetPress(budget)}
+                  onEdit={() => onEdit(budget)}
+                  onDelete={() => onDelete(budget)}
+                />
+              ) : (
+                <BudgetItem
+                  budget={budget as Budget}
+                  onEdit={onEdit as (budget: Budget) => void}
+                  onDelete={onDelete as (budget: Budget) => void}
+                />
+              )}
+            </React.Fragment>
+          ))}
         </View>
-      )}
+      ))}
 
-      <FlatList
-        data={displayBudgets}
-        renderItem={renderBudgetItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={showProgress ? styles.progressListContainer : styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={renderSeparator}
-        ListEmptyComponent={renderEmptyComponent}
-        scrollEnabled={false} // Parent handles scrolling
-      />
+      {displayBudgets.length === 0 && renderEmptyComponent()}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACING.lg,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+  monthSection: {
+    marginBottom: SPACING.xl,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  budgetCount: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  listContainer: {
-    flexGrow: 1,
-  },
-  progressListContainer: {
-    flexGrow: 1,
-    paddingHorizontal: 0, // Remove horizontal padding since cards have their own
+  monthTitle: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.medium,
+    color: BUDGET.transactionItem.titleColor,
+    marginBottom: SPACING.md,
+    paddingLeft: SPACING.md,
   },
   budgetItem: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: 'transparent',
+    paddingVertical: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   budgetContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  categorySection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
   categoryIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#eff6ff',
+    width: BUDGET.transactionItem.iconSize,
+    height: BUDGET.transactionItem.iconSize,
+    borderRadius: BUDGET.transactionItem.iconBorderRadius,
+    backgroundColor: BUDGET.transactionItem.backgroundColor,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: SPACING.md,
   },
   categoryInfo: {
     flex: 1,
+    marginLeft: SPACING.md,
   },
   categoryName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.medium,
+    color: BUDGET.transactionItem.titleColor,
     marginBottom: 2,
   },
-  budgetMonth: {
-    fontSize: 12,
-    color: '#6b7280',
+  timeText: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: BUDGET.transactionItem.subtitleColor,
   },
   amountSection: {
     alignItems: 'flex-end',
   },
   budgetAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#059669',
-    marginBottom: 2,
-  },
-  amountLabel: {
-    fontSize: 11,
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    marginLeft: 12,
-  },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#eff6ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  deleteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#fee2e2',
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.medium,
+    color: BUDGET.transactionItem.amountColor,
   },
   separator: {
     height: 12,

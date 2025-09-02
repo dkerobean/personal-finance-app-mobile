@@ -26,5 +26,8 @@ export const handleApiError = (error: unknown): string => {
 };
 
 export const createApiResponse = <T>(data?: T, error?: ApiError['error']): ApiResponse<T> => {
-  return { data, error };
+  return { 
+    data: data ?? null, 
+    error: error ?? null 
+  };
 };

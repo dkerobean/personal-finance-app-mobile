@@ -58,7 +58,7 @@ class MonoSyncService {
       
       if (sessionError || !session) {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: 'AUTH_ERROR',
             message: 'Not authenticated. Please log in again.',
@@ -83,7 +83,7 @@ class MonoSyncService {
 
       if (!response.ok || !data.success) {
         return {
-          data: undefined,
+          data: null,
           error: {
             code: data.error?.code || 'SYNC_ERROR',
             message: data.error?.message || 'Failed to sync bank account',
@@ -93,13 +93,13 @@ class MonoSyncService {
 
       return {
         data: data.data!,
-        error: undefined,
+        error: null,
       };
 
     } catch (error) {
       console.error('MonoSyncService: Error syncing bank account:', error);
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'NETWORK_ERROR',
           message: 'Network error occurred. Please check your connection and try again.',
@@ -181,7 +181,7 @@ class MonoSyncService {
       });
 
       return {
-        data: undefined,
+        data: null,
         error: {
           code: 'SYNC_ERROR',
           message: errorMessage,
@@ -238,7 +238,7 @@ class MonoSyncService {
 
       return {
         data: true,
-        error: undefined,
+        error: null,
       };
 
     } catch (error) {
@@ -289,7 +289,7 @@ class MonoSyncService {
 
       return {
         data: data || [],
-        error: undefined,
+        error: null,
       };
 
     } catch (error) {

@@ -9,7 +9,8 @@ import { authService } from '@/services/authService';
 import TotalBalanceCard from '@/components/dashboard/TotalBalanceCard';
 import RecentTransactions from '@/components/dashboard/RecentTransactions';
 import AccountsOverviewCard from '@/components/dashboard/AccountsOverviewCard';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '@/constants/design';
+import GradientHeader from '@/components/budgets/GradientHeader';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 
 export default function DashboardScreen(): React.ReactElement {
   const { user, logout } = useAuthStore();
@@ -19,6 +20,7 @@ export default function DashboardScreen(): React.ReactElement {
   useEffect(() => {
     loadTransactions();
   }, []);
+
 
   const handleSignOut = async (): Promise<void> => {
     const result = await authService.signOut();
@@ -56,82 +58,103 @@ export default function DashboardScreen(): React.ReactElement {
     router.push('/settings');
   };
 
+  const handleNetWorthCalculator = (): void => {
+    router.push('/networth');
+  };
+
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.title}>Hi, Welcome Back</Text>
-          <Text style={styles.welcomeText}>Good Morning</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.notificationButton} onPress={() => console.log('Notifications')}>
-            <View style={styles.notificationIconContainer}>
-              <MaterialIcons name="notifications-none" size={20} color={COLORS.textPrimary} />
+      <ScrollView 
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={isLoading} 
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
+        {/* Gradient Header Section */}
+        <GradientHeader
+          title="Hi, Welcome Back"
+          subtitle="Good Morning"
+          onCalendarPress={() => {
+            // Handle calendar press
+          }}
+          onNotificationPress={() => {
+            console.log('Notifications');
+          }}
+          showCalendar={false}
+        />
+
+        {/* Content Card */}
+        <View style={styles.contentCard}>
+
+          {/* Total Balance Card */}
+          <TotalBalanceCard transactions={transactions} isLoading={isLoading} />
+
+          {/* Net Worth Link Card */}
+          <TouchableOpacity style={styles.netWorthLinkCard} onPress={handleNetWorthCalculator}>
+            <View style={styles.netWorthHeader}>
+              <Text style={styles.netWorthTitle}>Net Worth Calculator</Text>
+              <MaterialIcons name="calculate" size={24} color={COLORS.white} />
+            </View>
+            <Text style={styles.netWorthDescription}>
+              Calculate and track your total net worth
+            </Text>
+            <View style={styles.netWorthCta}>
+              <Text style={styles.netWorthCtaText}>View Details</Text>
+              <MaterialIcons name="arrow-forward" size={16} color={COLORS.white} />
             </View>
           </TouchableOpacity>
-        </View>
-      </View>
 
-      {/* Main Content Container */}
-      <View style={styles.contentContainer}>
-        <ScrollView 
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
-          }
-        >
+          {/* Accounts Overview */}
+          <AccountsOverviewCard onAccountsPress={handleManageAccounts} />
 
-        {/* Total Balance Card */}
-        <TotalBalanceCard transactions={transactions} isLoading={isLoading} />
-
-        {/* Accounts Overview */}
-        <AccountsOverviewCard onAccountsPress={handleManageAccounts} />
-
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleAddTransaction}>
-            <MaterialIcons name="add" size={24} color="#ffffff" />
-            <Text style={styles.actionButtonText}>Add Transaction</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButtonSecondary} onPress={handleViewTransactions}>
-            <MaterialIcons name="list" size={24} color="#2563eb" />
-            <Text style={styles.actionButtonSecondaryText}>View All</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Budget and Reports Actions */}
-        <View style={styles.budgetActions}>
-          <TouchableOpacity style={styles.budgetButton} onPress={handleViewBudgets}>
-            <MaterialIcons name="account-balance-wallet" size={24} color="#059669" />
-            <Text style={styles.budgetButtonText}>Manage Budgets</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.reportsButton} onPress={handleViewReports}>
-            <MaterialIcons name="assessment" size={24} color="#7c3aed" />
-            <Text style={styles.reportsButtonText}>View Reports</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Recent Transactions */}
-        <RecentTransactions transactions={recentTransactions} isLoading={isLoading} />
-
-        {/* Error Display */}
-        {error && (
-          <View style={styles.errorContainer}>
-            <MaterialIcons name="error-outline" size={24} color="#dc3545" />
-            <Text style={styles.errorText}>{error}</Text>
+          {/* Quick Actions */}
+          <View style={styles.quickActions}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleAddTransaction}>
+              <MaterialIcons name="add" size={24} color={COLORS.white} />
+              <Text style={styles.actionButtonText}>Add Transaction</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.actionButtonSecondary} onPress={handleViewTransactions}>
+              <MaterialIcons name="list" size={24} color={COLORS.primary} />
+              <Text style={styles.actionButtonSecondaryText}>View All</Text>
+            </TouchableOpacity>
           </View>
-        )}
+
+          {/* Budget and Reports Actions */}
+          <View style={styles.budgetActions}>
+            <TouchableOpacity style={styles.budgetButton} onPress={handleViewBudgets}>
+              <MaterialIcons name="account-balance-wallet" size={24} color={COLORS.success} />
+              <Text style={styles.budgetButtonText}>Manage Budgets</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.reportsButton} onPress={handleViewReports}>
+              <MaterialIcons name="assessment" size={24} color={COLORS.accent} />
+              <Text style={styles.reportsButtonText}>View Reports</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Recent Transactions */}
+          <RecentTransactions transactions={recentTransactions} isLoading={isLoading} />
+
+          {/* Error Display */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <MaterialIcons name="error-outline" size={24} color={COLORS.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
 
           {/* Bottom spacing for navigation */}
           <View style={styles.bottomSpacing} />
-        </ScrollView>
-      </View>
-
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -139,55 +162,18 @@ export default function DashboardScreen(): React.ReactElement {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundMain,
+    backgroundColor: BUDGET.gradientColors.start,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.lg,
-  },
-  headerLeft: {
+  mainScrollView: {
     flex: 1,
   },
-  title: {
-    fontSize: TYPOGRAPHY.sizes.xxxl,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  welcomeText: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textPrimary,
-    fontWeight: TYPOGRAPHY.weights.normal,
-  },
-  contentContainer: {
-    flex: 1,
+  contentCard: {
     backgroundColor: COLORS.backgroundContent,
-    borderTopLeftRadius: BORDER_RADIUS.huge,
-    borderTopRightRadius: BORDER_RADIUS.huge,
-    marginTop: SPACING.md,
-  },
-  scrollView: {
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: 20,
     flex: 1,
-    paddingTop: SPACING.xxxl,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  notificationButton: {
-    padding: SPACING.sm,
-  },
-  notificationIconContainer: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: COLORS.backgroundInput,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   quickActions: {
     flexDirection: 'row',
@@ -275,11 +261,13 @@ const styles = StyleSheet.create({
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fee2e2',
-    padding: SPACING.xl,
+    backgroundColor: COLORS.backgroundCard,
     marginHorizontal: SPACING.xl,
     marginVertical: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.error,
     ...SHADOWS.sm,
   },
   errorText: {
@@ -289,6 +277,47 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bottomSpacing: {
-    height: 130,
+    height: 150,
+  },
+  // Net Worth Link Card styles
+  netWorthLinkCard: {
+    backgroundColor: COLORS.primary,
+    marginHorizontal: SPACING.xl,
+    marginVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.xl,
+    ...SHADOWS.md,
+  },
+  netWorthHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  netWorthTitle: {
+    fontSize: TYPOGRAPHY.sizes.xl,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.white,
+  },
+  netWorthDescription: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.white,
+    opacity: 0.9,
+    marginBottom: SPACING.lg,
+  },
+  netWorthCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  netWorthCtaText: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.medium,
+    color: COLORS.white,
+    marginRight: SPACING.xs,
   },
 });

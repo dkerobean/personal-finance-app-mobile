@@ -5,10 +5,13 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import GradientHeader from '@/components/budgets/GradientHeader';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 
 interface SettingsOption {
   id: string;
@@ -57,17 +60,40 @@ export default function SettingsScreen() {
     router.push(route as any);
   };
 
+  const handleGoBack = (): void => {
+    router.back();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Settings</Text>
-            <Text style={styles.subtitle}>
-              Manage your app preferences and data
-            </Text>
-          </View>
+      <ScrollView 
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={false} 
+            onRefresh={() => {}}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
+        {/* Gradient Header Section */}
+        <GradientHeader
+          title="Settings"
+          subtitle="Manage your app preferences and data"
+          onBackPress={handleGoBack}
+          onCalendarPress={() => {
+            // Handle calendar press
+          }}
+          onNotificationPress={() => {
+            // Handle notification press
+          }}
+          showCalendar={false}
+        />
 
+        {/* Content Card */}
+        <View style={styles.contentCard}>
           <View style={styles.optionsList}>
             {settingsOptions.map((option) => (
               <TouchableOpacity
@@ -80,7 +106,7 @@ export default function SettingsScreen() {
                     <MaterialIcons
                       name={option.icon}
                       size={24}
-                      color="#007bff"
+                      color={COLORS.primary}
                     />
                   </View>
                   <View style={styles.optionText}>
@@ -93,11 +119,14 @@ export default function SettingsScreen() {
                 <MaterialIcons
                   name="chevron-right"
                   size={24}
-                  color="#9ca3af"
+                  color={COLORS.textTertiary}
                 />
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Bottom spacing for navigation */}
+          <View style={styles.bottomSpacing} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -107,39 +136,31 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: BUDGET.gradientColors.start,
   },
-  scrollView: {
+  mainScrollView: {
     flex: 1,
   },
-  content: {
-    padding: 16,
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
+  contentCard: {
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: 20,
+    flex: 1,
   },
   optionsList: {
-    gap: 8,
+    paddingHorizontal: SPACING.xl,
+    gap: SPACING.md,
   },
   optionItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    backgroundColor: COLORS.backgroundCard,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    ...SHADOWS.sm,
   },
   optionContent: {
     flexDirection: 'row',
@@ -147,24 +168,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconContainer: {
-    backgroundColor: '#eff6ff',
-    padding: 12,
-    borderRadius: 24,
+    backgroundColor: COLORS.primaryLight,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.round,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: SPACING.lg,
   },
   optionText: {
     flex: 1,
   },
   optionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   optionDescription: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textTertiary,
+  },
+  bottomSpacing: {
+    height: 150,
   },
 });

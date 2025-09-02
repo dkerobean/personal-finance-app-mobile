@@ -18,6 +18,7 @@ export const COLORS = {
   
   // Accent colors
   accent: '#0068FF',
+  lightBlue: '#6DB6FE',
   success: '#059669',
   warning: '#f59e0b',
   error: '#dc3545',
@@ -99,31 +100,31 @@ export const SHADOWS = {
 };
 
 export const MODAL = {
-  // Container dimensions
-  width: 339,
-  height: 335,
+  // Container dimensions - optimized for mobile
+  width: 280,
+  height: 220,
   borderRadius: 20,
   
   // Content spacing
-  titleTopSpacing: 69,
+  titleTopSpacing: 30,
   inputTopSpacing: 110,
-  buttonStartSpacing: 165,
-  buttonGap: 11,
+  buttonStartSpacing: 120,
+  buttonGap: 12,
   
   // Input specifications
   inputHeight: 37,
   inputBorderRadius: 18,
   inputHorizontalSpacing: 32,
-  inputWidth: 268,
+  inputWidth: 240,
   
   // Button specifications
-  buttonWidth: 218,
-  buttonHeight: 45,
+  buttonWidth: 200,
+  buttonHeight: 40,
   buttonBorderRadius: 30,
-  buttonHorizontalSpacing: 57,
+  buttonHorizontalSpacing: 40,
   
   // Background and overlay
-  backdropOpacity: 0.5,
+  backdropOpacity: 0.6,
   backdropColor: '#000000',
 };
 
@@ -170,5 +171,58 @@ export const TRANSACTIONS = {
     buttonPadding: 12,
     borderRadius: 8,
     gap: 16,
+  },
+};
+
+export const BUDGET = {
+  // Gradient colors from Figma
+  gradientColors: {
+    start: '#00D09E',
+    end: '#00D09E',
+  },
+  
+  // Circular progress indicator
+  circularProgress: {
+    size: 167,
+    strokeWidth: 10,
+    iconSize: 50,
+    iconColor: '#093030',
+    progressColor: '#00D09E',
+    backgroundStroke: '#DFF7E2',
+  },
+  
+  // Progress bar
+  progressBar: {
+    height: 27,
+    borderRadius: 13.5,
+    backgroundColor: '#0E3E3E',
+    fillColor: '#00D09E',
+    textColor: '#DFF7E2',
+  },
+  
+  // Summary sections
+  summaryCard: {
+    backgroundColor: '#F1FFF3',
+    borderRadius: 40,
+    padding: 20,
+    marginHorizontal: 50,
+  },
+  
+  // Transaction items
+  transactionItem: {
+    iconSize: 57,
+    iconBorderRadius: 22,
+    backgroundColor: '#6DB6FE',
+    titleColor: '#052224',
+    subtitleColor: '#0068FF',
+    amountColor: '#093030',
+  },
+  
+  // Button
+  addButton: {
+    backgroundColor: '#00D09E',
+    borderRadius: 30,
+    height: 36,
+    textColor: '#093030',
   },
 };
