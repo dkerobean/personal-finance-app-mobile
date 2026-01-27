@@ -576,47 +576,36 @@ class MtnMomoService {
   }
 
   // Link MTN MoMo account (for dual platform integration)
-  async linkAccount(phoneNumber: string, pin: string): Promise<{ success: boolean; account?: any; error?: string }> {
+  // Link MTN MoMo account (using backend API)
+  async linkAccount(userId: string, phoneNumber: string, accountName: string): Promise<{ success: boolean; account?: any; error?: string }> {
     try {
       // Validate inputs
       validateInput('phoneNumber', phoneNumber, validators.phoneNumber, 'Please enter a valid Ghana phone number');
+      validateInput('accountName', accountName, validators.accountName, 'Account name must be between 2 and 50 characters');
+      validateInput('userId', userId, (val) => val.trim().length > 0, 'User ID is required');
       
-      // Initialize if needed
-      await this.loadStoredCredentials();
-      
-      if (!this.apiUser || !this.apiKey) {
-        const initResponse = await this.initializeForSandbox();
-        if (!initResponse.success) {
-          return {
-            success: false,
-            error: initResponse.error?.message || 'Failed to initialize MTN MoMo service'
-          };
-        }
-      }
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:3001/api';
 
-      // Get account balance to verify connection
-      const balanceResponse = await this.getAccountBalance();
-      if (!balanceResponse.success) {
-        return {
-          success: false,
-          error: 'Failed to connect to MTN MoMo account. Please check your credentials.'
-        };
-      }
-
-      // Create account record via backend
-      const { supabase } = await import('../supabaseClient');
-      const { data, error } = await supabase.functions.invoke('accounts-link-momo', {
-        body: {
+      // Call backend API
+      const response = await fetch(`${API_URL}/accounts/link-momo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
           phone_number: phoneNumber,
-          account_name: `MTN MoMo (${phoneNumber})`,
-          balance: balanceResponse.data?.availableBalance || 0
-        }
+          account_name: accountName,
+          balance: 0 // In real flow, we'd verify balance first
+        }),
       });
 
-      if (error) {
+      const data = await response.json();
+
+      if (!response.ok) {
         return {
           success: false,
-          error: 'Failed to save MTN MoMo account. Please try again.'
+          error: data.error || 'Failed to link MTN MoMo account'
         };
       }
 
@@ -629,7 +618,7 @@ class MtnMomoService {
       logError(error as Error, 'linkAccount');
       return {
         success: false,
-        error: 'An unexpected error occurred. Please try again.'
+        error: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'
       };
     }
   }

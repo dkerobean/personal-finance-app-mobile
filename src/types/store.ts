@@ -25,11 +25,11 @@ export interface CategoryState {
 }
 
 export interface CategoryActions {
-  loadCategories: () => Promise<void>;
-  createCategory: (name: string, iconName: string) => Promise<boolean>;
-  updateCategory: (id: string, name?: string, iconName?: string) => Promise<boolean>;
-  deleteCategory: (id: string) => Promise<boolean>;
-  seedDefaults: () => Promise<void>;
+  loadCategories: (userId: string) => Promise<void>;
+  createCategory: (userId: string, name: string, iconName: string) => Promise<boolean>;
+  updateCategory: (userId: string, id: string, name?: string, iconName?: string) => Promise<boolean>;
+  deleteCategory: (userId: string, id: string) => Promise<boolean>;
+  seedDefaults: (userId: string) => Promise<void>;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
@@ -43,8 +43,9 @@ export interface TransactionState {
 }
 
 export interface TransactionActions {
-  loadTransactions: () => Promise<void>;
+  loadTransactions: (userId: string) => Promise<void>;
   createTransaction: (
+    userId: string,
     amount: number,
     type: TransactionType,
     categoryId: string,
@@ -52,6 +53,7 @@ export interface TransactionActions {
     description?: string
   ) => Promise<boolean>;
   updateTransaction: (
+    userId: string,
     id: string,
     amount?: number,
     type?: TransactionType,
@@ -59,7 +61,7 @@ export interface TransactionActions {
     date?: string,
     description?: string
   ) => Promise<boolean>;
-  deleteTransaction: (id: string) => Promise<boolean>;
+  deleteTransaction: (userId: string, id: string) => Promise<boolean>;
   setSortOrder: (order: 'asc' | 'desc') => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -124,10 +126,10 @@ export interface ReportsState {
 }
 
 export interface ReportsActions {
-  fetchMonthlyReport: (month: string) => Promise<void>;
+  fetchMonthlyReport: (month: string, userId?: string) => Promise<void>;
   setSelectedMonth: (month: string) => void;
-  refreshCurrentReport: () => Promise<void>;
-  fetchReportComparison: (currentMonth: string, previousMonth: string) => Promise<void>;
+  refreshCurrentReport: (userId?: string) => Promise<void>;
+  fetchReportComparison: (currentMonth: string, previousMonth: string, userId?: string) => Promise<void>;
   clearReportData: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;

@@ -7,11 +7,12 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Budget, BudgetWithSpending } from '@/types/models';
 import BudgetProgressCard from './BudgetProgressCard';
 import { BUDGET, COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
+import { mapIconName } from '@/utils/iconMapping';
 
 interface BudgetsListProps {
   budgets?: Budget[];
@@ -52,8 +53,8 @@ const BudgetItem = ({ budget, onEdit, onDelete }: BudgetItemProps): React.ReactE
       <View style={styles.budgetContent}>
         {/* Icon */}
         <View style={styles.categoryIconContainer}>
-          <MaterialIcons
-            name={budget.category_icon_name as any || 'directions-car'}
+          <Ionicons
+            name={mapIconName(budget.category_icon_name, budget.category_name) as any}
             size={27}
             color={BUDGET.circularProgress.iconColor}
           />
@@ -130,7 +131,7 @@ export default function BudgetsList({
 
     return (
       <View style={styles.emptyContainer}>
-        <MaterialIcons name="account-balance-wallet" size={48} color="#d1d5db" />
+        <Ionicons name="wallet-outline" size={48} color="#d1d5db" />
         <Text style={styles.emptyTitle}>No budgets found</Text>
         <Text style={styles.emptySubtitle}>
           Create your first budget to start tracking spending limits

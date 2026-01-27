@@ -1,266 +1,128 @@
-import { supabase } from './supabaseClient';
-import { handleApiError } from './apiClient';
-import { secureStorage, STORAGE_KEYS } from '@/lib';
-import { resendService } from './resendService';
-import { otpManager } from './otpManager';
+/**
+ * Auth Service - Uses Backend API + Clerk
+ * 
+ * This service handles user profile syncing with the backend MongoDB.
+ * Authentication itself is handled by Clerk hooks (useSignIn, useSignUp, useAuth).
+ */
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 export interface AuthResult {
   success: boolean;
-  message?: string;
-  needsVerification?: boolean;
+  error?: string;
+  user?: any;
 }
 
 export const authService = {
-  async signUp(email: string, password: string, firstName?: string, mobileNumber?: string): Promise<AuthResult> {
+  /**
+   * Sync user to MongoDB after Clerk authentication
+   */
+  async syncUserToDatabase(
+    clerkUserId: string, 
+    email: string, 
+    firstName?: string,
+    lastName?: string
+  ): Promise<AuthResult> {
     try {
-      console.log('Starting signup for:', email);
-      
-      // Temporarily bypass email verification - create user and auto-confirm
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: undefined, // Disable Supabase email confirmation
-          data: {
-            first_name: firstName, // Store additional user data
-            full_name: firstName,
-            mobile_number: mobileNumber,
-          }
+      const response = await fetch(`${API_URL}/users/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          clerkId: clerkUserId,
+          email,
+          firstName,
+          lastName,
+        }),
       });
 
-      console.log('Signup response:', { data, error });
+      const data = await response.json();
 
-      if (error) {
-        console.error('Signup error:', error);
-        return {
-          success: false,
-          message: error.message,
-        };
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sync user');
       }
 
-      if (data.user) {
-        console.log('User created:', data.user.id, 'Email confirmed:', data.user.email_confirmed_at);
-        
-        if (data.session) {
-          console.log('Session created, storing...');
-          // Store session data using enhanced storage
-          await secureStorage.storeSession(data.session.access_token, data.session.refresh_token);
-
-          return {
-            success: true,
-            needsVerification: false, // Bypass verification
-            message: 'Account created successfully! You are now logged in.',
-          };
-        } else {
-          console.log('User created but no session - email confirmation may be required');
-          console.log('Attempting to sign in immediately...');
-          
-          // Try to sign in immediately to get a session
-          const signInResult = await this.signIn(email, password);
-          if (signInResult.success) {
-            return {
-              success: true,
-              needsVerification: false,
-              message: 'Account created successfully! You are now logged in.',
-            };
-          }
-          
-          return {
-            success: true,
-            needsVerification: false,
-            message: 'Account created successfully! Please try logging in.',
-          };
-        }
-      }
-
-      console.log('Unexpected signup response');
-      return {
-        success: true,
-        message: 'Account created successfully.',
-      };
-    } catch (error) {
-      console.error('Signup exception:', error);
-      return {
-        success: false,
-        message: handleApiError(error),
-      };
+      return { success: true, user: data.data };
+    } catch (error: any) {
+      console.error('Error syncing user to database:', error);
+      return { success: false, error: error.message };
     }
   },
 
-  async signIn(email: string, password: string): Promise<AuthResult> {
+  /**
+   * Get user by Clerk ID
+   */
+  async getUserByClerkId(clerkUserId: string): Promise<any | null> {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        return {
-          success: false,
-          message: error.message,
-        };
-      }
-
-      if (data.session) {
-        await secureStorage.storeSession(data.session.access_token, data.session.refresh_token);
-      }
-
-      return {
-        success: true,
-        message: 'Signed in successfully.',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: handleApiError(error),
-      };
-    }
-  },
-
-  async verifyOtp(email: string, token: string): Promise<AuthResult> {
-    try {
-      // First validate the OTP using our custom manager
-      const validationResult = await otpManager.validateOTP(email, token);
+      const response = await fetch(`${API_URL}/users/${clerkUserId}`);
       
-      if (!validationResult.success) {
-        return {
-          success: false,
-          message: validationResult.message,
-        };
-      }
-
-      // If OTP is valid, confirm the user's email in Supabase
-      // We need to get the user first
-      const { data: users, error: getUserError } = await supabase
-        .from('auth.users')
-        .select('*')
-        .eq('email', email)
-        .single();
-
-      if (getUserError) {
-        // Alternative approach: sign in the user to complete verification
-        return {
-          success: true,
-          message: 'Email verified successfully. You can now sign in.',
-        };
-      }
-
-      return {
-        success: true,
-        message: 'Email verified successfully.',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: handleApiError(error),
-      };
-    }
-  },
-
-  async resendVerificationCode(email: string, firstName?: string): Promise<AuthResult> {
-    try {
-      // Check rate limit
-      const rateLimitInfo = await otpManager.checkRateLimit(email);
-      if (!rateLimitInfo.canSend) {
-        const waitTime = await otpManager.getTimeUntilNextRequest(email);
-        const waitMinutes = Math.ceil(waitTime / (1000 * 60));
-        return {
-          success: false,
-          message: `Please wait ${waitMinutes} minute(s) before requesting another code.`,
-        };
-      }
-
-      // Clear any existing OTP
-      await otpManager.clearOTP(email);
-
-      // Generate and send new verification code
-      const verificationCode = otpManager.generateOTP(email);
-      await otpManager.storeOTP(email, verificationCode);
-
-      try {
-        const emailResult = await resendService.sendVerificationEmail(email, {
-          firstName: firstName || 'there',
-          verificationCode,
-          appName: 'Kippo',
-          companyName: 'Kippo',
-          supportEmail: 'support@kippo.com',
-          expirationMinutes: otpManager.getConfig().EXPIRATION_MINUTES,
-        });
-
-        if (!emailResult.success && emailResult.message?.includes('service disabled')) {
-          // Email service is disabled, but we can still proceed
-          console.log('Email service disabled, but verification code generated');
-          return {
-            success: true,
-            message: 'Verification code generated. (Email service disabled in development)',
-          };
-        }
-
-        if (!emailResult.success) {
-          return {
-            success: false,
-            message: 'Failed to send verification email. Please try again.',
-          };
-        }
-
-        return {
-          success: true,
-          message: 'New verification code sent! Please check your email.',
-        };
-      } catch (emailError) {
-        console.warn('Email service error, but continuing with verification:', emailError);
-        return {
-          success: true,
-          message: 'Verification code generated. (Email service unavailable)',
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        message: handleApiError(error),
-      };
-    }
-  },
-
-  async signOut(): Promise<AuthResult> {
-    try {
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        return {
-          success: false,
-          message: error.message,
-        };
-      }
-
-      await secureStorage.clearAuthData();
-
-      return {
-        success: true,
-        message: 'Signed out successfully.',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: handleApiError(error),
-      };
-    }
-  },
-
-  async getSession() {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-
-      if (error) {
-        console.error('Error getting session:', error);
+      if (!response.ok) {
         return null;
       }
 
-      return data.session;
+      const data = await response.json();
+      return data.data;
     } catch (error) {
-      console.error('Error getting session:', error);
+      console.error('Error fetching user:', error);
       return null;
     }
   },
+
+  /**
+   * Update user profile
+   */
+  async updateUserProfile(
+    clerkUserId: string,
+    updates: {
+      firstName?: string;
+      lastName?: string;
+      avatarUrl?: string;
+      mobileNumber?: string;
+    }
+  ): Promise<AuthResult> {
+    try {
+      const response = await fetch(`${API_URL}/users/${clerkUserId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update profile');
+      }
+
+      return { success: true, user: data.data };
+    } catch (error: any) {
+      console.error('Error updating user profile:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Deprecated methods - keeping for backward compatibility during migration
+  async signUp(): Promise<AuthResult> {
+    console.warn('authService.signUp is deprecated. Use Clerk useSignUp hook instead.');
+    return { success: false, error: 'Use Clerk for authentication' };
+  },
+
+  async signIn(): Promise<AuthResult> {
+    console.warn('authService.signIn is deprecated. Use Clerk useSignIn hook instead.');
+    return { success: false, error: 'Use Clerk for authentication' };
+  },
+
+  async signOut(): Promise<AuthResult> {
+    console.warn('authService.signOut is deprecated. Use Clerk useClerk hook instead.');
+    return { success: false, error: 'Use Clerk for authentication' };
+  },
+
+  async getSession(): Promise<{ session: null }> {
+    console.warn('authService.getSession is deprecated. Use Clerk useAuth hook instead.');
+    return { session: null };
+  },
 };
+
+export default authService;

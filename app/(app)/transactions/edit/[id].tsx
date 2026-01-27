@@ -304,11 +304,12 @@ export default function EditTransactionScreen() {
           <View style={styles.form}>
             {/* Amount Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Amount</Text>
+              <Text style={styles.label}>Amount (GHS)</Text>
               <View style={styles.inputContainer}>
+                <Text style={styles.currencySymbol}>₵</Text>
                 <TextInput
-                  style={[styles.input, amountError ? styles.inputError : null, isSync && styles.disabledInput]}
-                  placeholder="0"
+                  style={[styles.input, styles.amountInput, amountError ? styles.inputError : null, isSync && styles.disabledInput]}
+                  placeholder="0.00"
                   placeholderTextColor="#999"
                   value={amount}
                   onChangeText={(text) => {
@@ -800,6 +801,19 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DFF7E2',
+    borderRadius: 18,
+    paddingHorizontal: 34,
+    paddingVertical: 14,
+  },
+  currencySymbol: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#007bff',
+    marginRight: 8,
+    fontFamily: 'Poppins',
   },
   input: {
     backgroundColor: '#DFF7E2',
@@ -813,6 +827,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  amountInput: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    flex: 1,
   },
   textAreaInput: {
     backgroundColor: '#DFF7E2',

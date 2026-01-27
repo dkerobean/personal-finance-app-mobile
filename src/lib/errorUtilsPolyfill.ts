@@ -119,9 +119,12 @@ export const ERROR_MESSAGES = {
 export const validators = {
   phoneNumber: (phone: string): boolean => {
     const cleaned = phone.replace(/\D/g, '');
-    // Ghana phone numbers: 10 digits starting with 2 (for country code 233)
-    // or 9 digits for local format
-    return (cleaned.length === 10 && cleaned.startsWith('2')) || 
+    // Ghana phone numbers: 
+    // 12 digits: 233XXXXXXXXX (starts with 233)
+    // 10 digits: 0XXXXXXXXX (starts with 0)
+    // 9 digits: XXXXXXXXX (legacy/short)
+    return (cleaned.length === 12 && cleaned.startsWith('233')) || 
+           (cleaned.length === 10 && (cleaned.startsWith('0') || cleaned.startsWith('2'))) || 
            (cleaned.length === 9);
   },
 

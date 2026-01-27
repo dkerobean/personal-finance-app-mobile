@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View,
   Text,
@@ -10,413 +10,269 @@ import {
   SafeAreaView,
   Modal,
   Platform,
+  Alert,
+  StatusBar,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
 import { MaterialIcons } from '@expo/vector-icons';
+import { ArrowLeft, Calendar as CalendarIcon, Check, ChevronDown, Save } from 'lucide-react-native';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useCategoryStore } from '@/stores/categoryStore';
+import { useAppToast } from '@/hooks/useAppToast';
 import type { TransactionType } from '@/types/models';
-import { useCustomAlert } from '@/hooks/useCustomAlert';
-import CustomAlert from '@/components/ui/CustomAlert';
-import SegmentedControl from '@/components/ui/SegmentedControl';
-import GradientHeader from '@/components/budgets/GradientHeader';
-import { COLORS, BORDER_RADIUS, SPACING, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
+import { COLORS, BORDER_RADIUS, SPACING, TYPOGRAPHY, SHADOWS } from '@/constants/design';
+
+import { useAuth } from '@clerk/clerk-expo';
+
+// Verified valid MaterialIcons names
+const VALID_ICONS = [
+  'restaurant', 'local-cafe', 'local-pizza', 'fastfood', 'local-bar',
+  'lunch-dining', 'ramen-dining', 'bakery-dining', 'icecream', 'local-dining',
+  'directions-car', 'local-gas-station', 'directions-bus', 'flight', 'commute',
+  'two-wheeler', 'train', 'directions-boat', 'electric-bike', 'airport-shuttle',
+  'shopping-bag', 'shopping-cart', 'local-mall', 'storefront', 'card-giftcard',
+  'shopping-basket', 'redeem', 'sell', 'store',
+  'home', 'power', 'water', 'wifi', 'build',
+  'lightbulb', 'electrical-services', 'roofing', 'chair', 'weekend',
+  'movie', 'sports-esports', 'music-note', 'celebration', 'theaters',
+  'casino', 'sports-bar', 'nightlife', 'sports-soccer', 'sports-basketball',
+  'local-hospital', 'fitness-center', 'spa', 'medical-services', 'healing',
+  'vaccines', 'medication', 'health-and-safety', 'self-improvement',
+  'attach-money', 'savings', 'account-balance', 'credit-card', 'receipt',
+  'payments', 'request-quote', 'money', 'paid', 'currency-exchange',
+  'school', 'work', 'laptop', 'business-center', 'menu-book',
+  'auto-stories', 'class', 'engineering', 'science',
+  'family-restroom', 'pets', 'child-care', 'volunteer-activism', 'favorite',
+  'cake', 'baby-changing-station', 'elderly', 'person',
+  'category', 'more-horiz', 'label', 'bookmark', 'star',
+  'local-atm', 'local-phone', 'subscriptions', 'receipt-long'
+];
+
+// Validate icon name, return fallback if invalid
+const validateIcon = (iconName?: string): string => {
+  if (!iconName) return 'category';
+  return VALID_ICONS.includes(iconName) ? iconName : 'category';
+};
+
 
 export default function CreateTransactionScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const initialType = (params.type as TransactionType) || 'expense';
+  const { userId } = useAuth();
+  const toast = useAppToast();
+
   const { createTransaction, isLoading, error } = useTransactionStore();
   const { categories, loadCategories } = useCategoryStore();
-  const { alert, alertProps } = useCustomAlert();
 
   const [amount, setAmount] = useState('');
-  const [type, setType] = useState<TransactionType>('expense');
+  const [type, setType] = useState<TransactionType>(initialType);
   const [categoryId, setCategoryId] = useState('');
+  
   const now = new Date();
   const [date, setDate] = useState(now);
-  const [time, setTime] = useState(now);
-  const [tempDate, setTempDate] = useState(now);
-  const [tempTime, setTempTime] = useState(now);
   const [description, setDescription] = useState('');
+
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-
-  // Form validation errors
-  const [amountError, setAmountError] = useState('');
-  const [categoryError, setCategoryError] = useState('');
-
-  useEffect(() => {
-    loadCategories();
-  }, []);
+  
+  // Validation State
+  const [amountError, setAmountError] = useState(false);
+  const [categoryError, setCategoryError] = useState(false);
 
   useEffect(() => {
-    // Set first available category as default
-    if (categories.length > 0 && !categoryId) {
-      setCategoryId(categories[0].id);
+    if (userId) {
+      loadCategories(userId);
     }
-  }, [categories, categoryId]);
+  }, [userId]);
 
-  const validateForm = () => {
-    let isValid = true;
-    
-    // Validate amount
-    const amountValue = parseFloat(amount);
-    if (!amount.trim()) {
-      setAmountError('Amount is required');
-      isValid = false;
-    } else if (isNaN(amountValue) || amountValue <= 0) {
-      setAmountError('Please enter a valid amount greater than 0');
-      isValid = false;
-    } else {
-      setAmountError('');
+  // Update type if params change (e.g. deep link)
+  useEffect(() => {
+    if (params.type) {
+      setType(params.type as TransactionType);
     }
-
-    // Validate category
-    if (!categoryId) {
-      setCategoryError('Please select a category');
-      isValid = false;
-    } else {
-      setCategoryError('');
-    }
-
-    return isValid;
-  };
+  }, [params.type]);
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    // Combine date and time into a single datetime
-    const combinedDateTime = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      time.getHours(),
-      time.getMinutes(),
-      time.getSeconds()
-    );
-
-    const success = await createTransaction(
-      parseFloat(amount),
-      type,
-      categoryId,
-      combinedDateTime.toISOString(), // Full ISO datetime string
-      description.trim() || undefined
-    );
-    
-    if (success) {
-      alert('Success', 'Transaction created successfully', [{
-        text: 'OK',
-        onPress: () => router.back()
-      }]);
-    } else if (error) {
-      console.error('Transaction creation error:', error);
-      
-      // Provide more specific error messages
-      let errorMessage = error;
-      if (error.includes('permission') || error.includes('RLS')) {
-        errorMessage = 'You do not have permission to create transactions. Please check your account settings.';
-      } else if (error.includes('connection') || error.includes('network')) {
-        errorMessage = 'Network error. Please check your internet connection and try again.';
-      } else if (error.includes('validation') || error.includes('invalid')) {
-        errorMessage = 'Invalid transaction data. Please check your input and try again.';
-      } else if (error.includes('database') || error.includes('Database')) {
-        errorMessage = 'Database error occurred. Please try again later.';
-      }
-      
-      alert('Error Creating Transaction', errorMessage);
+    // Validation
+    let isValid = true;
+    if (!amount || parseFloat(amount) <= 0) {
+      setAmountError(true);
+      isValid = false;
     }
-  };
+    if (!categoryId) {
+      setCategoryError(true);
+      isValid = false;
+    }
 
-  const handleCancel = () => {
-    router.back();
+    if (!isValid || !userId) return;
+
+    try {
+      const success = await createTransaction(
+        userId,
+        parseFloat(amount),
+        type,
+        categoryId,
+        date.toISOString(),
+        description.trim() || undefined
+      );
+
+      if (success) {
+        toast.success(
+          type === 'income' ? 'Income Added!' : 'Expense Added!',
+          `₵${parseFloat(amount).toFixed(2)} saved successfully`
+        );
+        setTimeout(() => router.back(), 500);
+      } else {
+        toast.error('Error', error || 'Failed to save transaction');
+      }
+    } catch (e) {
+      toast.error('Error', 'An unexpected error occurred');
+    }
   };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
+    // Android: hide picker immediately after selection or cancellation
     if (Platform.OS === 'android') {
-      // Android: Close picker after selection
       setShowDatePicker(false);
-      
-      // Only update the date if user selected a date (not cancelled)
-      if (selectedDate && event.type !== 'dismissed') {
-        console.log('Android date change:', selectedDate);
-        setDate(selectedDate);
-      }
-    } else {
-      // iOS: Only update the temporary date, don't close picker
-      // Picker will be closed manually via Done/Cancel buttons
-      if (selectedDate) {
-        console.log('iOS temp date change:', selectedDate);
-        setTempDate(selectedDate);
-      }
     }
-  };
-
-  const handleTimeChange = (event: any, selectedTime?: Date) => {
-    if (Platform.OS === 'android') {
-      // Android: Close picker after selection
-      setShowTimePicker(false);
+    
+    if (selectedDate) {
+      // If user selected a date, update state
+      setDate(selectedDate);
       
-      // Only update the time if user selected a time (not cancelled)
-      if (selectedTime && event.type !== 'dismissed') {
-        console.log('Android time change:', selectedTime);
-        setTime(selectedTime);
-      }
-    } else {
-      // iOS: Only update the temporary time, don't close picker
-      // Picker will be closed manually via Done/Cancel buttons
-      if (selectedTime) {
-        console.log('iOS temp time change:', selectedTime);
-        setTempTime(selectedTime);
-      }
+      // OPTIONAL: If we wanted iOS to close on tap, we could do it here, 
+      // but "Done" button is better UI for inline pickers.
     }
-  };
-
-  const handleDatePickerOpen = () => {
-    console.log('Opening date picker - syncing tempDate with date:', date);
-    setTempDate(date);
-    setShowDatePicker(true);
-  };
-
-  const handleTimePickerOpen = () => {
-    console.log('Opening time picker - syncing tempTime with time:', time);
-    setTempTime(time);
-    setShowTimePicker(true);
-  };
-
-  const handleDatePickerDone = () => {
-    console.log('Date picker done - updating date from:', date, 'to:', tempDate);
-    setDate(new Date(tempDate));
-    setShowDatePicker(false);
-  };
-
-  const handleTimePickerDone = () => {
-    console.log('Time picker done - updating time from:', time, 'to:', tempTime);
-    setTime(new Date(tempTime));
-    setShowTimePicker(false);
-  };
-
-  const handleDatePickerCancel = () => {
-    setTempDate(date); // Reset to original value
-    setShowDatePicker(false);
-  };
-
-  const handleTimePickerCancel = () => {
-    setTempTime(time); // Reset to original value
-    setShowTimePicker(false);
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const formatTime = (time: Date) => {
-    return time.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
   };
 
   const selectedCategory = categories.find(cat => cat.id === categoryId);
+  const isIncome = type === 'income';
+  const themeColor = isIncome ? COLORS.success : COLORS.error;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.mainScrollView}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Gradient Header Section */}
-        <GradientHeader
-          title="Add Transaction"
-          subtitle="Record your expense or income"
-          onBackPress={handleCancel}
-          onCalendarPress={() => {
-            // Handle calendar press
-          }}
-          onNotificationPress={() => {
-            // Handle notification press
-          }}
-          showCalendar={false}
-        />
+    <View style={[styles.container, { backgroundColor: themeColor }]}>
+      <StatusBar barStyle="light-content" backgroundColor={themeColor} />
+      <SafeAreaView style={styles.safeArea}>
+        
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft color={COLORS.white} size={24} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{isIncome ? 'New Income' : 'New Expense'}</Text>
+          <View style={{ width: 24 }} /> 
+        </View>
 
-        {/* Content Card */}
-        <View style={styles.content}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <View style={styles.form}>
-            {/* Amount Input */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Amount</Text>
-              <TextInput
-                style={[styles.mintInput, amountError ? styles.inputError : null]}
-                placeholder="00"
-                placeholderTextColor={COLORS.textSecondary}
-                value={amount}
-                onChangeText={(text) => {
-                  // Only allow numbers and decimal point
-                  const cleanedText = text.replace(/[^0-9.]/g, '');
-                  setAmount(cleanedText);
-                  if (amountError) setAmountError('');
-                }}
-                keyboardType="decimal-pad"
-                autoCapitalize="none"
-              />
-              {amountError && (
-                <Text style={styles.errorText}>{amountError}</Text>
-              )}
-            </View>
-
-            {/* Type Selector */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Type</Text>
-              <SegmentedControl
-                options={[
-                  { label: 'Income', value: 'income' },
-                  { label: 'Expense', value: 'expense' }
-                ]}
-                selectedValue={type}
-                onValueChange={(value) => setType(value as TransactionType)}
-              />
-            </View>
-
-            {/* Category Picker */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Category</Text>
-              <TouchableOpacity
-                style={[styles.categorySelector, categoryError ? styles.inputError : null]}
-                onPress={() => setShowCategoryPicker(true)}
-              >
-                <View style={styles.pickerContent}>
-                  {selectedCategory ? (
-                    <>
-                      <MaterialIcons
-                        name={selectedCategory.icon_name as any}
-                        size={20}
-                        color="#007bff"
-                      />
-                      <Text style={styles.pickerText}>{selectedCategory.name}</Text>
-                    </>
-                  ) : (
-                    <Text style={styles.pickerPlaceholder}>Select a category</Text>
-                  )}
-                </View>
-                <MaterialIcons name="keyboard-arrow-down" size={24} color="#666" />
-              </TouchableOpacity>
-              {categoryError && (
-                <Text style={styles.errorText}>{categoryError}</Text>
-              )}
-            </View>
-
-            {/* Date & Time Pickers */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Date & Time</Text>
-              <View style={styles.dateTimeContainer}>
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={handleDatePickerOpen}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.dateTimeContent}>
-                    <MaterialIcons name="event" size={24} color={COLORS.primary} />
-                    <Text style={styles.dateTimeText}>{formatDate(date)}</Text>
-                  </View>
-                  <MaterialIcons name="keyboard-arrow-down" size={24} color={COLORS.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={handleTimePickerOpen}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.dateTimeContent}>
-                    <MaterialIcons name="access-time" size={24} color={COLORS.primary} />
-                    <Text style={styles.dateTimeText}>{formatTime(time)}</Text>
-                  </View>
-                  <MaterialIcons name="keyboard-arrow-down" size={24} color={COLORS.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Description (Optional) */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Description (Optional)</Text>
-              <TextInput
-                style={styles.mintTextArea}
-                placeholder="Enter Message"
-                placeholderTextColor={COLORS.primary}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={4}
-                maxLength={200}
-              />
-            </View>
-
-            {error && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
-          </View>
-
-          </ScrollView>
-          
-          {/* Save Button - Fixed at bottom */}
-          <View style={styles.saveButtonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.saveButton,
-                (isLoading || !amount.trim() || !categoryId) && styles.disabledButton
-              ]}
-              onPress={handleSubmit}
-              disabled={isLoading || !amount.trim() || !categoryId}
+        {/* Type Toggle (Pill) */}
+        <View style={styles.toggleContainer}>
+          <View style={styles.togglePill}>
+            <TouchableOpacity 
+              style={[styles.toggleOption, type === 'income' && styles.activeToggle]}
+              onPress={() => setType('income')}
             >
-              <Text style={styles.saveButtonText}>
-                {isLoading ? 'Saving...' : 'Save'}
-              </Text>
+              <Text style={[styles.toggleText, type === 'income' && styles.activeToggleText]}>Income</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.toggleOption, type === 'expense' && styles.activeToggle]}
+              onPress={() => setType('expense')}
+            >
+              <Text style={[styles.toggleText, type === 'expense' && styles.activeToggleText]}>Expense</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
 
-      {/* Date Picker Modal */}
-      {showDatePicker && Platform.OS === 'ios' && (
-        <Modal
-          visible={showDatePicker}
-          transparent
-          animationType="slide"
-          onRequestClose={handleDatePickerCancel}
-        >
-          <TouchableOpacity 
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={handleDatePickerCancel}
-          >
-            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.dateTimePickerContainer}>
-                <View style={styles.dateTimePickerHeader}>
-                  <TouchableOpacity onPress={handleDatePickerCancel}>
-                    <Text style={styles.dateTimePickerCancel}>Cancel</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.dateTimePickerTitle}>Select Date</Text>
-                  <TouchableOpacity onPress={handleDatePickerDone}>
-                    <Text style={styles.dateTimePickerDone}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-                <DateTimePicker
-                  value={tempDate}
-                  mode="date"
-                  display="spinner"
-                  onChange={handleDateChange}
+        {/* Massive Amount Input */}
+        <View style={styles.amountContainer}>
+          <Text style={styles.currencyPrefix}>GHS</Text>
+          <TextInput
+            style={[styles.amountInput, amountError && { color: '#ffcccc' }]}
+            value={amount}
+            onChangeText={(t) => {
+              setAmount(t.replace(/[^0-9.]/g, ''));
+              setAmountError(false);
+            }}
+            placeholder="0.00"
+            placeholderTextColor="rgba(255,255,255,0.6)"
+            keyboardType="numeric"
+            autoFocus
+          />
+        </View>
+
+        {/* Start of White Sheet */}
+        <View style={styles.sheetContainer}>
+          <ScrollView contentContainerStyle={styles.sheetContent}>
+            
+            {/* Category Selector */}
+            <TouchableOpacity 
+              style={[styles.inputRow, categoryError && styles.inputError]} 
+              onPress={() => setShowCategoryPicker(true)}
+            >
+              <View style={styles.iconCircle}>
+                <MaterialIcons 
+                  name={validateIcon(selectedCategory?.icon_name) || 'category'} 
+                  size={24} 
+                  color={themeColor} 
                 />
               </View>
+              <View style={styles.inputTextContainer}>
+                <Text style={styles.inputLabel}>Category</Text>
+                <Text style={[styles.inputValue, !selectedCategory && styles.placeholderText]}>
+                  {selectedCategory?.name || 'Select Category'}
+                </Text>
+              </View>
+              <ChevronDown size={20} color={COLORS.gray400} />
             </TouchableOpacity>
-          </TouchableOpacity>
-        </Modal>
-      )}
+
+            {/* Date Picker Trigger (Label only) */}
+            <TouchableOpacity 
+              style={styles.inputRow} 
+              onPress={() => setShowDatePicker(true)}
+            >
+              <View style={styles.iconCircle}>
+                <CalendarIcon size={24} color={themeColor} />
+              </View>
+              <View style={styles.inputTextContainer}>
+                <Text style={styles.inputLabel}>Date</Text>
+                <Text style={styles.inputValue}>{date.toLocaleDateString()}</Text>
+              </View>
+              <ChevronDown size={20} color={COLORS.gray400} />
+            </TouchableOpacity>
+
+            {/* Note Input */}
+            <View style={styles.noteContainer}>
+              <Text style={styles.inputLabel}>Note (Optional)</Text>
+              <TextInput
+                style={styles.noteInput}
+                placeholder="What is this for?"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+              />
+            </View>
+
+          </ScrollView>
+
+          {/* Save Button (Fixed at bottom of sheet) */}
+          <View style={styles.footer}>
+            <TouchableOpacity 
+              style={[styles.saveButton, { backgroundColor: themeColor }]} 
+              onPress={handleSubmit}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Text style={styles.saveButtonText}>Saving...</Text>
+              ) : (
+                <>
+                  <Save size={20} color={COLORS.white} style={{ marginRight: 8 }} />
+                  <Text style={styles.saveButtonText}>Save Transaction</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+      </SafeAreaView>
 
       {/* Android Date Picker */}
       {showDatePicker && Platform.OS === 'android' && (
@@ -428,366 +284,314 @@ export default function CreateTransactionScreen() {
         />
       )}
 
-      {/* Time Picker Modal */}
-      {showTimePicker && Platform.OS === 'ios' && (
+      {/* iOS Date Picker Modal */}
+      {Platform.OS === 'ios' && (
         <Modal
-          visible={showTimePicker}
+          visible={showDatePicker}
           transparent
           animationType="slide"
-          onRequestClose={handleTimePickerCancel}
+          presentationStyle="overFullScreen"
+          onRequestClose={() => setShowDatePicker(false)}
         >
-          <TouchableOpacity 
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={handleTimePickerCancel}
-          >
-            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.dateTimePickerContainer}>
-                <View style={styles.dateTimePickerHeader}>
-                  <TouchableOpacity onPress={handleTimePickerCancel}>
-                    <Text style={styles.dateTimePickerCancel}>Cancel</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.dateTimePickerTitle}>Select Time</Text>
-                  <TouchableOpacity onPress={handleTimePickerDone}>
-                    <Text style={styles.dateTimePickerDone}>Done</Text>
-                  </TouchableOpacity>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '75%' }]}>
+             <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>Select Date</Text>
+                  <Text style={{ fontSize: 32, fontWeight: '700', color: themeColor, marginTop: 8 }}>
+                    {date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                  </Text>
+                   <Text style={{ fontSize: 16, color: COLORS.textTertiary }}>
+                    {date.toLocaleDateString('en-US', { year: 'numeric', weekday: 'long' })}
+                  </Text>
                 </View>
-                <DateTimePicker
-                  value={tempTime}
-                  mode="time"
-                  display="spinner"
-                  onChange={handleTimeChange}
-                />
+                <TouchableOpacity onPress={() => setShowDatePicker(false)} style={{ padding: 8, backgroundColor: COLORS.gray100, borderRadius: 20 }}>
+                  <Check size={24} color={COLORS.primary} />
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
+              <DateTimePicker
+                value={date}
+                mode="date"
+                display="inline"
+                onChange={handleDateChange}
+                accentColor={themeColor}
+                style={{ height: 320 }}
+              />
+            </View>
+          </View>
         </Modal>
       )}
 
-      {/* Android Time Picker */}
-      {showTimePicker && Platform.OS === 'android' && (
-        <DateTimePicker
-          value={time}
-          mode="time"
-          display="default"
-          onChange={handleTimeChange}
-        />
-      )}
-
       {/* Category Picker Modal */}
-      <Modal
-        visible={showCategoryPicker}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCategoryPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Category</Text>
-              <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
-                <MaterialIcons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.categoryList}>
-              {categories.length === 0 ? (
-                <View style={styles.emptyCategoryContainer}>
-                  <Text style={styles.emptyCategoryText}>
-                    No categories available.{'\n'}
-                    Please create categories in Settings first.
-                  </Text>
-                  <TouchableOpacity 
-                    style={styles.settingsButton}
-                    onPress={() => {
-                      setShowCategoryPicker(false);
-                      router.push('/settings/categories');
-                    }}
-                  >
-                    <Text style={styles.settingsButtonText}>Go to Settings</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                categories.map((category) => (
-                  <TouchableOpacity
-                    key={category.id}
-                    style={[
-                      styles.categoryItem,
-                      categoryId === category.id && styles.categoryItemSelected
-                    ]}
-                    onPress={() => {
-                      setCategoryId(category.id);
-                      setCategoryError('');
-                      setShowCategoryPicker(false);
-                    }}
-                  >
-                    <MaterialIcons
-                      name={category.icon_name as any}
-                      size={24}
-                      color="#007bff"
-                    />
-                    <Text style={styles.categoryName}>{category.name}</Text>
-                    {categoryId === category.id && (
-                      <MaterialIcons name="check" size={20} color="#007bff" />
-                    )}
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
+      <Modal visible={showCategoryPicker} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Category</Text>
+            <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
+              <Text style={{ color: COLORS.primary, fontSize: 16 }}>Close</Text>
+            </TouchableOpacity>
           </View>
+          <ScrollView contentContainerStyle={[styles.categoryGrid, { paddingBottom: 50 }]}>
+            {categories.map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
+                style={[
+                  styles.categoryGridItem,
+                  categoryId === cat.id && { borderColor: themeColor, borderWidth: 2, backgroundColor: COLORS.primaryLight }
+                ]}
+                onPress={() => {
+                  setCategoryId(cat.id);
+                  setCategoryError(false);
+                  setShowCategoryPicker(false);
+                }}
+              >
+                <View style={[styles.categoryIconLarge, { backgroundColor: categoryId === cat.id ? themeColor : COLORS.gray100 }]}>
+                   <MaterialIcons 
+                      name={validateIcon(cat.icon_name) as any} 
+                      size={32} 
+                      color={categoryId === cat.id ? COLORS.white : COLORS.gray600} 
+                   />
+                </View>
+
+                <Text style={styles.categoryGridLabel}>{cat.name}</Text>
+              </TouchableOpacity>
+            ))}
+            
+            {/* Add New Category Button */}
+            <TouchableOpacity 
+              style={styles.categoryGridItem}
+              onPress={() => {
+                setShowCategoryPicker(false);
+                router.push('/settings/categories/create');
+              }}
+            >
+               <View style={[styles.categoryIconLarge, { backgroundColor: COLORS.gray50 }]}>
+                 <MaterialIcons name="add" size={32} color={COLORS.gray400} />
+               </View>
+               <Text style={styles.categoryGridLabel}>Add New</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </Modal>
-      
-      <CustomAlert {...alertProps} />
-    </SafeAreaView>
+
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BUDGET.gradientColors.start,
   },
-  mainScrollView: {
+  safeArea: {
     flex: 1,
   },
-  content: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  toggleContainer: {
+    alignItems: 'center',
+    marginVertical: SPACING.lg,
+  },
+  togglePill: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 25,
+    padding: 4,
+  },
+  toggleOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+  },
+  activeToggle: {
+    backgroundColor: COLORS.white,
+  },
+  toggleText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
+  },
+  activeToggleText: {
+    color: COLORS.primaryDark, // Or dynamic theme color
+  },
+  amountContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  currencyPrefix: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  amountInput: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: COLORS.white,
+    textAlign: 'center',
+    width: '80%',
+  },
+  sheetContainer: {
+    flex: 1,
     backgroundColor: COLORS.backgroundContent,
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    marginTop: -20,
-    paddingTop: 20,
-    flex: 1,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: SPACING.xl,
   },
-  scrollView: {
-    paddingHorizontal: SPACING.xl,
+  sheetContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: 100,
   },
-  form: {
-    gap: SPACING.xxl,
-    paddingBottom: SPACING.huge,
-  },
-  formGroup: {
-    gap: SPACING.sm,
-  },
-  label: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.medium,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-    textTransform: 'uppercase',
-  },
-  mintInput: {
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.backgroundInput,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-    fontWeight: TYPOGRAPHY.weights.medium,
-    minHeight: 41,
-  },
-  mintTextArea: {
-    backgroundColor: COLORS.backgroundInput,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-    fontWeight: TYPOGRAPHY.weights.medium,
-    minHeight: 166,
-    textAlignVertical: 'top',
+    padding: SPACING.md,
+    borderRadius: 16,
+    marginBottom: SPACING.md,
   },
   inputError: {
+    borderWidth: 1,
     borderColor: COLORS.error,
   },
-  errorText: {
-    color: COLORS.error,
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontFamily: 'Poppins',
-  },
-  errorContainer: {
-    backgroundColor: COLORS.backgroundCard,
-    marginHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.error,
-    ...SHADOWS.sm,
-  },
-  categorySelector: {
-    backgroundColor: COLORS.backgroundInput,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 41,
-  },
-  pickerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  pickerText: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-    fontWeight: TYPOGRAPHY.weights.medium,
-  },
-  pickerPlaceholder: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textTertiary,
-    fontFamily: 'Poppins',
-  },
-  dateTimeContainer: {
-    flexDirection: 'row',
-    gap: SPACING.lg,
-  },
-  dateTimeButton: {
-    flex: 1,
-    backgroundColor: COLORS.backgroundInput,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    minHeight: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    elevation: 2,
-    shadowColor: COLORS.gray900,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  dateTimeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    flex: 1,
-  },
-  dateTimeText: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-    fontWeight: TYPOGRAPHY.weights.medium,
-    flex: 1,
-  },
-  saveButtonContainer: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    paddingBottom: SPACING.xl,
-    backgroundColor: COLORS.backgroundContent,
-  },
-  saveButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.huge,
-    paddingVertical: SPACING.lg,
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 36,
+    marginRight: SPACING.md,
   },
-  disabledButton: {
-    backgroundColor: COLORS.textTertiary,
+  inputTextContainer: {
+    flex: 1,
+  },
+  inputLabel: {
+    fontSize: 12,
+    color: COLORS.textTertiary,
+    marginBottom: 2,
+  },
+  inputValue: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    fontWeight: '500',
+  },
+  placeholderText: {
+    color: COLORS.textTertiary,
+  },
+  noteContainer: {
+    marginTop: SPACING.md,
+  },
+  noteInput: {
+    backgroundColor: COLORS.backgroundInput,
+    borderRadius: 16,
+    padding: SPACING.lg,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    marginTop: 8,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: SPACING.lg,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray100,
+  },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 30,
+    ...SHADOWS.md,
   },
   saveButtonText: {
-    color: COLORS.textPrimary,
-    fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.medium,
-    fontFamily: 'Poppins',
-    textTransform: 'uppercase',
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: '600',
   },
-  modalOverlay: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: COLORS.backgroundCard,
-    borderTopLeftRadius: BORDER_RADIUS.xl,
-    borderTopRightRadius: BORDER_RADIUS.xl,
-    maxHeight: '80%',
+    backgroundColor: COLORS.white,
+    paddingTop: 20,
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  modalTitle: {
-    fontSize: TYPOGRAPHY.sizes.xl,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    color: COLORS.textPrimary,
-  },
-  categoryList: {
-    maxHeight: 400,
-  },
-  categoryItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.lg,
-    gap: SPACING.md,
-  },
-  categoryItemSelected: {
-    backgroundColor: COLORS.primaryLight,
-  },
-  categoryName: {
-    fontSize: TYPOGRAPHY.sizes.lg,
-    color: COLORS.textPrimary,
-    flex: 1,
-  },
-  emptyCategoryContainer: {
-    padding: SPACING.xxxl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyCategoryText: {
-    fontSize: TYPOGRAPHY.sizes.lg,
-    color: COLORS.textTertiary,
-    textAlign: 'center',
-    marginBottom: SPACING.xl,
-    lineHeight: 22,
-  },
-  settingsButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-  },
-  settingsButtonText: {
-    color: COLORS.white,
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-  },
-  dateTimePickerContainer: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: BORDER_RADIUS.lg,
-    borderTopRightRadius: BORDER_RADIUS.lg,
-    paddingBottom: 20,
-    marginTop: 'auto',
-  },
-  dateTimePickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
   },
-  dateTimePickerTitle: {
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: TYPOGRAPHY.weights.semibold,
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: SPACING.md,
+    justifyContent: 'space-between',
+  },
+  categoryGridItem: {
+    width: '30%',
+    alignItems: 'center',
+    marginBottom: SPACING.xl,
+    padding: 10,
+    borderRadius: 12,
+  },
+  categoryIconLarge: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  categoryGridLabel: {
+    fontSize: 12,
+    fontWeight: '500',
     color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
+    textAlign: 'center',
   },
-  dateTimePickerCancel: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textSecondary,
-    fontFamily: 'Poppins',
+  iosDatePickerContainer: {
+    backgroundColor: COLORS.gray50,
+    borderRadius: 12,
+    marginBottom: SPACING.md,
+    overflow: 'hidden',
   },
-  dateTimePickerDone: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.primary,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    fontFamily: 'Poppins',
+  closeDatePicker: {
+    alignItems: 'center',
+    padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray100,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40, 
   },
 });

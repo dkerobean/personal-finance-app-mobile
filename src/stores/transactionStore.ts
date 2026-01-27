@@ -29,14 +29,14 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     set({ transactions: sorted });
   },
 
-  loadTransactions: async () => {
+  loadTransactions: async (userId: string) => {
     const { setLoading, setError, sortOrder } = get();
     
     setLoading(true);
     setError(null);
 
     try {
-      const response = await transactionsApi.list();
+      const response = await transactionsApi.list(userId);
       
       if (response.error) {
         setError(response.error.message);
@@ -61,14 +61,14 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     }
   },
 
-  createTransaction: async (amount, type, categoryId, date, description) => {
+  createTransaction: async (userId: string, amount: number, type: TransactionType, categoryId: string, date: string, description?: string) => {
     const { setLoading, setError, loadTransactions } = get();
     
     setLoading(true);
     setError(null);
 
     try {
-      const response = await transactionsApi.create({
+      const response = await transactionsApi.create(userId, {
         amount,
         type,
         category_id: categoryId,
@@ -81,8 +81,7 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
         return false;
       }
 
-      // Reload transactions to get the updated list
-      await loadTransactions();
+      await loadTransactions(userId);
       return true;
     } catch (error) {
       setError('Failed to create transaction');
@@ -93,7 +92,7 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     }
   },
 
-  updateTransaction: async (id, amount, type, categoryId, date, description) => {
+  updateTransaction: async (userId: string, id: string, amount?: number, type?: TransactionType, categoryId?: string, date?: string, description?: string) => {
     const { setLoading, setError, loadTransactions } = get();
     
     setLoading(true);
@@ -107,15 +106,14 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
       if (date !== undefined) updateData.transaction_date = date;
       if (description !== undefined) updateData.description = description;
 
-      const response = await transactionsApi.update(id, updateData);
+      const response = await transactionsApi.update(userId, id, updateData);
       
       if (response.error) {
         setError(response.error.message);
         return false;
       }
 
-      // Reload transactions to get the updated list
-      await loadTransactions();
+      await loadTransactions(userId);
       return true;
     } catch (error) {
       setError('Failed to update transaction');
@@ -126,22 +124,21 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     }
   },
 
-  deleteTransaction: async (id) => {
+  deleteTransaction: async (userId: string, id: string) => {
     const { setLoading, setError, loadTransactions } = get();
     
     setLoading(true);
     setError(null);
 
     try {
-      const response = await transactionsApi.delete(id);
+      const response = await transactionsApi.delete(userId, id);
       
       if (response.error) {
         setError(response.error.message);
         return false;
       }
 
-      // Reload transactions to get the updated list
-      await loadTransactions();
+      await loadTransactions(userId);
       return true;
     } catch (error) {
       setError('Failed to delete transaction');

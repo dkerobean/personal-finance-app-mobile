@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { TrendingUp, TrendingDown, ChevronRight } from 'lucide-react-native';
 import Svg, { Path, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/design';
 import { formatCurrency } from '@/lib/formatters';
@@ -80,7 +81,7 @@ export default function NetWorthTrendChart({
 
   const renderPlaceholder = () => (
     <View style={styles.placeholderContainer}>
-      <MaterialIcons name="show-chart" size={48} color={COLORS.textSecondary} />
+      <Ionicons name="trending-up" size={48} color={COLORS.textSecondary} />
       <Text style={styles.placeholderTitle}>Net Worth History</Text>
       <Text style={styles.placeholderText}>
         Track your progress over time. Add assets and liabilities to start building your history.
@@ -109,11 +110,11 @@ export default function NetWorthTrendChart({
         <View style={styles.headerLeft}>
           <Text style={styles.title}>Net Worth Trend</Text>
           <View style={styles.changeContainer}>
-            <MaterialIcons 
-              name={isPositiveChange ? 'trending-up' : 'trending-down'} 
-              size={16} 
-              color={isPositiveChange ? COLORS.success : COLORS.error} 
-            />
+            {isPositiveChange ? (
+              <TrendingUp size={16} color={COLORS.success} />
+            ) : (
+              <TrendingDown size={16} color={COLORS.error} />
+            )}
             <Text style={[
               styles.changeText, 
               { color: isPositiveChange ? COLORS.success : COLORS.error }
@@ -124,7 +125,7 @@ export default function NetWorthTrendChart({
         </View>
         <TouchableOpacity onPress={onViewHistory} style={styles.viewHistoryButton}>
           <Text style={styles.viewHistoryText}>View All</Text>
-          <MaterialIcons name="arrow-forward" size={16} color={COLORS.primary} />
+          <ChevronRight size={16} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
@@ -272,7 +273,7 @@ const styles = StyleSheet.create({
   gridLine: {
     position: 'absolute',
     height: 1,
-    backgroundColor: COLORS.border,
+    backgroundColor: COLORS.gray100,
     opacity: 0.3,
   },
   svg: {
@@ -338,20 +339,20 @@ const styles = StyleSheet.create({
   loadingTitle: {
     width: 120,
     height: 20,
-    backgroundColor: COLORS.border,
+    backgroundColor: COLORS.gray100,
     borderRadius: BORDER_RADIUS.sm,
     marginBottom: SPACING.sm,
   },
   loadingChange: {
     width: 80,
     height: 16,
-    backgroundColor: COLORS.border,
+    backgroundColor: COLORS.gray100,
     borderRadius: BORDER_RADIUS.sm,
   },
   loadingChart: {
     width: '100%',
     height: 150,
-    backgroundColor: COLORS.border,
+    backgroundColor: COLORS.gray100,
     borderRadius: BORDER_RADIUS.md,
     marginBottom: SPACING.md,
   },

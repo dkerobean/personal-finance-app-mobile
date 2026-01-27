@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { COLORS, SHADOWS } from '@/constants/design';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -52,7 +53,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       return (
         <View style={styles.container}>
           <View style={styles.errorContainer}>
-            <MaterialIcons name="error-outline" size={64} color="#dc2626" />
+            <View style={styles.iconContainer}>
+              <MaterialIcons name="error-outline" size={48} color={COLORS.error} />
+            </View>
             <Text style={styles.title}>Something went wrong</Text>
             <Text style={styles.message}>{this.state.errorMessage}</Text>
             
@@ -61,7 +64,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             </TouchableOpacity>
             
             <Text style={styles.helpText}>
-              If this error persists, please restart the app or check your internet connection.
+              If this error persists, please restart the app.
             </Text>
           </View>
         </View>
@@ -75,45 +78,59 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.backgroundMain, // Emerald background for full screen error? Or white? Let's go white card on emerald or just white. Use White for simplicity.
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   errorContainer: {
     alignItems: 'center',
-    maxWidth: 300,
+    maxWidth: 320,
+    backgroundColor: COLORS.white,
+    padding: 32,
+    borderRadius: 24,
+    ...SHADOWS.lg,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginTop: 16,
-    marginBottom: 8,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 12,
     textAlign: 'center',
   },
   message: {
     fontSize: 16,
-    color: '#6b7280',
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
     lineHeight: 24,
   },
   retryButton: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginBottom: 24,
+    width: '100%',
+    alignItems: 'center',
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
   },
   helpText: {
-    fontSize: 14,
-    color: '#9ca3af',
+    fontSize: 13,
+    color: COLORS.textTertiary,
     textAlign: 'center',
     lineHeight: 20,
   },

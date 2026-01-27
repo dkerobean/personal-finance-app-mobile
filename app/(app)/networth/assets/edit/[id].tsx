@@ -9,13 +9,14 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNetWorthStore } from '@/stores/netWorthStore';
 import type { Asset, UpdateAssetRequest } from '@/types/models';
-import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
-import { useCustomAlert } from '@/hooks/useCustomAlert';
-import CustomAlert from '@/components/ui/CustomAlert';
+import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, BUDGET } from '@/constants/design';
+import { useAppToast } from '@/hooks/useAppToast';
+import GradientHeader from '@/components/budgets/GradientHeader';
 import { AssetForm } from '@/components/networth/assets';
 
 export default function EditAssetScreen() {
@@ -23,7 +24,7 @@ export default function EditAssetScreen() {
   const { id } = useLocalSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [asset, setAsset] = useState<Asset | null>(null);
-  const { alert, alertProps } = useCustomAlert();
+  const toast = useAppToast();
   
   const { assets, updateAsset, deleteAsset, error } = useNetWorthStore();
 
@@ -33,9 +34,8 @@ export default function EditAssetScreen() {
       if (foundAsset) {
         setAsset(foundAsset);
       } else {
-        alert('Asset Not Found', 'The asset you are trying to edit could not be found.', [
-          { text: 'OK', onPress: () => router.back() }
-        ]);
+        toast.error('Not Found', 'The asset you are trying to edit could not be found.');
+        router.back();
       }
     }
   }, [id, assets]);
@@ -49,43 +49,19 @@ export default function EditAssetScreen() {
       const success = await updateAsset(asset.id, assetData);
       
       if (success) {
-        alert(
-          'Asset Updated',
-          `"${assetData.name || asset.name}" has been updated successfully.`,
-          [{ 
-            text: 'OK', 
-            style: 'default',
-            onPress: () => router.back()
-          }]
-        );
+        toast.success('Asset Updated', `"${assetData.name || asset.name}" updated successfully`);
+        setTimeout(() => router.back(), 500);
       } else if (error) {
-        alert('Error', error);
+        toast.error('Error', error);
       }
     } catch (err) {
-      alert('Error', 'Failed to update asset. Please try again.');
+      toast.error('Error', 'Failed to update asset. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDeleteAsset = () => {
-    if (!asset) return;
-    
-    alert(
-      'Delete Asset',
-      `Are you sure you want to delete "${asset.name}" worth $${asset.current_value.toFixed(2)}? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: confirmDelete
-        }
-      ]
-    );
-  };
-
-  const confirmDelete = async () => {
+  const handleDeleteAsset = async () => {
     if (!asset) return;
     
     setIsLoading(true);
@@ -94,147 +70,198 @@ export default function EditAssetScreen() {
       const success = await deleteAsset(asset.id);
       
       if (success) {
-        alert(
-          'Asset Deleted',
-          `"${asset.name}" has been deleted successfully.`,
-          [{ 
-            text: 'OK', 
-            style: 'default',
-            onPress: () => router.back()
-          }]
-        );
+        toast.success('Asset Deleted', `"${asset.name}" has been deleted`);
+        setTimeout(() => router.back(), 500);
       } else if (error) {
-        alert('Error', error);
+        toast.error('Error', error);
       }
     } catch (err) {
-      alert('Error', 'Failed to delete asset. Please try again.');
+      toast.error('Error', 'Failed to delete asset. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleCancel = () => {
-    alert(
-      'Discard Changes?',
-      'Are you sure you want to discard your changes?',
-      [
-        { text: 'Continue Editing', style: 'cancel' },
-        { 
-          text: 'Discard', 
-          style: 'destructive',
-          onPress: () => router.back()
-        }
-      ]
-    );
+    router.back();
+  };
+
+  const handleGoBack = () => {
+    router.back();
   };
 
   if (!asset) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading asset...</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
-          <MaterialIcons name="close" size={24} color={COLORS.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Edit Asset</Text>
-        <TouchableOpacity onPress={handleDeleteAsset} style={styles.deleteButton}>
-          <MaterialIcons name="delete-outline" size={24} color={COLORS.error} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardView} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.formContainer}>
-          <AssetForm 
-            initialData={asset}
-            onSave={handleUpdateAsset}
-            onCancel={handleCancel}
-            onDelete={handleDeleteAsset}
-            isLoading={isLoading}
-            mode="edit"
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Gradient Header */}
+          <GradientHeader
+            title="Edit Asset"
+            onBackPress={handleGoBack}
+            onCalendarPress={() => {}}
+            onNotificationPress={() => {}}
           />
-        </View>
-      </ScrollView>
-      
-      {isLoading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Updating asset...</Text>
-        </View>
-      )}
-      
-      <CustomAlert {...alertProps} />
-    </KeyboardAvoidingView>
+
+          {/* Content Card */}
+          <View style={styles.contentCard}>
+            {/* Asset Info Card */}
+            <View style={styles.infoCard}>
+              <View style={styles.infoIconBg}>
+                <MaterialIcons name="edit" size={24} color={COLORS.primary} />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={styles.infoTitle}>Editing: {asset.name}</Text>
+                <Text style={styles.infoDescription}>
+                  Current value: ₵{asset.current_value.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </Text>
+              </View>
+            </View>
+
+            {/* Delete Button */}
+            <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAsset}>
+              <MaterialIcons name="delete-outline" size={20} color={COLORS.error} />
+              <Text style={styles.deleteButtonText}>Delete Asset</Text>
+            </TouchableOpacity>
+
+            {/* Asset Form */}
+            <View style={styles.formContainer}>
+              <AssetForm 
+                initialData={asset}
+                onSave={handleUpdateAsset}
+                onCancel={handleCancel}
+                onDelete={handleDeleteAsset}
+                isLoading={isLoading}
+                mode="edit"
+              />
+            </View>
+          </View>
+        </ScrollView>
+        
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingCard}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={styles.loadingText}>Updating asset...</Text>
+            </View>
+          </View>
+        )}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundMain,
-    paddingTop: 44,
+    backgroundColor: BUDGET.gradientColors.start,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 37,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.backgroundInput,
-  },
-  cancelButton: {
-    padding: 8,
-    borderRadius: 20,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.sizes.xxl,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-  },
-  deleteButton: {
-    padding: 8,
-    borderRadius: 20,
+  keyboardView: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
-  },
-  formContainer: {
-    padding: 37,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  contentCard: {
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
+    flex: 1,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    ...SHADOWS.sm,
+  },
+  infoIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  infoTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  infoTitle: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  infoDescription: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.success,
+    fontWeight: '500',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEE2E2',
+    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  deleteButtonText: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: '600',
+    color: COLORS.error,
+  },
+  formContainer: {
+    flex: 1,
+    paddingBottom: 100,
+  },
   loadingText: {
-    marginTop: 16,
-    fontSize: TYPOGRAPHY.sizes.lg,
+    marginTop: SPACING.md,
+    fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textSecondary,
-    fontFamily: 'Poppins',
+    fontWeight: '500',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
+  },
+  loadingCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.xxl,
+    alignItems: 'center',
+    ...SHADOWS.lg,
   },
 });

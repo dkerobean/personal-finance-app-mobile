@@ -6,10 +6,13 @@ import {
   ScrollView,
   StyleSheet,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Grid3x3, Smartphone, Bell, LogOut, ChevronRight } from 'lucide-react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useAuth } from '@clerk/clerk-expo';
 import GradientHeader from '@/components/budgets/GradientHeader';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 
@@ -17,7 +20,8 @@ interface SettingsOption {
   id: string;
   title: string;
   description: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
+  iconComponent: React.ComponentType<{ size: number; color: string }>;
+  iconBgColor: string;
   route: string;
 }
 
@@ -26,35 +30,31 @@ const settingsOptions: SettingsOption[] = [
     id: 'categories',
     title: 'Categories',
     description: 'Manage transaction categories',
-    icon: 'category',
+    iconComponent: Grid3x3,
+    iconBgColor: COLORS.primaryLight,
     route: '/settings/categories',
   },
   {
     id: 'momo',
     title: 'MTN MoMo Integration',
     description: 'Connect and sync your MTN MoMo account',
-    icon: 'phone-android',
+    iconComponent: Smartphone,
+    iconBgColor: COLORS.lightBlue,
     route: '/settings/momo',
   },
   {
     id: 'notifications',
     title: 'Notifications',
     description: 'Manage budget alerts and notification preferences',
-    icon: 'notifications',
+    iconComponent: Bell,
+    iconBgColor: '#FEF9C3',
     route: '/settings/notifications',
   },
-  // Add more settings options here as the app grows
-  // {
-  //   id: 'profile',
-  //   title: 'Profile',
-  //   description: 'Update your profile information',
-  //   icon: 'person',
-  //   route: '/settings/profile',
-  // },
 ];
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { signOut } = useAuth();
 
   const handleOptionPress = (route: string) => {
     router.push(route as any);
@@ -62,6 +62,24 @@ export default function SettingsScreen() {
 
   const handleGoBack = (): void => {
     router.back();
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/(auth)/login');
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -83,47 +101,59 @@ export default function SettingsScreen() {
           title="Settings"
           subtitle="Manage your app preferences and data"
           onBackPress={handleGoBack}
-          onCalendarPress={() => {
-            // Handle calendar press
-          }}
-          onNotificationPress={() => {
-            // Handle notification press
-          }}
+          onCalendarPress={() => {}}
+          onNotificationPress={() => {}}
           showCalendar={false}
         />
 
         {/* Content Card */}
         <View style={styles.contentCard}>
           <View style={styles.optionsList}>
-            {settingsOptions.map((option) => (
-              <TouchableOpacity
-                key={option.id}
-                style={styles.optionItem}
-                onPress={() => handleOptionPress(option.route)}
-              >
-                <View style={styles.optionContent}>
-                  <View style={styles.iconContainer}>
-                    <MaterialIcons
-                      name={option.icon}
+            {settingsOptions.map((option, index) => {
+              const IconComponent = option.iconComponent;
+              return (
+                <Animated.View
+                  key={option.id}
+                  entering={FadeInDown.delay(index * 100).duration(600)}
+                >
+                  <TouchableOpacity
+                    style={styles.optionItem}
+                    onPress={() => handleOptionPress(option.route)}
+                  >
+                    <View style={styles.optionContent}>
+                      <View style={[styles.iconContainer, { backgroundColor: option.iconBgColor }]}>
+                        <IconComponent
+                          size={24}
+                          color={COLORS.primary}
+                        />
+                      </View>
+                      <View style={styles.optionText}>
+                        <Text style={styles.optionTitle}>{option.title}</Text>
+                        <Text style={styles.optionDescription}>
+                          {option.description}
+                        </Text>
+                      </View>
+                    </View>
+                    <ChevronRight
                       size={24}
-                      color={COLORS.primary}
+                      color={COLORS.textTertiary}
                     />
-                  </View>
-                  <View style={styles.optionText}>
-                    <Text style={styles.optionTitle}>{option.title}</Text>
-                    <Text style={styles.optionDescription}>
-                      {option.description}
-                    </Text>
-                  </View>
-                </View>
-                <MaterialIcons
-                  name="chevron-right"
-                  size={24}
-                  color={COLORS.textTertiary}
-                />
-              </TouchableOpacity>
-            ))}
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
           </View>
+
+          {/* Logout Button */}
+          <Animated.View 
+            entering={FadeInDown.delay(300).duration(600)}
+            style={styles.logoutSection}
+          >
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <LogOut size={22} color={COLORS.error} />
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </Animated.View>
 
           {/* Bottom spacing for navigation */}
           <View style={styles.bottomSpacing} />
@@ -168,9 +198,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconContainer: {
-    backgroundColor: COLORS.primaryLight,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.round,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.lg,
@@ -190,5 +220,25 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 150,
+  },
+  logoutSection: {
+    paddingHorizontal: SPACING.xl,
+    marginTop: SPACING.xxl,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.lg,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+    gap: SPACING.sm,
+  },
+  logoutText: {
+    color: COLORS.error,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: '600',
   },
 });

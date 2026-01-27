@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, TRANSACTIONS, TYPOGRAPHY, SPACING } from '@/constants/design';
 import type { Transaction } from '@/types/models';
+import { mapIconName } from '@/utils/iconMapping';
 
 interface BudgetTransactionsListProps {
   transactions: Transaction[];
@@ -58,7 +59,7 @@ const BudgetTransactionItem = ({ transaction }: TransactionItemProps): React.Rea
           { backgroundColor: getCategoryIconColor(transaction.category?.name) }
         ]}>
           <MaterialIcons
-            name={transaction.category?.icon_name as any || 'category'}
+            name={mapIconName(transaction.category?.icon_name) as any}
             size={26}
             color={COLORS.primaryLight}
           />

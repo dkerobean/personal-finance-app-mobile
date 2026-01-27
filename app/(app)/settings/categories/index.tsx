@@ -15,8 +15,11 @@ import GradientHeader from '@/components/budgets/GradientHeader';
 import { COLORS, BORDER_RADIUS, SPACING, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 import type { Category } from '@/types/models';
 
+import { useAuth } from '@clerk/clerk-expo';
+
 export default function CategoriesScreen() {
   const router = useRouter();
+  const { userId } = useAuth();
   const {
     categories,
     isLoading,
@@ -27,8 +30,10 @@ export default function CategoriesScreen() {
   } = useCategoryStore();
 
   useEffect(() => {
-    loadCategories();
-  }, []);
+    if (userId) {
+      loadCategories(userId);
+    }
+  }, [userId]);
 
   const handleCategoryPress = (categoryId: string) => {
     router.push(`/settings/categories/edit/${categoryId}`);
@@ -107,8 +112,8 @@ export default function CategoriesScreen() {
             <TouchableOpacity 
               style={styles.seedButton}
               onPress={async () => {
-                const { seedDefaults } = useCategoryStore.getState();
-                await seedDefaults();
+                // Triggering a reload which triggers the seed on server
+                if (userId) await loadCategories(userId);
               }}
               disabled={isLoading}
             >
@@ -132,17 +137,21 @@ export default function CategoriesScreen() {
               return (
                 <TouchableOpacity
                   key={isCategory ? category.id : index}
-                  style={styles.categoryItem}
+                  style={styles.categoryCard}
                   onPress={() => isCategory ? handleCategoryPress(category.id) : handleCreatePress()}
+                  activeOpacity={0.7}
                 >
-                  <View style={[styles.categoryCircle, { backgroundColor: categoryColor }]}>
+                  <View style={[styles.categoryIconContainer, { backgroundColor: categoryColor + '20' }]}>
                     <MaterialIcons
                       name={categoryIcon}
-                      size={32}
-                      color={COLORS.white}
+                      size={28}
+                      color={categoryColor}
                     />
                   </View>
-                  <Text style={styles.categoryName}>{categoryName}</Text>
+                  <Text style={styles.categoryName} numberOfLines={1}>{categoryName}</Text>
+                  
+                  {/* Subtle Arrow for interactivity hint */}
+                  {/* <MaterialIcons name="chevron-right" size={20} color={COLORS.gray400} style={{ marginTop: 4 }} /> */}
                 </TouchableOpacity>
               );
             })}
@@ -255,31 +264,34 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins',
   },
   categoriesGrid: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    gap: SPACING.md,
+  },
+  categoryCard: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    paddingHorizontal: SPACING.xl,
-    gap: SPACING.sm,
-  },
-  categoryItem: {
-    width: '31%',
     alignItems: 'center',
-    marginBottom: SPACING.xxl,
-    flexShrink: 0,
+    backgroundColor: COLORS.white,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    marginBottom: SPACING.sm,
+    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
   },
-  categoryCircle: {
-    width: 105,
-    height: 98,
-    borderRadius: 26,
+  categoryIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.md,
+    marginRight: SPACING.md,
   },
   categoryName: {
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.medium,
+    fontWeight: TYPOGRAPHY.weights.semibold,
     color: COLORS.textPrimary,
     fontFamily: 'Poppins',
-    textAlign: 'center',
+    flex: 1,
   },
 });

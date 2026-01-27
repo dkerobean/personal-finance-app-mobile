@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,21 +7,46 @@ import {
   StyleSheet,
   ScrollView,
   StatusBar,
+  ActivityIndicator,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SvgXml } from 'react-native-svg';
+import { useSignIn, useAuth, useOAuth } from '@clerk/clerk-expo';
+import * as WebBrowser from 'expo-web-browser';
 import { validateEmail } from '@/lib/validators';
 import { authService } from '@/services/authService';
-import { useAuthStore } from '@/stores/authStore';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import CustomAlert from '@/components/ui/CustomAlert';
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/design';
 
-const EYE_ICON = `<svg width="26" height="20" viewBox="0 0 26 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M13 0C7.5 0 2.73 3.11 1 7.5C2.73 11.89 7.5 15 13 15C18.5 15 23.27 11.89 25 7.5C23.27 3.11 18.5 0 13 0ZM13 12.5C10.24 12.5 8 10.26 8 7.5C8 4.74 10.24 2.5 13 2.5C15.76 2.5 18 4.74 18 7.5C18 10.26 15.76 12.5 13 12.5ZM13 4.5C11.34 4.5 10 5.84 10 7.5C10 9.16 11.34 10.5 13 10.5C14.66 10.5 16 9.16 16 7.5C16 5.84 14.66 4.5 13 4.5Z" fill="#0E3E3E"/>
+// Warm up the browser for OAuth
+WebBrowser.maybeCompleteAuthSession();
+
+const EYE_ICON = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 4.5C7 4.5 2.73 7.61 1 12C2.73 16.39 7 19.5 12 19.5C17 19.5 21.27 16.39 23 12C21.27 7.61 17 4.5 12 4.5ZM12 17C9.24 17 7 14.76 7 12C7 9.24 9.24 7 12 7C14.76 7 17 9.24 17 12C17 14.76 14.76 17 12 17ZM12 9C10.34 9 9 10.34 9 12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12C15 10.34 13.66 9 12 9Z" fill="#94A3B8"/>
 </svg>`;
 
-const EYE_OFF_ICON = `<svg width="26" height="11" viewBox="0 0 26 11" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2.65582 0.82533C8.20704 8.21776 17.0805 8.44331 22.8328 1.49836C23.0127 1.28372 23.1855 1.05816 23.3618 0.82533M13.0071 6.54428V9.9047M18.6112 5.06361L20.4416 8.31235M22.8293 1.49836L25.1746 3.6848M7.39235 5.06361L5.56192 8.31235M3.17073 1.49836L0.825392 3.6848" stroke="#0E3E3E" stroke-width="1.63636" stroke-linecap="round" stroke-linejoin="round"/>
+const EYE_OFF_ICON = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 7C14.76 7 17 9.24 17 12C17 12.88 16.79 13.69 16.42 14.41L19.55 17.54C21.22 16.14 22.46 14.23 23 12C21.27 7.61 17 4.5 12 4.5C10.74 4.5 9.54 4.79 8.44 5.31L10.59 7.46C11.03 7.16 11.5 7 12 7ZM2.41 1.58L1 2.99L5.27 7.26C3.48 8.42 2.01 10.06 1 12C2.73 16.39 7 19.5 12 19.5C13.55 19.5 15.02 19.16 16.38 18.55L19.59 21.76L21 20.35L2.41 1.58ZM12 17C9.24 17 7 14.76 7 12C7 11.23 7.18 10.5 7.5 9.85L14.15 16.5C13.5 16.82 12.77 17 12 17Z" fill="#94A3B8"/>
+</svg>`;
+
+const GOOGLE_ICON = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M22.56 12.25C22.56 11.47 22.49 10.72 22.36 10H12V14.26H17.92C17.66 15.63 16.88 16.79 15.71 17.57V20.34H19.28C21.36 18.42 22.56 15.6 22.56 12.25Z" fill="#4285F4"/>
+<path d="M12 23C14.97 23 17.46 22.02 19.28 20.34L15.71 17.57C14.73 18.23 13.48 18.63 12 18.63C9.13 18.63 6.71 16.69 5.84 14.09H2.17V16.95C3.98 20.53 7.7 23 12 23Z" fill="#34A853"/>
+<path d="M5.84 14.09C5.62 13.43 5.49 12.73 5.49 12C5.49 11.27 5.62 10.57 5.84 9.91V7.05H2.17C1.4 8.57 0.96 10.24 0.96 12C0.96 13.76 1.4 15.43 2.17 16.95L5.84 14.09Z" fill="#FBBC05"/>
+<path d="M12 5.37C13.62 5.37 15.06 5.92 16.21 6.98L19.36 3.83C17.45 2.09 14.97 1 12 1C7.7 1 3.98 3.47 2.17 7.05L5.84 9.91C6.71 7.31 9.13 5.37 12 5.37Z" fill="#EA4335"/>
+</svg>`;
+
+const APPLE_ICON = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M17.05 20.28C16.07 21.23 15 21.08 13.97 20.63C12.88 20.17 11.88 20.15 10.73 20.63C9.29 21.25 8.53 21.07 7.67 20.28C2.79 15.25 3.51 7.59 9.05 7.31C10.4 7.38 11.34 8.05 12.13 8.11C13.31 7.87 14.44 7.18 15.69 7.27C17.19 7.39 18.32 7.99 19.07 9.07C15.98 10.94 16.72 15.05 19.58 16.2C18.97 17.82 18.17 19.42 17.04 20.29L17.05 20.28ZM12.03 7.25C11.88 5.02 13.69 3.18 15.77 3C16.06 5.58 13.43 7.5 12.03 7.25Z" fill="#000000"/>
+</svg>`;
+
+// Kippo K Logo - White version for green background
+const KIPPO_LOGO_WHITE = `<svg width="50" height="50" viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg">
+  <path d="M17.5 65 L37.5 15 L57.5 15 L37.5 65 Z" fill="white"/>
+  <path d="M62.5 15 L82.5 15 L70.5 40 L60.5 65 L40.5 65 L50.5 40 Z" fill="white"/>
 </svg>`;
 
 interface FormData {
@@ -30,9 +55,9 @@ interface FormData {
 }
 
 interface FormErrors {
-  email?: string;
-  password?: string;
   general?: string;
+  field_email?: string;
+  field_password?: string;
 }
 
 interface PasswordVisibility {
@@ -40,324 +65,465 @@ interface PasswordVisibility {
 }
 
 export default function LoginScreen(): React.ReactElement {
+  const { signIn, setActive, isLoaded } = useSignIn();
+  const { isSignedIn } = useAuth();
+  const { startOAuthFlow: startGoogleOAuth } = useOAuth({ strategy: 'oauth_google' });
+  const { startOAuthFlow: startAppleOAuth } = useOAuth({ strategy: 'oauth_apple' });
+  
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | null>(null);
   const [showPassword, setShowPassword] = useState<PasswordVisibility>({
     password: false,
   });
-  const { setUser, setSession } = useAuthStore();
   const { alert, alertProps } = useCustomAlert();
+
+  // Redirect if already signed in
+  React.useEffect(() => {
+    if (isSignedIn) {
+      router.replace('/(app)');
+    }
+  }, [isSignedIn]);
+
+  const handleGoogleSignIn = useCallback(async () => {
+    try {
+      setSocialLoading('google');
+      const { createdSessionId, setActive: setActiveSession } = await startGoogleOAuth();
+      
+      if (createdSessionId && setActiveSession) {
+        await setActiveSession({ session: createdSessionId });
+        router.replace('/(app)');
+      }
+    } catch (error: any) {
+      console.error('Google OAuth error:', error);
+      alert('Google Sign In Failed', error?.message || 'An error occurred');
+    } finally {
+      setSocialLoading(null);
+    }
+  }, [startGoogleOAuth, alert]);
+
+  const handleAppleSignIn = useCallback(async () => {
+    try {
+      setSocialLoading('apple');
+      const { createdSessionId, setActive: setActiveSession } = await startAppleOAuth();
+      
+      if (createdSessionId && setActiveSession) {
+        await setActiveSession({ session: createdSessionId });
+        router.replace('/(app)');
+      }
+    } catch (error: any) {
+      console.error('Apple OAuth error:', error);
+      alert('Apple Sign In Failed', error?.message || 'An error occurred');
+    } finally {
+      setSocialLoading(null);
+    }
+  }, [startAppleOAuth, alert]);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
     if (!formData.email) {
-      newErrors.email = 'Email is required';
+      newErrors.field_email = 'Email is required';
     } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.field_email = 'Please enter a valid email address';
     }
 
     if (!formData.password) {
-      newErrors.password = 'Password is required';
+      newErrors.field_password = 'Password is required';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignIn = async (): Promise<void> => {
+  const handleSignIn = useCallback(async (): Promise<void> => {
+    if (!isLoaded || !signIn) {
+      alert('Error', 'Authentication service not ready. Please try again.');
+      return;
+    }
+
     if (!validateForm()) return;
 
     setIsLoading(true);
     setErrors({});
 
     try {
-      const result = await authService.signIn(formData.email, formData.password);
+      // Attempt Clerk sign in
+      const result = await signIn.create({
+        identifier: formData.email,
+        password: formData.password,
+      });
 
-      if (!result.success) {
-        setErrors({ general: result.message });
-        alert('Login Failed', result.message);
-        return;
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        
+        // Sync user to MongoDB
+        try {
+          // Use session user ID if available
+          await authService.syncUserToDatabase(
+            result.createdSessionId || '',
+            formData.email
+          );
+        } catch (syncError) {
+          console.error('Failed to sync user to MongoDB:', syncError);
+          // Don't block login if sync fails
+        }
+
+        router.replace('/(app)');
+      } else {
+        console.log('Sign in status:', result.status);
+        if (result.status === 'needs_first_factor') {
+          alert('Verification Required', 'Please complete the verification process.');
+        } else {
+          alert('Sign In Incomplete', 'Further steps are required to sign in.');
+        }
       }
-
-      // Get the session to update the store
-      const session = await authService.getSession();
-      if (session) {
-        setSession(session);
-        setUser(session.user);
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      
+      let errorMessage = 'An unexpected error occurred';
+      
+      if (error.errors && error.errors.length > 0) {
+        const firstError = error.errors[0];
+        if (firstError.code === 'form_password_incorrect') {
+          setErrors({ field_password: 'Incorrect password' });
+          setIsLoading(false);
+          return;
+        }
+        if (firstError.code === 'form_identifier_not_found') {
+          setErrors({ field_email: 'Account not found' });
+          setIsLoading(false);
+          return;
+        }
+        errorMessage = firstError.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
       }
-
-      alert('Success', 'Welcome back!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            router.replace('/(app)');
-          },
-        },
-      ]);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'An unexpected error occurred';
-      setErrors({ general: message });
-      alert('Error', message);
+      
+      alert('Sign In Failed', errorMessage);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const updateFormData = (field: keyof FormData, value: string): void => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  };
-
-  const navigateToRegister = (): void => {
-    router.push('/(auth)/register');
-  };
+  }, [isLoaded, signIn, setActive, formData, validateForm, alert]);
 
   const togglePasswordVisibility = (field: keyof PasswordVisibility): void => {
-    setShowPassword(prev => ({ ...prev, [field]: !prev[field] }));
+    setShowPassword((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
-  const handleForgotPassword = (): void => {
-    // TODO: Implement forgot password functionality
-    alert('Forgot Password', 'This feature will be available soon.');
+  const handleInputChange = (field: keyof FormData, value: string): void => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    const errorKey = `field_${field}` as keyof FormErrors;
+    if (errors[errorKey]) {
+      setErrors((prev) => ({ ...prev, [errorKey]: undefined }));
+    }
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#00D09E" barStyle="light-content" />
-
-      {/* Green Header Section */}
-      <View style={styles.greenHeader}>
-        <Text style={styles.welcomeText}>Welcome</Text>
+      <StatusBar barStyle="light-content" backgroundColor="#006D4F" />
+      <CustomAlert {...alertProps} />
+      
+      <View style={styles.topSection}>
+        <SvgXml xml={KIPPO_LOGO_WHITE} width={50} height={50} />
+        <Text style={styles.title}>Welcome to{'\n'}Kippo</Text>
       </View>
 
-      {/* Curved White Content Section */}
-      <ScrollView style={styles.whiteContent} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Username or email</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[styles.input, errors.email ? styles.inputError : null]}
-                placeholder="example@example.com"
-                placeholderTextColor="#999"
-                value={formData.email}
-                onChangeText={(value) => updateFormData('email', value)}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-            {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[styles.input, styles.passwordInput, errors.password ? styles.inputError : null]}
-                placeholder="●●●●●●"
-                placeholderTextColor="#999"
-                value={formData.password}
-                onChangeText={(value) => updateFormData('password', value)}
-                secureTextEntry={!showPassword.password}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => togglePasswordVisibility('password')}
-              >
-                <SvgXml 
-                  xml={showPassword.password ? EYE_OFF_ICON : EYE_ICON} 
-                  width={24} 
-                  height={16} 
+      <View style={styles.bottomSection}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.formContainer}>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Username or email</Text>
+              <View style={[styles.inputContainer, errors.field_email && styles.inputError]}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="example@finance.com"
+                  placeholderTextColor="#94A3B8"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoCorrect={false}
+                  value={formData.email}
+                  onChangeText={(text) => handleInputChange('email', text)}
                 />
+              </View>
+              {errors.field_email && (
+                <Text style={styles.errorText}>{errors.field_email}</Text>
+              )}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <View style={[styles.inputContainer, errors.field_password && styles.inputError]}>
+                <View style={styles.passwordWrapper}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="********"
+                    placeholderTextColor="#94A3B8"
+                    secureTextEntry={!showPassword.password}
+                    autoCapitalize="none"
+                    value={formData.password}
+                    onChangeText={(text) => handleInputChange('password', text)}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeIcon}
+                    onPress={() => togglePasswordVisibility('password')}
+                  >
+                    <SvgXml
+                      xml={showPassword.password ? EYE_ICON : EYE_OFF_ICON}
+                      width={20}
+                      height={20}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {errors.field_password && (
+                <Text style={styles.errorText}>{errors.field_password}</Text>
+              )}
+              <TouchableOpacity 
+                style={styles.forgotPassword}
+                onPress={() => router.push('/forgot-password')}
+              >
+                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
             </View>
-            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+
+            <TouchableOpacity
+              style={[styles.loginButton, isLoading && styles.buttonDisabled]}
+              onPress={handleSignIn}
+              disabled={isLoading || socialLoading !== null}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.loginButtonText}>Log In</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Social Login Divider */}
+            <View style={styles.dividerContainer}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or continue with</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Social Login Buttons */}
+            <View style={styles.socialButtonsContainer}>
+              <TouchableOpacity
+                style={styles.socialButton}
+                onPress={handleGoogleSignIn}
+                disabled={isLoading || socialLoading !== null}
+              >
+                {socialLoading === 'google' ? (
+                  <ActivityIndicator color="#006D4F" size="small" />
+                ) : (
+                  <SvgXml xml={GOOGLE_ICON} width={24} height={24} />
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.socialButton}
+                onPress={handleAppleSignIn}
+                disabled={isLoading || socialLoading !== null}
+              >
+                {socialLoading === 'apple' ? (
+                  <ActivityIndicator color="#006D4F" size="small" />
+                ) : (
+                  <SvgXml xml={APPLE_ICON} width={24} height={24} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => router.push('/register')}>
+                <Text style={styles.footerLink}>Sign Up</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-
-          {/* Forgot Password Link */}
-          <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPasswordContainer}>
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-          </TouchableOpacity>
-
-          {errors.general && <Text style={styles.generalError}>{errors.general}</Text>}
-
-          {/* Login Button */}
-          <TouchableOpacity
-            style={[styles.loginButton, isLoading && styles.buttonDisabled]}
-            onPress={handleSignIn}
-            disabled={isLoading}
-          >
-            <Text style={styles.loginButtonText}>
-              {isLoading ? 'Logging In...' : 'Log In'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Sign Up Button */}
-          <TouchableOpacity
-            style={styles.signUpButton}
-            onPress={navigateToRegister}
-          >
-            <Text style={styles.signUpButtonText}>Sign Up</Text>
-          </TouchableOpacity>
-
-
-          {/* Footer */}
-          <TouchableOpacity onPress={navigateToRegister} style={styles.footerContainer}>
-            <Text style={styles.footerText}>Don't have an account? Sign Up</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-      
-      <CustomAlert {...alertProps} />
+        </ScrollView>
+      </View>
     </View>
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#00D09E',
+    backgroundColor: COLORS.primary,
   },
-  greenHeader: {
-    paddingTop: 68,
-    paddingBottom: 40,
+  topSection: {
+    height: '35%',
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
   },
-  welcomeText: {
-    fontSize: 30,
-    fontWeight: '600',
-    color: '#093030',
-    fontFamily: 'Poppins',
+  logo: {
+    marginBottom: SPACING.lg,
+  },
+  title: {
+    fontSize: TYPOGRAPHY.sizes.massive,
+    fontWeight: '800',
+    color: COLORS.white,
     textAlign: 'center',
+    marginTop: SPACING.md,
+    lineHeight: 48,
+    letterSpacing: -1,
   },
-  whiteContent: {
+  bottomSection: {
     flex: 1,
-    backgroundColor: '#F1FFF3',
-    borderTopLeftRadius: 70,
-    borderTopRightRadius: 70,
+    backgroundColor: COLORS.backgroundCard,
+    borderTopLeftRadius: BORDER_RADIUS.huge,
+    borderTopRightRadius: BORDER_RADIUS.huge,
+    overflow: 'hidden',
   },
-  contentContainer: {
-    paddingTop: 40,
-    paddingHorizontal: 37,
-    paddingBottom: 40,
+  scrollContent: {
+    padding: SPACING.xl,
+    paddingTop: SPACING.xxxl,
   },
-  form: {
-    flex: 1,
+  formContainer: {
+    width: '100%',
   },
   inputGroup: {
-    marginBottom: 24,
+    marginBottom: SPACING.lg,
   },
   label: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#093030',
-    fontFamily: 'Poppins',
-    marginBottom: 8,
-    marginLeft: 16,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
+    backgroundColor: COLORS.backgroundCard,
+    alignSelf: 'flex-start',
+    zIndex: 1,
+    marginLeft: SPACING.md,
+    paddingHorizontal: SPACING.xs,
+    position: 'absolute',
+    top: -10,
+    fontWeight: '600',
   },
   inputContainer: {
-    position: 'relative',
-  },
-  input: {
-    backgroundColor: '#DFF7E2',
-    borderRadius: 18,
-    paddingHorizontal: 34,
-    paddingVertical: 14,
-    fontSize: 16,
-    fontFamily: 'Poppins',
-    color: '#093030',
-    borderWidth: 0,
-  },
-  passwordInput: {
-    paddingRight: 60,
+    backgroundColor: COLORS.backgroundInput,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1.5,
+    borderColor: COLORS.gray100,
+    paddingHorizontal: SPACING.lg,
+    height: 56,
+    justifyContent: 'center',
   },
   inputError: {
-    borderWidth: 1,
-    borderColor: '#ef4444',
+    borderColor: COLORS.error,
+    backgroundColor: '#FEF2F2',
   },
-  eyeButton: {
-    position: 'absolute',
-    right: 20,
-    top: '50%',
-    transform: [{ translateY: -12 }],
-    padding: 4,
+  input: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
+    height: '100%',
+    fontWeight: '500',
+  },
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: '100%',
+  },
+  passwordInput: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
+    height: '100%',
+    fontWeight: '500',
+  },
+  eyeIcon: {
+    padding: SPACING.xs,
   },
   errorText: {
-    color: '#ef4444',
-    fontSize: 12,
-    marginTop: 4,
-    marginLeft: 16,
+    color: COLORS.error,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    marginTop: SPACING.xs,
+    marginLeft: SPACING.sm,
   },
-  forgotPasswordContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginTop: SPACING.md,
+    paddingVertical: SPACING.xs,
   },
   forgotPasswordText: {
-    fontSize: 14,
+    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: '600',
-    color: '#093030',
-    fontFamily: 'League Spartan',
-  },
-  generalError: {
-    color: '#ef4444',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 16,
   },
   loginButton: {
-    backgroundColor: '#00D09E',
-    borderRadius: 30,
-    paddingVertical: 15,
-    paddingHorizontal: 24,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.round,
+    height: 56,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#00D09E',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  loginButtonText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#093030',
-    fontFamily: 'Poppins',
-  },
-  signUpButton: {
-    backgroundColor: '#DFF7E2',
-    borderRadius: 30,
-    paddingVertical: 15,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  signUpButtonText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#0E3E3E',
-    fontFamily: 'Poppins',
-  },
-  footerContainer: {
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 13,
-    fontWeight: '300',
-    color: '#093030',
-    fontFamily: 'League Spartan',
-    textAlign: 'center',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.xl,
+    ...SHADOWS.md,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.4,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
+  },
+  loginButtonText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: '700',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: SPACING.md,
+  },
+  footerText: {
+    color: COLORS.textSecondary,
+    fontSize: TYPOGRAPHY.sizes.md,
+  },
+  footerLink: {
+    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: '700',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: SPACING.xl,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.gray100,
+  },
+  dividerText: {
+    paddingHorizontal: SPACING.md,
+    color: COLORS.textTertiary,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: '500',
+  },
+  socialButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.xl,
+    marginBottom: SPACING.xxl,
+  },
+  socialButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.sm,
   },
 });

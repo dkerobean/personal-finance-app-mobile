@@ -42,7 +42,7 @@ interface MoMoState {
 interface MoMoActions {
   // Account management
   loadLinkedAccounts: () => Promise<void>;
-  linkAccount: (request: MoMoAccountLinkRequest) => Promise<boolean>;
+  linkAccount: (userId: string, request: MoMoAccountLinkRequest) => Promise<boolean>;
   deactivateAccount: (accountId: string) => Promise<boolean>;
   
   // Transaction sync
@@ -126,17 +126,21 @@ export const useMoMoStore = create<MoMoStore>((set, get) => ({
     }
   },
 
-  linkAccount: async (request) => {
+  linkAccount: async (userId: string, request: MoMoAccountLinkRequest) => {
     const { setLoading, setError, loadLinkedAccounts } = get();
     
     setLoading('accounts', true);
     setError(null);
 
     try {
-      const response = await transactionSyncService.linkMoMoAccount(request);
+      const response = await mtnMomoService.linkAccount(
+        userId,
+        request.phone_number,
+        request.account_name
+      );
       
-      if (response.error) {
-        setError(response.error.message);
+      if (!response.success) {
+        setError(response.error || 'Failed to link account');
         return false;
       }
 

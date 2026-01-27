@@ -66,3 +66,27 @@ export interface TransactionResponse {
   created_at: string;
   updated_at: string;
 }
+
+// Budget API Types
+export interface CreateBudgetRequest {
+  category_id: string;
+  amount: number;
+  month: string; // Format: 'YYYY-MM-01'
+}
+
+export interface UpdateBudgetRequest {
+  amount: number;
+}
+
+// Alert API Types
+export interface CreateAlertSettingsRequest {
+  budget_alerts_enabled?: boolean;
+  warning_threshold?: number;
+  over_budget_alerts_enabled?: boolean;
+}
+
+export interface UpdateAlertSettingsRequest {
+  budget_alerts_enabled?: boolean;
+  warning_threshold?: number;
+  over_budget_alerts_enabled?: boolean;
+}

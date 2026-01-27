@@ -31,24 +31,28 @@ export const useReportsStore = create<ReportsStore>((set, get) => ({
   setSelectedMonth: (month: string) => {
     set({ selectedMonth: month });
     
-    const { reportHistory, fetchMonthlyReport } = get();
+    const { reportHistory } = get();
     const cachedReport = reportHistory.get(month);
     
     if (cachedReport) {
       set({ currentReport: cachedReport });
-    } else {
-      fetchMonthlyReport(month);
     }
+    // Note: fetchMonthlyReport should be called by the component with userId
   },
 
-  fetchMonthlyReport: async (month: string) => {
+  fetchMonthlyReport: async (month: string, userId?: string) => {
     const { setLoading, setError, reportHistory } = get();
+    
+    // Don't fetch if no userId - this is expected during initial load
+    if (!userId) {
+      return;
+    }
     
     setLoading(true);
     setError(null);
 
     try {
-      const response = await reportsApi.getMonthlyReport(month);
+      const response = await reportsApi.getMonthlyReport(month, userId);
       
       if (response.error) {
         setError(response.error.message);
@@ -74,24 +78,31 @@ export const useReportsStore = create<ReportsStore>((set, get) => ({
     }
   },
 
-  refreshCurrentReport: async () => {
+  refreshCurrentReport: async (userId?: string) => {
     const { selectedMonth, fetchMonthlyReport, reportHistory } = get();
+    
+    if (!userId) return;
     
     const newHistory = new Map(reportHistory);
     newHistory.delete(selectedMonth);
     set({ reportHistory: newHistory });
     
-    await fetchMonthlyReport(selectedMonth);
+    await fetchMonthlyReport(selectedMonth, userId);
   },
 
-  fetchReportComparison: async (currentMonth: string, previousMonth: string) => {
+  fetchReportComparison: async (currentMonth: string, previousMonth: string, userId?: string) => {
     const { setLoading, setError } = get();
+    
+    if (!userId) {
+      setError('User ID is required');
+      return;
+    }
     
     setLoading(true);
     setError(null);
 
     try {
-      const response = await reportsApi.getReportComparison(currentMonth, previousMonth);
+      const response = await reportsApi.getReportComparison(currentMonth, previousMonth, userId);
       
       if (response.error) {
         setError(response.error.message);

@@ -6,13 +6,16 @@ import {
   ScrollView, 
   RefreshControl, 
   TouchableOpacity,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet2, AlertTriangle, Grid3x3, Receipt, BarChart3, PiggyBank, AlertCircle, Download, ArrowLeftRight, FileText, X } from 'lucide-react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useReportsStore } from '@/stores/reportsStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useUser } from '@clerk/clerk-expo';
 import GradientHeader from '@/components/budgets/GradientHeader';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 
@@ -26,15 +29,18 @@ export default function ReportsScreen(): React.ReactElement {
     fetchMonthlyReport,
     refreshCurrentReport,
     clearError,
-    fetchReportComparison
+    fetchReportComparison,
+    comparison
   } = useReportsStore();
   
-  const { user } = useAuthStore();
+  const { user } = useUser();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [compareMonth, setCompareMonth] = useState<string>('');
 
   useEffect(() => {
     if (user) {
-      fetchMonthlyReport(selectedMonth);
+      fetchMonthlyReport(selectedMonth, user.id);
     }
   }, [user, selectedMonth]);
 
@@ -83,7 +89,28 @@ export default function ReportsScreen(): React.ReactElement {
   };
 
   const handleCompareMonths = (): void => {
-    Alert.alert('Compare Months', 'Month comparison functionality will be available soon.');
+    setShowCompareModal(true);
+  };
+
+  const executeComparison = async (monthToCompare: string) => {
+    if (!user) return;
+    
+    setCompareMonth(monthToCompare);
+    setShowCompareModal(false);
+    
+    try {
+      await fetchReportComparison(selectedMonth, monthToCompare, user.id);
+      Alert.alert(
+        'Comparison Ready',
+        `Comparing ${formatMonthYear(selectedMonth)} with ${formatMonthYear(monthToCompare)}`,
+        [{ text: 'View Details', onPress: () => router.push({
+          pathname: '/reports/compare',
+          params: { current: selectedMonth, previous: monthToCompare }
+        } as any) }]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to generate comparison');
+    }
   };
 
   const combinedLoading = isLoading || isRefreshing;
@@ -119,7 +146,7 @@ export default function ReportsScreen(): React.ReactElement {
           {/* Error Display */}
           {error && (
             <View style={styles.errorContainer}>
-              <MaterialIcons name="error-outline" size={20} color={COLORS.error} />
+              <AlertCircle size={20} color={COLORS.error} />
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity 
                 style={styles.errorRetryButton}
@@ -136,7 +163,7 @@ export default function ReportsScreen(): React.ReactElement {
               style={styles.monthNavButton}
               onPress={() => handleMonthNavigation('prev')}
             >
-              <MaterialIcons name="chevron-left" size={24} color={COLORS.textPrimary} />
+              <ChevronLeft size={24} color={COLORS.white} />
             </TouchableOpacity>
             
             <View style={styles.monthDisplayContainer}>
@@ -149,18 +176,18 @@ export default function ReportsScreen(): React.ReactElement {
               style={styles.monthNavButton}
               onPress={() => handleMonthNavigation('next')}
             >
-              <MaterialIcons name="chevron-right" size={24} color={COLORS.textPrimary} />
+              <ChevronRight size={24} color={COLORS.white} />
             </TouchableOpacity>
           </View>
 
           {/* Report Summary Section */}
-          <View style={styles.summarySection}>
+          <Animated.View entering={FadeInDown.duration(600)} style={styles.summarySection}>
             <Text style={styles.sectionTitle}>Monthly Summary</Text>
             {currentReport ? (
               <View style={styles.summaryCard}>
                 <View style={styles.summaryRow}>
                   <View style={styles.summaryItem}>
-                    <MaterialIcons name="trending-up" size={24} color={COLORS.success} />
+                    <TrendingUp size={24} color={COLORS.success} />
                     <Text style={styles.summaryLabel}>Income</Text>
                     <Text style={styles.summaryValue}>
                       ₵{currentReport.totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -168,7 +195,7 @@ export default function ReportsScreen(): React.ReactElement {
                   </View>
                   
                   <View style={styles.summaryItem}>
-                    <MaterialIcons name="trending-down" size={24} color={COLORS.error} />
+                    <TrendingDown size={24} color={COLORS.error} />
                     <Text style={styles.summaryLabel}>Expenses</Text>
                     <Text style={styles.summaryValue}>
                       ₵{currentReport.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -177,11 +204,11 @@ export default function ReportsScreen(): React.ReactElement {
                 </View>
                 
                 <View style={styles.netIncomeContainer}>
-                  <MaterialIcons 
-                    name={currentReport.netIncome >= 0 ? "account-balance" : "warning"} 
-                    size={28} 
-                    color={currentReport.netIncome >= 0 ? COLORS.success : COLORS.error} 
-                  />
+                  {currentReport.netIncome >= 0 ? (
+                    <Wallet2 size={28} color={COLORS.success} />
+                  ) : (
+                    <AlertTriangle size={28} color={COLORS.error} />
+                  )}
                   <Text style={styles.netIncomeLabel}>Net Income</Text>
                   <Text style={[
                     styles.netIncomeValue,
@@ -199,14 +226,14 @@ export default function ReportsScreen(): React.ReactElement {
                 </Text>
               </View>
             )}
-          </View>
+          </Animated.View>
 
           {/* Quick Insights Grid */}
-          <View style={styles.insightsSection}>
+          <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.insightsSection}>
             <Text style={styles.sectionTitle}>Quick Insights</Text>
             <View style={styles.insightsGrid}>
               <View style={styles.insightCard}>
-                <MaterialIcons name="category" size={24} color={COLORS.primary} />
+                <Grid3x3 size={24} color={COLORS.primary} />
                 <Text style={styles.insightCardTitle}>Top Category</Text>
                 <Text style={styles.insightCardValue}>
                   {currentReport?.topCategories[0]?.categoryName || '--'}
@@ -214,7 +241,7 @@ export default function ReportsScreen(): React.ReactElement {
               </View>
               
               <View style={styles.insightCard}>
-                <MaterialIcons name="receipt" size={24} color={COLORS.accent} />
+                <Receipt size={24} color={COLORS.accent} />
                 <Text style={styles.insightCardTitle}>Transactions</Text>
                 <Text style={styles.insightCardValue}>
                   {currentReport?.transactionCount || '--'}
@@ -222,7 +249,7 @@ export default function ReportsScreen(): React.ReactElement {
               </View>
               
               <View style={styles.insightCard}>
-                <MaterialIcons name="analytics" size={24} color={COLORS.success} />
+                <BarChart3 size={24} color={COLORS.success} />
                 <Text style={styles.insightCardTitle}>Avg Amount</Text>
                 <Text style={styles.insightCardValue}>
                   {currentReport ? `₵${currentReport.avgTransactionAmount.toFixed(0)}` : '--'}
@@ -230,7 +257,7 @@ export default function ReportsScreen(): React.ReactElement {
               </View>
               
               <View style={styles.insightCard}>
-                <MaterialIcons name="savings" size={24} color={COLORS.warning} />
+                <PiggyBank size={24} color={COLORS.warning} />
                 <Text style={styles.insightCardTitle}>Savings Rate</Text>
                 <Text style={styles.insightCardValue}>
                   {currentReport && currentReport.totalIncome > 0 
@@ -240,7 +267,7 @@ export default function ReportsScreen(): React.ReactElement {
                 </Text>
               </View>
             </View>
-          </View>
+          </Animated.View>
 
           {/* Detailed Insights */}
           {currentReport && currentReport.topCategories.length > 0 && (
@@ -249,7 +276,7 @@ export default function ReportsScreen(): React.ReactElement {
               <View style={styles.detailsCard}>
                 {currentReport.topCategories.slice(0, 3).map((category, index) => (
                   <View key={category.categoryName} style={styles.detailItem}>
-                    <MaterialIcons name="trending-up" size={20} color={COLORS.error} />
+                    <TrendingDown size={20} color={COLORS.error} />
                     <Text style={styles.detailItemText}>
                       #{index + 1} spending: {category.categoryName} - ₵{category.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Text>
@@ -258,11 +285,11 @@ export default function ReportsScreen(): React.ReactElement {
                 
                 {currentReport.netIncome !== 0 && (
                   <View style={styles.detailItem}>
-                    <MaterialIcons 
-                      name={currentReport.netIncome > 0 ? "savings" : "warning"}
-                      size={20} 
-                      color={currentReport.netIncome > 0 ? COLORS.success : COLORS.warning}
-                    />
+                    {currentReport.netIncome > 0 ? (
+                      <PiggyBank size={20} color={COLORS.success} />
+                    ) : (
+                      <AlertTriangle size={20} color={COLORS.warning} />
+                    )}
                     <Text style={styles.detailItemText}>
                       {currentReport.netIncome > 0 
                         ? `You saved ₵${currentReport.netIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })} this month`
@@ -278,12 +305,12 @@ export default function ReportsScreen(): React.ReactElement {
           {/* Action Buttons */}
           <View style={styles.actionsContainer}>
             <TouchableOpacity style={styles.primaryActionButton} onPress={handleExportReport}>
-              <MaterialIcons name="file-download" size={18} color={COLORS.textSecondary} />
+              <Download size={18} color={COLORS.textSecondary} />
               <Text style={styles.primaryActionButtonText}>Export Report</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.secondaryActionButton} onPress={handleCompareMonths}>
-              <MaterialIcons name="compare-arrows" size={18} color={COLORS.primary} />
+              <ArrowLeftRight size={18} color={COLORS.primary} />
               <Text style={styles.secondaryActionButtonText}>Compare Months</Text>
             </TouchableOpacity>
           </View>
@@ -298,7 +325,7 @@ export default function ReportsScreen(): React.ReactElement {
           {/* Empty State */}
           {!combinedLoading && !currentReport && !error && (
             <View style={styles.emptyState}>
-              <MaterialIcons name="assessment" size={64} color="#d1d5db" />
+              <FileText size={64} color="#d1d5db" />
               <Text style={styles.emptyStateTitle}>No Report Data</Text>
               <Text style={styles.emptyStateText}>
                 No financial data available for the selected month.
@@ -310,6 +337,46 @@ export default function ReportsScreen(): React.ReactElement {
           <View style={styles.bottomSpacing} />
         </View>
       </ScrollView>
+
+      {/* Comparison Month Selection Modal */}
+      <Modal
+        visible={showCompareModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCompareModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowCompareModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Compare with Month</Text>
+              <TouchableOpacity onPress={() => setShowCompareModal(false)}>
+                <X size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.monthList}>
+              <TouchableOpacity 
+                style={styles.monthItem}
+                onPress={() => {
+                  const prevMonthDate = new Date(selectedMonth + '-01');
+                  prevMonthDate.setMonth(prevMonthDate.getMonth() - 1);
+                  const prevMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+                  executeComparison(prevMonth);
+                }}
+              >
+                <Text style={styles.monthText}>Previous Month</Text>
+                <ArrowLeftRight size={20} color={COLORS.primary} />
+              </TouchableOpacity>
+
+              {/* Add more specific month options if available in store */}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -571,5 +638,44 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 150,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.backgroundCard,
+    borderTopLeftRadius: BORDER_RADIUS.xl,
+    borderTopRightRadius: BORDER_RADIUS.xl,
+    maxHeight: '60%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray100,
+  },
+  modalTitle: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
+  },
+  monthList: {
+    maxHeight: 300,
+  },
+  monthItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray100,
+  },
+  monthText: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
   },
 });

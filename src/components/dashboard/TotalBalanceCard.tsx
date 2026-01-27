@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { Transaction } from '@/types/models';
+import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS } from '@/constants/design';
 
 interface TotalBalanceCardProps {
   transactions: Transaction[];
@@ -34,7 +35,7 @@ export default function TotalBalanceCard({ transactions, isLoading }: TotalBalan
     return (
       <View style={styles.card}>
         <View style={styles.header}>
-          <MaterialIcons name="account-balance-wallet" size={24} color="#6b7280" />
+          <MaterialIcons name="account-balance-wallet" size={24} color={COLORS.textTertiary} />
           <Text style={styles.title}>Total Balance</Text>
         </View>
         <View style={styles.loadingContainer}>
@@ -47,7 +48,7 @@ export default function TotalBalanceCard({ transactions, isLoading }: TotalBalan
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <MaterialIcons name="account-balance-wallet" size={24} color="#6b7280" />
+        <MaterialIcons name="account-balance-wallet" size={24} color={COLORS.primary} />
         <Text style={styles.title}>Total Balance</Text>
       </View>
       
@@ -62,8 +63,8 @@ export default function TotalBalanceCard({ transactions, isLoading }: TotalBalan
         <View style={styles.balanceIndicator}>
           <MaterialIcons 
             name={isPositive ? "trending-up" : "trending-down"} 
-            size={20} 
-            color={isPositive ? "#059669" : "#dc3545"} 
+            size={24} 
+            color={isPositive ? COLORS.primary : COLORS.error} 
           />
         </View>
       </View>
@@ -97,83 +98,81 @@ export default function TotalBalanceCard({ transactions, isLoading }: TotalBalan
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.xl,
+    marginHorizontal: SPACING.lg,
+    marginVertical: SPACING.sm,
+    ...SHADOWS.md,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginLeft: 8,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textSecondary,
+    marginLeft: SPACING.sm,
   },
   loadingContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: SPACING.xl,
   },
   loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textTertiary,
   },
   balanceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: SPACING.xl,
   },
   balanceAmount: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: TYPOGRAPHY.sizes.massive,
+    fontWeight: TYPOGRAPHY.weights.bold,
     flex: 1,
+    letterSpacing: -1,
   },
   positiveBalance: {
-    color: '#059669',
+    color: COLORS.primary,
   },
   negativeBalance: {
-    color: '#dc3545',
+    color: COLORS.error,
   },
   balanceIndicator: {
-    marginLeft: 8,
+    marginLeft: SPACING.sm,
+    backgroundColor: COLORS.primaryLight,
+    padding: 8,
+    borderRadius: 12,
   },
   summaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 16,
+    paddingTop: SPACING.lg,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: COLORS.gray100,
   },
   summaryItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   summaryLabel: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
     marginBottom: 4,
+    fontWeight: TYPOGRAPHY.weights.medium,
   },
   incomeAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#059669',
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.primary,
   },
   expenseAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#dc3545',
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.error,
   },
 });

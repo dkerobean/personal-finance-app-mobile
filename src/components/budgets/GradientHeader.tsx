@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
-import { BUDGET, COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
+import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 
 interface GradientHeaderProps {
   title: string;
@@ -25,11 +24,8 @@ export default function GradientHeader({
   showNotification = true,
 }: GradientHeaderProps): React.ReactElement {
   return (
-    <LinearGradient
-      colors={[BUDGET.gradientColors.start, BUDGET.gradientColors.end]}
-      style={styles.container}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={BUDGET.gradientColors.start} />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.backgroundMain} />
       
       {/* Header Section */}
       <View style={styles.headerSection}>
@@ -37,7 +33,7 @@ export default function GradientHeader({
         <View style={styles.leftSection}>
           {onBackPress && (
             <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
-              <MaterialIcons name="arrow-back" size={19} color={COLORS.backgroundContent} />
+              <MaterialIcons name="arrow-back" size={20} color={COLORS.white} />
             </TouchableOpacity>
           )}
         </View>
@@ -51,25 +47,26 @@ export default function GradientHeader({
         {/* Right Section - Action Buttons */}
         <View style={styles.rightSection}>
           {showCalendar && onCalendarPress && (
-            <TouchableOpacity onPress={onCalendarPress} style={styles.calendarButton}>
-              <MaterialIcons name="calendar-today" size={17.93} color={COLORS.textSecondary} />
+            <TouchableOpacity onPress={onCalendarPress} style={styles.iconButton}>
+              <MaterialIcons name="calendar-today" size={20} color={COLORS.white} />
             </TouchableOpacity>
           )}
           {showNotification && onNotificationPress && (
-            <TouchableOpacity onPress={onNotificationPress} style={styles.notificationButton}>
-              <MaterialIcons name="notifications-none" size={14.57} color={COLORS.textSecondary} />
+            <TouchableOpacity onPress={onNotificationPress} style={styles.iconButton}>
+              <MaterialIcons name="notifications-none" size={22} color={COLORS.white} />
             </TouchableOpacity>
           )}
         </View>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: SPACING.md, // Reduced padding since native status bar handles this
+    paddingTop: SPACING.md,
     paddingBottom: SPACING.xl,
+    backgroundColor: COLORS.backgroundMain,
   },
   headerSection: {
     flexDirection: 'row',
@@ -90,36 +87,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: TYPOGRAPHY.sizes.xxl,
+    fontSize: TYPOGRAPHY.sizes.xl,
     fontWeight: TYPOGRAPHY.weights.semibold,
-    color: COLORS.textSecondary,
+    color: COLORS.white,
   },
   subtitle: {
-    fontSize: TYPOGRAPHY.sizes.md,
+    fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.normal,
-    color: COLORS.textSecondary,
+    color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
   },
   rightSection: {
-    width: 50,
-    alignItems: 'flex-end',
+    width: 60,
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    gap: 8,
   },
-  calendarButton: {
-    width: 32.26,
-    height: 30,
-    backgroundColor: COLORS.backgroundContent,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.sm,
-  },
-  notificationButton: {
-    width: 30,
-    height: 30,
-    backgroundColor: COLORS.backgroundInput,
-    borderRadius: 25,
+  iconButton: {
+    width: 36,
+    height: 36,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },

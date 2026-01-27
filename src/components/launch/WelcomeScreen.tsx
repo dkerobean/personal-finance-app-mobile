@@ -3,17 +3,31 @@ import { StyleSheet, View, TouchableOpacity, Image } from 'react-native';
 import { Text } from '@gluestack-ui/themed';
 import { router } from 'expo-router';
 
-export default function WelcomeScreen(): React.ReactElement {
+interface WelcomeScreenProps {
+  onManualContinue?: () => void;
+}
+
+export default function WelcomeScreen({ onManualContinue }: WelcomeScreenProps): React.ReactElement {
+  console.log('[WELCOME] WelcomeScreen rendered with props:', { onManualContinue: !!onManualContinue });
+
   const handleLogin = () => {
+    console.log('[WELCOME] Login button pressed');
     router.push('/(auth)/login');
   };
 
   const handleSignUp = () => {
+    console.log('[WELCOME] Sign up button pressed');
     router.push('/(auth)/register');
   };
 
   const handleForgotPassword = () => {
+    console.log('[WELCOME] Forgot password pressed');
     // TODO: Navigate to forgot password screen when implemented
+  };
+
+  const handleManualContinue = () => {
+    console.log('[WELCOME] Manual continue triggered');
+    onManualContinue?.();
   };
 
   return (
@@ -43,6 +57,15 @@ export default function WelcomeScreen(): React.ReactElement {
         <TouchableOpacity onPress={handleForgotPassword}>
           <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
         </TouchableOpacity>
+
+        {onManualContinue && (
+          <TouchableOpacity 
+            style={styles.debugButton} 
+            onPress={handleManualContinue}
+          >
+            <Text style={styles.debugButtonText}>Continue (Debug)</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -135,6 +158,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#093030',
     fontFamily: 'League Spartan',
+    textAlign: 'center',
+  },
+  debugButton: {
+    backgroundColor: '#ff6b6b',
+    borderRadius: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 20,
+  },
+  debugButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
     textAlign: 'center',
   },
 });

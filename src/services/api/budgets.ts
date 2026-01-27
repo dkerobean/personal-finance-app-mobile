@@ -1,308 +1,81 @@
-import { supabase } from '../supabaseClient';
-import { ApiResponse } from '@/types/api';
-import type { BudgetWithSpending, Transaction } from '@/types/models';
+/**
+ * Budgets API - Uses Backend API
+ */
 
-export interface Budget {
-  id: string;
-  user_id: string;
-  category_id: string;
-  amount: number;
-  month: string; // Format: 'YYYY-MM-01'
-  created_at: string;
-  updated_at: string;
-  category_name?: string;
-  category_icon_name?: string;
-}
+import { apiClient, createApiResponse, ApiResponse } from '@/services/apiClient';
+import type { Budget as BudgetType, BudgetWithSpending } from '@/types/models';
+import type { CreateBudgetRequest, UpdateBudgetRequest } from '@/types/api';
 
-export interface CreateBudgetRequest {
-  category_id: string;
-  amount: number;
-  month: string; // Format: 'YYYY-MM-01'
-}
+const transformBudget = (budget: any): BudgetType => ({
+  id: budget._id,
+  user_id: budget.userId,
+  category_id: budget.categoryId?._id,
+  amount: budget.amount,
+  month: budget.month,
+  created_at: budget.createdAt,
+  updated_at: budget.updatedAt,
+  category_name: budget.categoryId?.name,
+  category_icon_name: budget.categoryId?.iconName,
+});
 
-export interface UpdateBudgetRequest {
-  amount: number;
-}
+const transformBudgetWithSpending = (budget: any): BudgetWithSpending => ({
+  ...transformBudget(budget),
+  spent: budget.spent,
+  percentage: budget.percentage,
+  remaining: budget.remaining,
+  status: budget.status,
+  transaction_count: budget.transactionCount,
+});
 
-export interface BudgetResponse {
-  success: boolean;
-  data?: Budget | Budget[];
-  error?: {
-    code: string;
-    message: string;
-  };
-}
-
-class BudgetsApi {
-  private getAuthHeaders = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return {
-      'Authorization': `Bearer ${session?.access_token}`,
-      'Content-Type': 'application/json',
-    };
-  };
-
-  private getBaseUrl = () => {
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    return `${supabaseUrl}/functions/v1/budgets-crud`;
-  };
-
-  private getTrackingBaseUrl = () => {
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    return `${supabaseUrl}/functions/v1/budget-tracking`;
-  };
-
-  list = async (): Promise<ApiResponse<Budget[]>> => {
-    try {
-      const headers = await this.getAuthHeaders();
-      const response = await fetch(this.getBaseUrl(), {
-        method: 'GET',
-        headers,
-      });
-
-      const result: BudgetResponse = await response.json();
-
-      if (!result.success) {
-        return {
-          data: null,
-          error: result.error || { 
-            message: 'Failed to fetch budgets', 
-            code: 'FETCH_ERROR' 
-          },
-        };
-      }
-
-      return {
-        data: Array.isArray(result.data) ? result.data : [],
-        error: null,
-      };
-    } catch (error) {
-      console.error('Error fetching budgets:', error);
-      return {
-        data: null,
-        error: {
-          message: 'Network error while fetching budgets',
-          code: 'NETWORK_ERROR',
-        },
-      };
+export const budgetsApi = {
+  async list(userId: string): Promise<ApiResponse<BudgetType[]>> {
+    const result = await apiClient.get<any[]>(`/budgets?userId=${userId}`);
+    if (result.data) {
+      return createApiResponse(result.data.map(transformBudget));
     }
-  };
+    return createApiResponse([], result.error || undefined);
+  },
 
-  create = async (request: CreateBudgetRequest): Promise<ApiResponse<Budget>> => {
-    try {
-      const headers = await this.getAuthHeaders();
-      const response = await fetch(this.getBaseUrl(), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(request),
-      });
-
-      const result: BudgetResponse = await response.json();
-
-      if (!result.success) {
-        return {
-          data: null,
-          error: result.error || { 
-            message: 'Failed to create budget', 
-            code: 'CREATE_ERROR' 
-          },
-        };
-      }
-
-      return {
-        data: result.data as Budget,
-        error: null,
-      };
-    } catch (error) {
-      console.error('Error creating budget:', error);
-      return {
-        data: null,
-        error: {
-          message: 'Network error while creating budget',
-          code: 'NETWORK_ERROR',
-        },
-      };
+  async getWithSpending(userId: string, month: string): Promise<ApiResponse<BudgetWithSpending[]>> {
+    const result = await apiClient.get<any[]>(`/budgets/spending/${month}?userId=${userId}`);
+    if (result.data) {
+      return createApiResponse(result.data.map(transformBudgetWithSpending));
     }
-  };
+    return createApiResponse([], result.error || undefined);
+  },
 
-  update = async (id: string, request: UpdateBudgetRequest): Promise<ApiResponse<Budget>> => {
-    try {
-      const headers = await this.getAuthHeaders();
-      const response = await fetch(`${this.getBaseUrl()}/${id}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify(request),
-      });
-
-      const result: BudgetResponse = await response.json();
-
-      if (!result.success) {
-        return {
-          data: null,
-          error: result.error || { 
-            message: 'Failed to update budget', 
-            code: 'UPDATE_ERROR' 
-          },
-        };
-      }
-
-      return {
-        data: result.data as Budget,
-        error: null,
-      };
-    } catch (error) {
-      console.error('Error updating budget:', error);
-      return {
-        data: null,
-        error: {
-          message: 'Network error while updating budget',
-          code: 'NETWORK_ERROR',
-        },
-      };
+  async getById(userId: string, id: string): Promise<ApiResponse<BudgetType>> {
+    const result = await apiClient.get<any>(`/budgets/${id}?userId=${userId}`);
+    if (result.data) {
+      return createApiResponse(transformBudget(result.data));
     }
-  };
+    return createApiResponse({} as BudgetType, result.error || undefined);
+  },
 
-  delete = async (id: string): Promise<ApiResponse<{ message: string }>> => {
-    try {
-      const headers = await this.getAuthHeaders();
-      const response = await fetch(`${this.getBaseUrl()}/${id}`, {
-        method: 'DELETE',
-        headers,
-      });
-
-      const result: BudgetResponse = await response.json();
-
-      if (!result.success) {
-        return {
-          data: null,
-          error: result.error || { 
-            message: 'Failed to delete budget', 
-            code: 'DELETE_ERROR' 
-          },
-        };
-      }
-
-      return {
-        data: (result.data as any) || { message: 'Budget deleted successfully' },
-        error: null,
-      };
-    } catch (error) {
-      console.error('Error deleting budget:', error);
-      return {
-        data: null,
-        error: {
-          message: 'Network error while deleting budget',
-          code: 'NETWORK_ERROR',
-        },
-      };
+  async create(userId: string, request: CreateBudgetRequest): Promise<ApiResponse<BudgetType>> {
+    const result = await apiClient.post<any>('/budgets', {
+      userId,
+      categoryId: request.category_id,
+      amount: request.amount,
+      month: request.month,
+    });
+    if (result.data) {
+      return createApiResponse(transformBudget(result.data));
     }
-  };
+    return createApiResponse({} as BudgetType, result.error || undefined);
+  },
 
-  getBudgetsForMonth = async (month: string): Promise<ApiResponse<Budget[]>> => {
-    try {
-      const allBudgets = await this.list();
-      
-      if (allBudgets.error) {
-        return allBudgets;
-      }
-
-      const monthBudgets = allBudgets.data?.filter(budget => budget.month === month) || [];
-      
-      return {
-        data: monthBudgets,
-        error: null,
-      };
-    } catch (error) {
-      console.error('Error fetching budgets for month:', error);
-      return {
-        data: null,
-        error: {
-          message: 'Error filtering budgets by month',
-          code: 'FILTER_ERROR',
-        },
-      };
+  async update(userId: string, id: string, request: UpdateBudgetRequest): Promise<ApiResponse<BudgetType>> {
+    const result = await apiClient.patch<any>(`/budgets/${id}?userId=${userId}`, {
+      amount: request.amount,
+    });
+    if (result.data) {
+      return createApiResponse(transformBudget(result.data));
     }
-  };
+    return createApiResponse({} as BudgetType, result.error || undefined);
+  },
 
-  getBudgetTracking = async (month?: string): Promise<ApiResponse<BudgetWithSpending[]>> => {
-    try {
-      const headers = await this.getAuthHeaders();
-      const url = month 
-        ? `${this.getTrackingBaseUrl()}?month=${encodeURIComponent(month)}`
-        : this.getTrackingBaseUrl();
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
-        return {
-          data: null,
-          error: result.error || { 
-            message: 'Failed to fetch budget tracking data', 
-            code: 'FETCH_ERROR' 
-          },
-        };
-      }
-
-      return {
-        data: Array.isArray(result.data) ? result.data : [],
-        error: null,
-      };
-    } catch (error) {
-      console.error('Error fetching budget tracking:', error);
-      return {
-        data: null,
-        error: {
-          message: 'Network error while fetching budget tracking',
-          code: 'NETWORK_ERROR',
-        },
-      };
-    }
-  };
-
-  getBudgetTransactions = async (budgetId: string, month?: string): Promise<ApiResponse<{ budget: Budget; transactions: Transaction[] }>> => {
-    try {
-      const headers = await this.getAuthHeaders();
-      const url = month 
-        ? `${this.getTrackingBaseUrl()}?budget_id=${encodeURIComponent(budgetId)}&month=${encodeURIComponent(month)}`
-        : `${this.getTrackingBaseUrl()}?budget_id=${encodeURIComponent(budgetId)}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
-
-      const result = await response.json();
-
-      if (!result.success) {
-        return {
-          data: null,
-          error: result.error || { 
-            message: 'Failed to fetch budget transactions', 
-            code: 'FETCH_ERROR' 
-          },
-        };
-      }
-
-      return {
-        data: result.data,
-        error: null,
-      };
-    } catch (error) {
-      console.error('Error fetching budget transactions:', error);
-      return {
-        data: null,
-        error: {
-          message: 'Network error while fetching budget transactions',
-          code: 'NETWORK_ERROR',
-        },
-      };
-    }
-  };
-}
-
-export const budgetsApi = new BudgetsApi();
+  async delete(userId: string, id: string): Promise<ApiResponse<void>> {
+    return apiClient.delete(`/budgets/${id}?userId=${userId}`);
+  },
+};

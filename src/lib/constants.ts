@@ -22,3 +22,27 @@ export const MTN_MOMO_CONFIG = {
   CALLBACK_HOST: process.env.EXPO_PUBLIC_MTN_MOMO_CALLBACK_HOST || '',
   CURRENCY: 'GHS', // Ghana Cedis
 } as const;
+
+export const CURRENCY_CONFIG = {
+  DEFAULT_CURRENCY: 'GHS',
+  CURRENCY_CODE: 'GHS',
+  CURRENCY_SYMBOL: '₵',
+  CURRENCY_NAME: 'Ghana Cedis',
+  LOCALE: 'en-GH',
+  DECIMAL_PLACES: 2,
+} as const;
+
+export const SUPPORTED_CURRENCIES = [
+  {
+    code: 'GHS',
+    symbol: '₵',
+    name: 'Ghana Cedis',
+    locale: 'en-GH',
+  },
+  {
+    code: 'USD',
+    symbol: '$',
+    name: 'US Dollar',
+    locale: 'en-US',
+  },
+] as const;

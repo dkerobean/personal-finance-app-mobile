@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { Wallet2, TrendingDown, Droplet, Lightbulb, ArrowRight, Info } from 'lucide-react-native';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/design';
 
@@ -52,7 +53,7 @@ export default function FinancialHealthScore({
         label: 'Net Worth Position',
         score: netWorthPositive,
         weight: 0.3,
-        icon: 'account-balance-wallet',
+        icon: 'wallet',
         description: netWorth > 0 ? 'Positive net worth' : 'Work on increasing assets',
       },
       {
@@ -66,14 +67,14 @@ export default function FinancialHealthScore({
         label: 'Liquidity Ratio',
         score: liquidityScore,
         weight: 0.25,
-        icon: 'water-drop',
+        icon: 'water',
         description: liquidityScore > 80 ? 'Strong cash flow' : 'Monitor cash flow',
       },
       {
         label: 'Savings Rate',
         score: savingsScore,
         weight: 0.2,
-        icon: 'savings',
+        icon: 'wallet-outline',
         description: savingsRate > 10 ? 'Great savings habit' : 'Increase savings rate',
       },
     ];
@@ -184,7 +185,7 @@ export default function FinancialHealthScore({
       {metrics.map((metric, index) => (
         <View key={index} style={styles.metricItem}>
           <View style={styles.metricHeader}>
-            <MaterialIcons
+            <Ionicons
               name={metric.icon as any}
               size={20}
               color={getScoreColor(metric.score)}
@@ -232,7 +233,10 @@ export default function FinancialHealthScore({
 
     return (
       <View style={styles.insightsContainer}>
-        <Text style={styles.insightsTitle}>💡 Insights & Tips</Text>
+        <View style={styles.insightsHeader}>
+          <Lightbulb size={18} color={COLORS.warning} />
+          <Text style={styles.insightsTitle}>Insights & Tips</Text>
+        </View>
         {insights.map((insight, index) => (
           <View key={index} style={styles.insightItem}>
             <View style={styles.insightBullet} />
@@ -267,7 +271,7 @@ export default function FinancialHealthScore({
       <View style={styles.header}>
         <Text style={styles.title}>Financial Health Score</Text>
         <TouchableOpacity onPress={onViewDetails}>
-          <MaterialIcons name="info-outline" size={24} color={COLORS.textSecondary} />
+          <Info size={22} color={COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -277,7 +281,7 @@ export default function FinancialHealthScore({
 
       <TouchableOpacity style={styles.actionButton} onPress={onViewDetails}>
         <Text style={styles.actionButtonText}>View Detailed Analysis</Text>
-        <MaterialIcons name="arrow-forward" size={20} color={COLORS.primary} />
+        <ArrowRight size={18} color={COLORS.primary} />
       </TouchableOpacity>
     </View>
   );
@@ -361,11 +365,16 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.lg,
   },
+  insightsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
   insightsTitle: {
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.semibold,
     color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
   },
   insightItem: {
     flexDirection: 'row',

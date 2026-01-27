@@ -16,15 +16,15 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
 
   clearError: () => set({ error: null }),
 
-  loadCategories: async () => {
+  loadCategories: async (userId: string) => {
     const { setLoading, setError } = get();
     
     setLoading(true);
     setError(null);
 
     try {
-      console.log('CategoryStore: Loading categories...');
-      const response = await categoriesApi.list();
+      console.log('CategoryStore: Loading categories for user:', userId);
+      const response = await categoriesApi.list(userId);
       
       if (response.error) {
         console.error('CategoryStore: Failed to load categories:', response.error);
@@ -33,14 +33,12 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
       }
 
       const categories = response.data || [];
-      console.log('CategoryStore: Loaded categories:', categories.length, categories);
+      console.log('CategoryStore: Loaded categories:', categories.length);
       
       set({ 
         categories, 
         initialized: true 
       });
-      
-      console.log('CategoryStore: Categories set in store:', categories.length);
     } catch (error) {
       console.error('CategoryStore: Error loading categories:', error);
       setError('Failed to load categories');
@@ -49,14 +47,14 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
     }
   },
 
-  createCategory: async (name, iconName) => {
+  createCategory: async (userId: string, name: string, iconName: string) => {
     const { setLoading, setError, loadCategories } = get();
     
     setLoading(true);
     setError(null);
 
     try {
-      const response = await categoriesApi.create({
+      const response = await categoriesApi.create(userId, {
         name,
         icon_name: iconName,
       });
@@ -66,8 +64,7 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
         return false;
       }
 
-      // Reload categories to get the updated list
-      await loadCategories();
+      await loadCategories(userId);
       return true;
     } catch (error) {
       setError('Failed to create category');
@@ -78,7 +75,7 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
     }
   },
 
-  updateCategory: async (id, name, iconName) => {
+  updateCategory: async (userId: string, id: string, name?: string, iconName?: string) => {
     const { setLoading, setError, loadCategories } = get();
     
     setLoading(true);
@@ -89,15 +86,14 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
       if (name) updateData.name = name;
       if (iconName) updateData.icon_name = iconName;
 
-      const response = await categoriesApi.update(id, updateData);
+      const response = await categoriesApi.update(userId, id, updateData);
       
       if (response.error) {
         setError(response.error.message);
         return false;
       }
 
-      // Reload categories to get the updated list
-      await loadCategories();
+      await loadCategories(userId);
       return true;
     } catch (error) {
       setError('Failed to update category');
@@ -108,22 +104,21 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
     }
   },
 
-  deleteCategory: async (id) => {
+  deleteCategory: async (userId: string, id: string) => {
     const { setLoading, setError, loadCategories } = get();
     
     setLoading(true);
     setError(null);
 
     try {
-      const response = await categoriesApi.delete(id);
+      const response = await categoriesApi.delete(userId, id);
       
       if (response.error) {
         setError(response.error.message);
         return false;
       }
 
-      // Reload categories to get the updated list
-      await loadCategories();
+      await loadCategories(userId);
       return true;
     } catch (error) {
       setError('Failed to delete category');
@@ -134,26 +129,28 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
     }
   },
 
-  seedDefaults: async () => {
+  seedDefaults: async (userId: string) => {
     const { setLoading, setError, loadCategories } = get();
     
     setLoading(true);
     setError(null);
 
     try {
-      console.log('CategoryStore: Seeding default categories...');
-      const response = await categoriesApi.seedDefaults();
+      console.log('CategoryStore: Seeding default categories for user:', userId);
+      // Ensure the API method exists and accepts userId if needed. 
+      // Assuming categoriesApi.list with seeding logic is triggered by just listing with the flag or similar.
+      // Wait, in previous turns I relied on GET /categories?userId=... triggering the seed.
+      // So effectively loadCategories(userId) triggers the seed if empty.
+      // But if we have an explicit seed endpoint, use that.
+      // Based on my review of api/src/routes/categories.js, GET / triggers seed.
+      // So we just need to call loadCategories(userId).
+      // However, the `categoriesApi` might not have `seedDefaults`.
+      // Let's check `src/services/api/categories.ts`.
+      // It DOES NOT have seedDefaults.
+      // I will remove seedDefaults from the store or just make it call loadCategories.
       
-      if (response.error) {
-        console.error('CategoryStore: Failed to seed defaults:', response.error);
-        setError(response.error.message);
-        return;
-      }
-
-      console.log('CategoryStore: Default categories seeded successfully:', response.data?.length || 0);
+      await loadCategories(userId);
       
-      // Reload categories to get the seeded categories
-      await loadCategories();
     } catch (error) {
       console.error('CategoryStore: Error seeding default categories:', error);
       setError('Failed to seed default categories');

@@ -1,35 +1,41 @@
 // Design system constants based on Figma design
 export const COLORS = {
   // Primary brand colors
-  primary: '#00D09E',
-  primaryLight: '#F1FFF3',
-  primaryDark: '#093030',
+  primary: '#006D4F',
+  primaryLight: '#F0FDF4',
+  primaryDark: '#022C22',
+  secondary: '#10B981',
   
   // Text colors
-  textPrimary: '#052224',
-  textSecondary: '#093030',
-  textTertiary: '#9CA3AF',
+  textPrimary: '#0F172A', // Slate 900
+  textSecondary: '#334155', // Slate 700
+  textTertiary: '#64748B', // Slate 500
+  textInverse: '#FFFFFF',
+
+  // Gradients
+  emeraldGradientStart: '#006D4F',
+  emeraldGradientEnd: '#10B981',
   
   // Background colors
-  backgroundMain: '#00D09E',
-  backgroundContent: '#F1FFF3',
+  backgroundMain: '#006D4F',
+  backgroundContent: '#FFFFFF',
   backgroundCard: '#FFFFFF',
-  backgroundInput: '#DFF7E2',
+  backgroundInput: '#F8FAFC',
   
   // Accent colors
-  accent: '#0068FF',
-  lightBlue: '#6DB6FE',
-  success: '#059669',
-  warning: '#f59e0b',
-  error: '#dc3545',
+  accent: '#3B82F6', // Blue
+  lightBlue: '#E0F2FE',
+  success: '#006D4F', // Aligned with primary
+  warning: '#F59E0B',
+  error: '#EF4444',
   
   // Neutral colors
   white: '#FFFFFF',
-  gray50: '#f9fafb',
-  gray100: '#E5E7EB',
-  gray400: '#9CA3AF',
-  gray600: '#6b7280',
-  gray900: '#111827',
+  gray50: '#F8FAFC',
+  gray100: '#F1F5F9',
+  gray400: '#94A3B8',
+  gray600: '#475569',
+  gray900: '#0F172A',
 };
 
 export const SPACING = {
@@ -54,6 +60,14 @@ export const BORDER_RADIUS = {
   bottomNav: 70,
 };
 
+const FONT_FAMILY = {
+  light: 'PlusJakartaSans_300Light',
+  regular: 'PlusJakartaSans_400Regular',
+  medium: 'PlusJakartaSans_500Medium',
+  semibold: 'PlusJakartaSans_600SemiBold',
+  bold: 'PlusJakartaSans_700Bold',
+};
+
 export const TYPOGRAPHY = {
   sizes: {
     xs: 10,
@@ -73,6 +87,7 @@ export const TYPOGRAPHY = {
     semibold: '600' as const,
     bold: '700' as const,
   },
+  fonts: FONT_FAMILY, // Expose font family names
 };
 
 export const SHADOWS = {
@@ -177,8 +192,8 @@ export const TRANSACTIONS = {
 export const BUDGET = {
   // Gradient colors from Figma
   gradientColors: {
-    start: '#00D09E',
-    end: '#00D09E',
+    start: '#006D4F',
+    end: '#006D4F',
   },
   
   // Circular progress indicator
@@ -186,23 +201,23 @@ export const BUDGET = {
     size: 167,
     strokeWidth: 10,
     iconSize: 50,
-    iconColor: '#093030',
-    progressColor: '#00D09E',
-    backgroundStroke: '#DFF7E2',
+    iconColor: '#FFFFFF',
+    progressColor: '#006D4F',
+    backgroundStroke: '#FFFFFF',
   },
   
   // Progress bar
   progressBar: {
     height: 27,
     borderRadius: 13.5,
-    backgroundColor: '#0E3E3E',
-    fillColor: '#00D09E',
-    textColor: '#DFF7E2',
+    backgroundColor: '#E2E8F0',
+    fillColor: '#006D4F',
+    textColor: '#FFFFFF',
   },
   
   // Summary sections
   summaryCard: {
-    backgroundColor: '#F1FFF3',
+    backgroundColor: '#FFFFFF',
     borderRadius: 40,
     padding: 20,
     marginHorizontal: 50,
@@ -212,17 +227,17 @@ export const BUDGET = {
   transactionItem: {
     iconSize: 57,
     iconBorderRadius: 22,
-    backgroundColor: '#6DB6FE',
-    titleColor: '#052224',
-    subtitleColor: '#0068FF',
-    amountColor: '#093030',
+    backgroundColor: '#F1F5F9',
+    titleColor: '#0F172A',
+    subtitleColor: '#64748B',
+    amountColor: '#0F172A',
   },
   
   // Button
   addButton: {
-    backgroundColor: '#00D09E',
+    backgroundColor: '#006D4F',
     borderRadius: 30,
     height: 36,
-    textColor: '#093030',
+    textColor: '#FFFFFF',
   },
 };

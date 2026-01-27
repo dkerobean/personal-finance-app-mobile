@@ -1,33 +1,128 @@
-import type { ApiError, ApiResponse } from '@/types/api';
+/**
+ * API Client - Uses Backend API
+ */
 
-export const handleApiError = (error: unknown): string => {
-  console.error('API Error (full object):', error);
-  
-  if (error instanceof Error) {
-    console.error('API Error (message):', error.message);
-    console.error('API Error (stack):', error.stack);
-    return error.message || 'An error occurred. Please try again.';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+export interface ApiResponse<T> {
+  data: T | null;
+  error: { code: string; message: string } | null;
+}
+
+export const handleApiError = (error: any): string => {
+  if (error.response?.data?.error) {
+    return error.response.data.error;
   }
-  
-  // Handle Supabase-specific errors
-  if (error && typeof error === 'object' && 'message' in error) {
-    const supabaseError = error as { message: string; details?: string; hint?: string; code?: string };
-    console.error('Supabase Error:', {
-      message: supabaseError.message,
-      details: supabaseError.details,
-      hint: supabaseError.hint,
-      code: supabaseError.code,
-    });
-    return supabaseError.message || 'Database error occurred.';
+  if (error.message) {
+    return error.message;
   }
-  
-  console.error('Unknown error type:', typeof error, error);
-  return 'An unexpected error occurred.';
+  return 'An unexpected error occurred';
 };
 
-export const createApiResponse = <T>(data?: T, error?: ApiError['error']): ApiResponse<T> => {
-  return { 
-    data: data ?? null, 
-    error: error ?? null 
+export const createApiResponse = <T>(
+  data?: T,
+  error?: { code: string; message: string }
+): ApiResponse<T> => {
+  return {
+    data: data ?? null,
+    error: error ?? null,
   };
 };
+
+export const apiClient = {
+  async get<T>(endpoint: string): Promise<ApiResponse<T>> {
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return createApiResponse(null as T, {
+          code: 'API_ERROR',
+          message: data.error || 'Request failed',
+        });
+      }
+      
+      return createApiResponse(data.data);
+    } catch (error) {
+      return createApiResponse(null as T, {
+        code: 'NETWORK_ERROR',
+        message: handleApiError(error),
+      });
+    }
+  },
+
+  async post<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return createApiResponse(null as T, {
+          code: 'API_ERROR',
+          message: data.error || 'Request failed',
+        });
+      }
+      
+      return createApiResponse(data.data);
+    } catch (error) {
+      return createApiResponse(null as T, {
+        code: 'NETWORK_ERROR',
+        message: handleApiError(error),
+      });
+    }
+  },
+
+  async patch<T>(endpoint: string, body: any): Promise<ApiResponse<T>> {
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return createApiResponse(null as T, {
+          code: 'API_ERROR',
+          message: data.error || 'Request failed',
+        });
+      }
+      
+      return createApiResponse(data.data);
+    } catch (error) {
+      return createApiResponse(null as T, {
+        code: 'NETWORK_ERROR',
+        message: handleApiError(error),
+      });
+    }
+  },
+
+  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return createApiResponse(null as T, {
+          code: 'API_ERROR',
+          message: data.error || 'Request failed',
+        });
+      }
+      
+      return createApiResponse(data.data || { success: true } as T);
+    } catch (error) {
+      return createApiResponse(null as T, {
+        code: 'NETWORK_ERROR',
+        message: handleApiError(error),
+      });
+    }
+  },
+};
+
+export default apiClient;

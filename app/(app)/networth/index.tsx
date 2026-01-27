@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useFocusEffect } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { TrendingUp, TrendingDown, Plus, Minus, Clock, RefreshCw } from 'lucide-react-native';
+import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import NetWorthSummaryCard from '@/components/networth/dashboard/NetWorthSummaryCard';
 import NetWorthBreakdownChart from '@/components/networth/dashboard/NetWorthBreakdownChart';
 import NetWorthTrendChart from '@/components/networth/dashboard/NetWorthTrendChart';
@@ -11,9 +13,10 @@ import NetWorthErrorState, { NetworkError, CalculationError } from '@/components
 import FinancialHealthScore from '@/components/networth/dashboard/FinancialHealthScore';
 import AssetLiabilityQuickActions from '@/components/networth/dashboard/AssetLiabilityQuickActions';
 import UnifiedActivityFeed, { ActivityItem } from '@/components/networth/dashboard/UnifiedActivityFeed';
+import GradientHeader from '@/components/budgets/GradientHeader';
 import { NetWorthService, NetWorthData } from '@/services/netWorthService';
 import { useNetWorthStore, useNetWorthDashboard } from '@/stores/netWorthStore';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '@/constants/design';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 
 export default function NetWorthScreen(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +36,6 @@ export default function NetWorthScreen(): React.ReactElement {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [dashboardError, setDashboardError] = useState<any>(null);
   
-  // Get data from store for real-time updates
   const { 
     assets, 
     liabilities, 
@@ -45,7 +47,6 @@ export default function NetWorthScreen(): React.ReactElement {
     clearError 
   } = useNetWorthStore();
 
-  // Get dashboard-specific data and actions
   const {
     currentNetWorth,
     isCalculating,
@@ -60,7 +61,6 @@ export default function NetWorthScreen(): React.ReactElement {
   } = useNetWorthDashboard();
 
   useEffect(() => {
-    // Load initial data
     const initializeData = async () => {
       try {
         await Promise.all([
@@ -68,9 +68,8 @@ export default function NetWorthScreen(): React.ReactElement {
           loadLiabilities(),
           loadHistoricalData(),
         ]);
-        // Refresh net worth calculation after loading data
         await refreshNetWorth();
-        loadNetWorthData(); // Load legacy data for backward compatibility
+        loadNetWorthData();
       } catch (error) {
         console.error('Error initializing dashboard data:', error);
         setDashboardError(NetworkError('Failed to load dashboard data'));
@@ -80,7 +79,6 @@ export default function NetWorthScreen(): React.ReactElement {
     initializeData();
   }, []);
 
-  // Recalculate net worth when assets or liabilities change
   useEffect(() => {
     if (assets.length > 0 || liabilities.length > 0) {
       refreshNetWorth();
@@ -88,17 +86,14 @@ export default function NetWorthScreen(): React.ReactElement {
     }
   }, [assets, liabilities]);
 
-  // Refresh data when screen comes into focus (e.g., returning from asset/liability screens)
   useFocusEffect(
     React.useCallback(() => {
-      // Refresh store data when returning to screen
       const refreshStoreData = async () => {
         try {
           await Promise.all([
             loadAssets(),
             loadLiabilities()
           ]);
-          // Net worth will recalculate automatically due to the useEffect above
         } catch (error) {
           console.error('Error refreshing store data on focus:', error);
         }
@@ -111,11 +106,9 @@ export default function NetWorthScreen(): React.ReactElement {
   const loadNetWorthData = async (): Promise<void> => {
     setIsLoading(true);
     try {
-      // Fetch real net worth data from Supabase
       const data = await NetWorthService.calculateNetWorth();
       setNetWorthData(data);
 
-      // Generate mock activities for now - TODO: Create activity service
       const mockActivities: ActivityItem[] = [
         {
           id: '1',
@@ -133,24 +126,6 @@ export default function NetWorthScreen(): React.ReactElement {
           description: 'Monthly net worth snapshot completed',
           timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
         },
-        {
-          id: '3',
-          type: 'asset_updated',
-          title: 'Property Value Updated',
-          description: 'Updated house valuation based on market trends',
-          amount: 5000,
-          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          category: 'property',
-        },
-        {
-          id: '4',
-          type: 'liability_updated',
-          title: 'Mortgage Payment',
-          description: 'Monthly mortgage payment processed',
-          amount: 2500,
-          timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          category: 'mortgages',
-        },
       ];
 
       setActivities(mockActivities);
@@ -162,29 +137,17 @@ export default function NetWorthScreen(): React.ReactElement {
   };
 
   const handleRefresh = async (): Promise<void> => {
-    // Clear any existing errors
-    if (error) {
-      clearError();
-    }
-    if (calculationError) {
-      resetCalculationError();
-    }
-    if (dashboardError) {
-      setDashboardError(null);
-    }
+    if (error) clearError();
+    if (calculationError) resetCalculationError();
+    if (dashboardError) setDashboardError(null);
     
     try {
-      // Refresh all data
       await Promise.all([
         loadAssets(),
         loadLiabilities(),
         loadHistoricalData(),
       ]);
-      
-      // Refresh net worth calculation
       await refreshNetWorth();
-      
-      // Load legacy data for backward compatibility
       loadNetWorthData();
     } catch (error) {
       console.error('Error during refresh:', error);
@@ -197,15 +160,12 @@ export default function NetWorthScreen(): React.ReactElement {
     await handleRefresh();
   };
 
-  // Combined loading state
   const combinedLoading = isLoading || isLoadingAssets || isLoadingLiabilities || isCalculating;
   const isInitialLoading = combinedLoading && (!assets.length && !liabilities.length);
-  
-  // Error state priority: dashboard errors first, then calculation errors, then general errors
   const currentError = dashboardError || (calculationError && CalculationError(calculationError)) || (error && NetworkError(error));
 
-  const handleNetWorthDetails = (): void => {
-    console.log('Navigate to detailed net worth analysis');
+  const handleGoBack = (): void => {
+    router.back();
   };
 
   const handleAddAsset = (): void => {
@@ -236,122 +196,268 @@ export default function NetWorthScreen(): React.ReactElement {
     console.log('Activity pressed:', activity.title);
   };
 
+  const formatCurrency = (amount: number): string => {
+    return `₵${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+  };
+
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: 'Net Worth Calculator',
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: COLORS.backgroundMain,
-          },
-          headerTitleStyle: {
-            color: COLORS.textPrimary,
-            fontWeight: TYPOGRAPHY.weights.semibold,
-          },
-          headerTintColor: COLORS.textPrimary,
-        }}
-      />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
       
-      <SafeAreaView style={styles.container}>
-        {/* Show comprehensive loading state on initial load */}
-        {isInitialLoading ? (
-          <NetWorthLoadingState showTrendChart={true} />
-        ) : currentError ? (
-          /* Show error state with retry option */
-          <NetWorthErrorState 
-            error={currentError}
-            onRetry={handleRetryError}
-            showContactSupport={true}
+      <ScrollView 
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={combinedLoading && !isInitialLoading} 
+            onRefresh={handleRefresh}
+            tintColor={COLORS.white}
+            colors={[COLORS.white]}
           />
-        ) : (
-          /* Main dashboard content */
-          <ScrollView 
-            style={styles.scrollView}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl 
-                refreshing={combinedLoading && !isInitialLoading} 
-                onRefresh={handleRefresh}
-                tintColor={COLORS.primary}
-                colors={[COLORS.primary]}
+        }
+      >
+        {/* Gradient Header Section */}
+        <GradientHeader
+          title="Net Worth"
+          onBackPress={handleGoBack}
+          onCalendarPress={() => router.push('/networth/history')}
+          onNotificationPress={() => {}}
+        />
+
+        {/* Content Card */}
+        <View style={styles.contentCard}>
+          {isInitialLoading ? (
+            <NetWorthLoadingState showTrendChart={true} />
+          ) : currentError ? (
+            <NetWorthErrorState 
+              error={currentError}
+              onRetry={handleRetryError}
+              showContactSupport={true}
+            />
+          ) : (
+            <>
+              {/* Net Worth Hero Card */}
+              <Animated.View entering={FadeInUp.duration(600)} style={styles.heroCard}>
+                <Text style={styles.heroLabel}>Total Net Worth</Text>
+                <Text style={styles.heroAmount}>
+                  {formatCurrency(currentNetWorth?.netWorth || netWorthData.netWorth)}
+                </Text>
+                <View style={styles.changeContainer}>
+                  {(currentNetWorth?.monthlyChange || netWorthData.monthlyChange) >= 0 ? (
+                    <TrendingUp size={20} color={COLORS.success} />
+                  ) : (
+                    <TrendingDown size={20} color={COLORS.error} />
+                  )}
+                  <Text style={[
+                    styles.changeText,
+                    { color: (currentNetWorth?.monthlyChange || netWorthData.monthlyChange) >= 0 ? COLORS.success : COLORS.error }
+                  ]}>
+                    {formatCurrency(Math.abs(currentNetWorth?.monthlyChange || netWorthData.monthlyChange))} this month
+                  </Text>
+                </View>
+              </Animated.View>
+
+              {/* Assets & Liabilities Summary */}
+              <Animated.View entering={FadeInDown.delay(100).duration(600)} style={styles.summaryRow}>
+                <TouchableOpacity style={styles.summaryCard} onPress={handleViewAssets}>
+                  <View style={[styles.summaryIconBg, { backgroundColor: COLORS.primaryLight }]}>
+                    <TrendingUp size={24} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.summaryLabel}>Total Assets</Text>
+                  <Text style={styles.summaryAmount}>
+                    {formatCurrency(currentNetWorth?.totalAssets || netWorthData.totalAssets)}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.summaryCard} onPress={handleViewLiabilities}>
+                  <View style={[styles.summaryIconBg, { backgroundColor: '#FEF2F2' }]}>
+                    <TrendingDown size={24} color={COLORS.error} />
+                  </View>
+                  <Text style={styles.summaryLabel}>Total Liabilities</Text>
+                  <Text style={styles.summaryAmount}>
+                    {formatCurrency(currentNetWorth?.totalLiabilities || netWorthData.totalLiabilities)}
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Quick Actions */}
+              <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.quickActionsSection}>
+                <Text style={styles.sectionTitle}>Quick Actions</Text>
+                <View style={styles.quickActionsGrid}>
+                  <TouchableOpacity style={styles.actionButton} onPress={handleAddAsset}>
+                    <View style={[styles.actionIconBg, { backgroundColor: COLORS.primaryLight }]}>
+                      <Plus size={24} color={COLORS.primary} />
+                    </View>
+                    <Text style={styles.actionText}>Add Asset</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.actionButton} onPress={handleAddLiability}>
+                    <View style={[styles.actionIconBg, { backgroundColor: '#FEF2F2' }]}>
+                      <Minus size={24} color={COLORS.error} />
+                    </View>
+                    <Text style={styles.actionText}>Add Liability</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.actionButton} onPress={handleViewHistory}>
+                    <View style={[styles.actionIconBg, { backgroundColor: COLORS.lightBlue }]}>
+                      <Clock size={24} color={COLORS.accent} />
+                    </View>
+                    <Text style={styles.actionText}>View History</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.actionButton} onPress={handleCalculateNetWorth}>
+                    <View style={[styles.actionIconBg, { backgroundColor: '#FEF9C3' }]}>
+                      <RefreshCw size={24} color={COLORS.warning} />
+                    </View>
+                    <Text style={styles.actionText}>Recalculate</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+
+              {/* Trend Chart */}
+              <NetWorthTrendChart
+                historicalData={historicalData}
+                isLoading={isLoadingHistory}
+                onViewHistory={handleViewHistory}
               />
-            }
-          >
-            {/* Net Worth Summary Card */}
-            <NetWorthSummaryCard
-              netWorth={currentNetWorth?.netWorth || netWorthData.netWorth}
-              totalAssets={currentNetWorth?.totalAssets || netWorthData.totalAssets}
-              totalLiabilities={currentNetWorth?.totalLiabilities || netWorthData.totalLiabilities}
-              monthlyChange={currentNetWorth?.monthlyChange || netWorthData.monthlyChange}
-              monthlyChangePercentage={currentNetWorth?.monthlyChangePercentage || netWorthData.monthlyChangePercentage}
-              isLoading={isCalculating}
-              onPress={handleNetWorthDetails}
-            />
 
-            {/* Net Worth Breakdown Chart */}
-            <NetWorthBreakdownChart
-              totalAssets={currentNetWorth?.totalAssets || netWorthData.totalAssets}
-              totalLiabilities={currentNetWorth?.totalLiabilities || netWorthData.totalLiabilities}
-              assetsBreakdown={netWorthData.assetsBreakdown}
-              liabilitiesBreakdown={netWorthData.liabilitiesBreakdown}
-              isLoading={combinedLoading}
-              onViewDetails={handleNetWorthDetails}
-            />
+              {/* Financial Health Score */}
+              <FinancialHealthScore
+                totalAssets={currentNetWorth?.totalAssets || netWorthData.totalAssets}
+                totalLiabilities={currentNetWorth?.totalLiabilities || netWorthData.totalLiabilities}
+                monthlyIncome={netWorthData.monthlyIncome}
+                monthlyExpenses={netWorthData.monthlyExpenses}
+                savingsRate={netWorthData.savingsRate}
+                isLoading={combinedLoading}
+                onViewDetails={() => {}}
+              />
 
-            {/* Net Worth Trend Chart - NEW COMPONENT */}
-            <NetWorthTrendChart
-              historicalData={historicalData}
-              isLoading={isLoadingHistory}
-              onViewHistory={handleViewHistory}
-            />
+              {/* Activity Feed */}
+              <UnifiedActivityFeed
+                activities={activities}
+                isLoading={combinedLoading}
+                onItemPress={handleActivityPress}
+              />
+            </>
+          )}
 
-            {/* Quick Actions for Assets/Liabilities */}
-            <AssetLiabilityQuickActions
-              onAddAsset={handleAddAsset}
-              onAddLiability={handleAddLiability}
-              onViewAssets={handleViewAssets}
-              onViewLiabilities={handleViewLiabilities}
-              onViewHistory={handleViewHistory}
-              onCalculateNetWorth={handleCalculateNetWorth}
-              isLoading={combinedLoading}
-            />
-
-            {/* Financial Health Score */}
-            <FinancialHealthScore
-              totalAssets={currentNetWorth?.totalAssets || netWorthData.totalAssets}
-              totalLiabilities={currentNetWorth?.totalLiabilities || netWorthData.totalLiabilities}
-              monthlyIncome={netWorthData.monthlyIncome}
-              monthlyExpenses={netWorthData.monthlyExpenses}
-              savingsRate={netWorthData.savingsRate}
-              isLoading={combinedLoading}
-              onViewDetails={handleNetWorthDetails}
-            />
-
-            {/* Activity Feed */}
-            <UnifiedActivityFeed
-              activities={activities}
-              isLoading={combinedLoading}
-              onItemPress={handleActivityPress}
-            />
-
-            {/* Bottom spacing for navigation */}
-            <View style={styles.bottomSpacing} />
-          </ScrollView>
-        )}
-      </SafeAreaView>
-    </>
+          <View style={styles.bottomSpacing} />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundMain,
+    backgroundColor: BUDGET.gradientColors.start,
   },
-  scrollView: {
+  mainScrollView: {
     flex: 1,
+  },
+  contentCard: {
     backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
+    flex: 1,
+  },
+  heroCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.xl,
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+    ...SHADOWS.md,
+  },
+  heroLabel: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
+    marginBottom: SPACING.xs,
+  },
+  heroAmount: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+  },
+  changeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  changeText: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: '600',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    ...SHADOWS.sm,
+  },
+  summaryIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.sm,
+  },
+  summaryLabel: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
+    marginBottom: SPACING.xs,
+  },
+  summaryAmount: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  quickActionsSection: {
+    marginBottom: SPACING.lg,
+  },
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.md,
+  },
+  actionButton: {
+    width: '47%',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    alignItems: 'center',
+    ...SHADOWS.sm,
+  },
+  actionIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.sm,
+  },
+  actionText: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
   },
   bottomSpacing: {
     height: 130,

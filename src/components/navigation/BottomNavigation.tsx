@@ -1,14 +1,14 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Platform, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, usePathname } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '@/constants/design';
+import { Home, BarChart2, ArrowRightLeft, Wallet, User } from 'lucide-react-native';
+import { COLORS, SPACING, SHADOWS, TYPOGRAPHY } from '@/constants/design';
 
 interface TabItem {
   key: string;
   label: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
+  icon: React.ElementType;
   route: string;
 }
 
@@ -16,34 +16,37 @@ const tabs: TabItem[] = [
   {
     key: 'home',
     label: 'Home',
-    icon: 'home',
+    icon: Home,
     route: '/',
   },
   {
     key: 'analytics',
-    label: 'Analytics',
-    icon: 'analytics',
+    label: 'Reports',
+    icon: BarChart2,
     route: '/reports',
   },
   {
     key: 'transactions',
-    label: 'Transactions',
-    icon: 'swap-horiz',
+    label: 'Activity',
+    icon: ArrowRightLeft,
     route: '/transactions',
   },
   {
-    key: 'categories',
-    label: 'Categories',
-    icon: 'category',
-    route: '/settings/categories',
+    key: 'networth',
+    label: 'Net Worth',
+    icon: Wallet,
+    route: '/networth',
   },
   {
     key: 'profile',
-    label: 'Profile',
-    icon: 'person',
+    label: 'Settings',
+    icon: User,
     route: '/settings',
   },
 ];
+
+const { width } = Dimensions.get('window');
+const FLOATING_MARGIN = 20;
 
 export default function BottomNavigation(): React.ReactElement {
   const insets = useSafeAreaInsets();
@@ -55,13 +58,14 @@ export default function BottomNavigation(): React.ReactElement {
       return pathname === '/' || pathname === '/index' || pathname === '/(app)' || pathname === '/(app)/index';
     }
     
-    // Handle nested routes more precisely
-    if (route === '/settings/categories') {
-      return pathname.includes('/categories');
+    // Handle networth route
+    if (route === '/networth') {
+      return pathname.includes('/networth');
     }
     
+    // Handle settings route
     if (route === '/settings') {
-      return pathname === '/settings' || (pathname.includes('/settings') && !pathname.includes('/categories'));
+      return pathname === '/settings' || pathname.includes('/settings');
     }
     
     // For other routes, check if pathname starts with the route
@@ -77,10 +81,11 @@ export default function BottomNavigation(): React.ReactElement {
   };
 
   return (
-    <View style={[styles.floatingContainer, { bottom: 0 }]}>
-      <View style={styles.tabBar}>
+    <View style={styles.container}>
+      <View style={styles.dockedBar}>
         {tabs.map((tab) => {
           const isActive = isActiveTab(tab.route);
+          const Icon = tab.icon;
           
           return (
             <TouchableOpacity
@@ -89,13 +94,18 @@ export default function BottomNavigation(): React.ReactElement {
               onPress={() => handleTabPress(tab.route)}
               activeOpacity={0.7}
             >
-              <View style={[styles.tabContent, isActive && styles.activeTabContent]}>
-                <MaterialIcons
-                  name={tab.icon}
-                  size={35}
-                  color={COLORS.textPrimary}
+              <View style={[styles.iconContainer, isActive && styles.activeIconContainer]}>
+                <Icon
+                  size={24}
+                  color={isActive ? COLORS.primary : COLORS.textTertiary}
+                  strokeWidth={isActive ? 2.5 : 2}
                 />
               </View>
+              {isActive && (
+                 <Text style={[styles.tabLabel, { fontFamily: TYPOGRAPHY.fonts.bold }]}>
+                    {tab.label}
+                 </Text>
+              )}
             </TouchableOpacity>
           );
         })}
@@ -105,51 +115,48 @@ export default function BottomNavigation(): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
-  floatingContainer: {
+  container: {
     position: 'absolute',
+    bottom: 0,
     left: 0,
     right: 0,
-    height: 108,
-    backgroundColor: COLORS.backgroundInput,
-    borderTopLeftRadius: 70,
-    borderTopRightRadius: 70,
-    ...SHADOWS.lg,
-    elevation: 8,
+    backgroundColor: COLORS.white,
   },
-  tabBar: {
-    flex: 1,
+  dockedBar: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    justifyContent: 'space-between',
+    backgroundColor: COLORS.white,
+    width: '100%',
+    height: 70,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    justifyContent: 'space-around',
     alignItems: 'center',
+    paddingHorizontal: 10,
+    ...SHADOWS.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 10,
   },
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
+    height: '100%',
+    flex: 1,
   },
-  tabContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-  },
-  activeTabContent: {
-    backgroundColor: COLORS.primary,
+  iconContainer: {
+    width: 44,
+    height: 44,
     borderRadius: 22,
-    width: 65,
-    height: 61,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  activeIconContainer: {
+    backgroundColor: COLORS.primaryLight,
   },
   tabLabel: {
-    fontSize: 10,
-    fontWeight: '400',
-    color: COLORS.textPrimary,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  activeTabLabel: {
-    color: COLORS.white,
-    fontWeight: '600',
-  },
+    display: 'none', 
+  }
 });

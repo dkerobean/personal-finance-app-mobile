@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { isSyncedTransaction } from '@/services/api/transactions';
 import SyncedTransactionBadge from '@/components/SyncedTransactionBadge';
 import type { Transaction } from '@/types/models';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '@/constants/design';
+import { mapIconName } from '@/utils/iconMapping';
 
 interface RecentTransactionsProps {
   transactions: Transaction[];
@@ -28,15 +30,12 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    // Check if it's today
     if (date.toDateString() === today.toDateString()) {
       return 'Today';
     }
-    // Check if it's yesterday
     if (date.toDateString() === yesterday.toDateString()) {
       return 'Yesterday';
     }
-    // Return formatted date
     return date.toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
@@ -63,6 +62,7 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
           <Text style={styles.title}>Recent Transactions</Text>
         </View>
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading transactions...</Text>
         </View>
       </View>
@@ -76,7 +76,7 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
           <Text style={styles.title}>Recent Transactions</Text>
         </View>
         <View style={styles.emptyContainer}>
-          <MaterialIcons name="receipt-long" size={48} color="#d1d5db" />
+          <MaterialIcons name="receipt-long" size={48} color={COLORS.textTertiary} />
           <Text style={styles.emptyTitle}>No Transactions Yet</Text>
           <Text style={styles.emptySubtitle}>
             Start by adding your first transaction to track your finances
@@ -85,7 +85,7 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
             style={styles.addButton}
             onPress={() => router.push('/transactions/create')}
           >
-            <MaterialIcons name="add" size={20} color="#ffffff" />
+            <MaterialIcons name="add" size={20} color={COLORS.white} />
             <Text style={styles.addButtonText}>Add Transaction</Text>
           </TouchableOpacity>
         </View>
@@ -114,10 +114,10 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
                 styles.iconContainer,
                 transaction.type === 'income' ? styles.incomeIcon : styles.expenseIcon
               ]}>
-                <MaterialIcons
-                  name={transaction.category?.icon_name as any || 'category'}
+                <Ionicons
+                  name={mapIconName(transaction.category?.icon_name, transaction.category?.name) as any}
                   size={20}
-                  color="#ffffff"
+                  color={COLORS.white}
                 />
               </View>
               
@@ -148,7 +148,7 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
               ]}>
                 {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
               </Text>
-              <MaterialIcons name="chevron-right" size={20} color="#9ca3af" />
+              <MaterialIcons name="chevron-right" size={20} color={COLORS.textTertiary} />
             </View>
           </TouchableOpacity>
         ))}
@@ -159,86 +159,82 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.lg,
+    marginVertical: SPACING.sm,
+    ...SHADOWS.md,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   title: {
-    fontSize: 18,
+    fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: '600',
-    color: '#374151',
+    color: COLORS.textPrimary,
   },
   viewAllButton: {
-    fontSize: 14,
-    color: '#2563eb',
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.primary,
     fontWeight: '600',
   },
   loadingContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: SPACING.xl,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.sm,
   },
   loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textTertiary,
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: SPACING.xxl,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
-    marginBottom: 8,
+    color: COLORS.textPrimary,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.xs,
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 24,
+    marginBottom: SPACING.lg,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING.xs,
   },
   addButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: '600',
-    marginLeft: 8,
   },
   transactionsList: {
-    maxHeight: 300,
+    maxHeight: 320,
   },
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: COLORS.gray100,
   },
   transactionLeft: {
     flexDirection: 'row',
@@ -246,18 +242,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: SPACING.md,
   },
   incomeIcon: {
-    backgroundColor: '#059669',
+    backgroundColor: COLORS.success,
   },
   expenseIcon: {
-    backgroundColor: '#dc3545',
+    backgroundColor: COLORS.error,
   },
   transactionDetails: {
     flex: 1,
@@ -265,22 +261,22 @@ const styles = StyleSheet.create({
   categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: SPACING.xs,
     flexWrap: 'wrap',
     marginBottom: 2,
   },
   categoryName: {
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: '500',
-    color: '#374151',
+    color: COLORS.textPrimary,
   },
   transactionDate: {
-    fontSize: 12,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: COLORS.textTertiary,
   },
   transactionDescription: {
-    fontSize: 12,
-    color: '#9ca3af',
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: COLORS.textTertiary,
     marginTop: 2,
   },
   transactionRight: {
@@ -288,14 +284,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   transactionAmount: {
-    fontSize: 16,
+    fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: '600',
-    marginRight: 8,
+    marginRight: SPACING.xs,
   },
   incomeAmount: {
-    color: '#059669',
+    color: COLORS.success,
   },
   expenseAmount: {
-    color: '#dc3545',
+    color: COLORS.error,
   },
 });

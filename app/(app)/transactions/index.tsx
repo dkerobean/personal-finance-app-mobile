@@ -8,28 +8,39 @@ import {
   StyleSheet,
   SafeAreaView,
   Modal,
-  RefreshControl 
+  RefreshControl,
+  LayoutAnimation,
+  UIManager,
+  Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import { AlertCircle, Calendar, Receipt, Plus, X, Check } from 'lucide-react-native';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useCategoryStore } from '@/stores/categoryStore';
+import { useUser } from '@clerk/clerk-expo';
 import { isSyncedTransaction } from '@/services/api/transactions';
 import TransactionSummaryCards from '@/components/transactions/TransactionSummaryCards';
 import TotalBalanceCard from '@/components/transactions/TotalBalanceCard';
 import TransactionItem from '@/components/transactions/TransactionItem';
 import NotableTransactions from '@/components/transactions/NotableTransactions';
 import AverageTransactions from '@/components/transactions/AverageTransactions';
+import FilterPills from '@/components/common/FilterPills';
 import GradientHeader from '@/components/budgets/GradientHeader';
 import type { Transaction, TransactionWithAccount } from '@/types/models';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, BUDGET } from '@/constants/design';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import CustomAlert from '@/components/ui/CustomAlert';
 
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 export default function TransactionsScreen() {
   const router = useRouter();
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [showMonthSelector, setShowMonthSelector] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'income' | 'expense'>('all');
   const { alert, alertProps } = useCustomAlert();
   
   const {
@@ -44,11 +55,14 @@ export default function TransactionsScreen() {
   } = useTransactionStore();
 
   const { loadCategories } = useCategoryStore();
+  const { user } = useUser();
 
   useEffect(() => {
-    loadTransactions();
-    loadCategories();
-  }, []);
+    if (user) {
+      loadTransactions(user.id);
+      loadCategories(user.id);
+    }
+  }, [user]);
 
   // Set default selected month to current month when transactions load
   useEffect(() => {
@@ -85,7 +99,8 @@ export default function TransactionsScreen() {
   };
 
   const handleDeleteConfirm = async (transactionId: string) => {
-    const success = await deleteTransaction(transactionId);
+    if (!user) return;
+    const success = await deleteTransaction(user.id, transactionId);
     if (!success && error) {
       alert('Error', error);
     }
@@ -104,7 +119,9 @@ export default function TransactionsScreen() {
   };
 
   const handleRefresh = async (): Promise<void> => {
-    await loadTransactions();
+    if (user) {
+      await loadTransactions(user.id);
+    }
   };
 
   const handleGoBack = (): void => {
@@ -149,6 +166,20 @@ export default function TransactionsScreen() {
 
     return { totalIncome, totalExpense, totalBalance, filteredTransactions, groupedTransactions, sortedMonths };
   }, [transactions, selectedMonth]);
+
+  // Apply transaction type filter
+  const displayedTransactions = useMemo(() => {
+    if (selectedFilter === 'all') {
+      return summaryData.filteredTransactions;
+    }
+    return summaryData.filteredTransactions.filter(t => t.type === selectedFilter);
+  }, [summaryData.filteredTransactions, selectedFilter]);
+
+  // Handle filter change with animation
+  const handleFilterChange = (filter: 'all' | 'income' | 'expense') => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedFilter(filter);
+  };
 
   // Get available months from transactions
   const availableMonths = useMemo(() => {
@@ -267,7 +298,7 @@ export default function TransactionsScreen() {
           {/* Error Display */}
           {error && (
             <View style={styles.errorContainer}>
-              <MaterialIcons name="error-outline" size={20} color={COLORS.error} />
+              <AlertCircle size={20} color={COLORS.error} />
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity onPress={clearError} style={styles.errorRetryButton}>
                 <Text style={styles.errorRetryText}>Retry</Text>
@@ -284,6 +315,14 @@ export default function TransactionsScreen() {
             totalExpense={summaryData.totalExpense}
           />
 
+          {/* Filter Pills */}
+          <View style={styles.filterSection}>
+            <FilterPills 
+              activeFilter={selectedFilter}
+              onFilterChange={handleFilterChange}
+            />
+          </View>
+
           {/* Month Header with Calendar Icon */}
           <View style={styles.monthHeaderContainer}>
             <Text style={styles.monthHeaderText}>
@@ -293,7 +332,7 @@ export default function TransactionsScreen() {
               style={styles.calendarIconButton}
               onPress={() => setShowMonthSelector(true)}
             >
-              <MaterialIcons name="event" size={24} color={COLORS.white} />
+              <Calendar size={24} color={COLORS.white} />
             </TouchableOpacity>
           </View>
 
@@ -301,7 +340,7 @@ export default function TransactionsScreen() {
           <View style={styles.transactionsList}>
             {summaryData.filteredTransactions.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <MaterialIcons name="receipt-long" size={64} color={COLORS.textTertiary} />
+                <Receipt size={64} color={COLORS.textTertiary} />
                 <Text style={styles.emptyText}>
                   {selectedMonth ? `No transactions in ${selectedMonth}` : 'No transactions yet.'}{'\n'}
                   {!selectedMonth && 'Add your first transaction to get started.'}
@@ -346,7 +385,7 @@ export default function TransactionsScreen() {
 
       {/* FAB */}
       <TouchableOpacity style={styles.fab} onPress={handleCreatePress}>
-        <MaterialIcons name="add" size={24} color={COLORS.white} />
+        <Plus size={24} color={COLORS.white} />
       </TouchableOpacity>
 
       {/* Month Selection Modal */}
@@ -361,7 +400,7 @@ export default function TransactionsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Month</Text>
               <TouchableOpacity onPress={() => setShowMonthSelector(false)}>
-                <MaterialIcons name="close" size={24} color="#666" />
+                <X size={24} color="#666" />
               </TouchableOpacity>
             </View>
             
@@ -384,7 +423,7 @@ export default function TransactionsScreen() {
                   All Transactions
                 </Text>
                 {!selectedMonth && (
-                  <MaterialIcons name="check" size={20} color={COLORS.primary} />
+                  <Check size={20} color={COLORS.primary} />
                 )}
               </TouchableOpacity>
               
@@ -408,7 +447,7 @@ export default function TransactionsScreen() {
                     {month}
                   </Text>
                   {selectedMonth === month && (
-                    <MaterialIcons name="check" size={20} color={COLORS.primary} />
+                    <Check size={20} color={COLORS.primary} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -468,6 +507,11 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.medium,
+  },
+  filterSection: {
+    paddingHorizontal: SPACING.xl,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   monthHeaderContainer: {
     flexDirection: 'row',

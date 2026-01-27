@@ -9,13 +9,17 @@ import {
   ScrollView 
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAuth } from '@clerk/clerk-expo';
 import { useMoMoStore, useMoMoAccountsData } from '@/stores/momoStore';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface MoMoAccountLinkProps {
   onAccountLinked?: () => void;
 }
 
 export default function MoMoAccountLink({ onAccountLinked }: MoMoAccountLinkProps) {
+  const { userId } = useAuth();
+  const toast = useAppToast();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [accountName, setAccountName] = useState('');
   const [isLinking, setIsLinking] = useState(false);
@@ -48,15 +52,20 @@ export default function MoMoAccountLink({ onAccountLinked }: MoMoAccountLinkProp
   };
 
   const handleLinkAccount = async () => {
+    if (!userId) {
+      toast.error('Authentication Error', 'You must be logged in to link an account');
+      return;
+    }
+
     if (!phoneNumber.trim() || !accountName.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      toast.error('Missing Fields', 'Please fill in all fields');
       return;
     }
 
     const cleanedPhone = phoneNumber.replace(/\D/g, '');
     
     if (!validatePhoneNumber(cleanedPhone)) {
-      Alert.alert(
+      toast.error(
         'Invalid Phone Number', 
         'Please enter a valid Ghana phone number (e.g., 024 123 4567)'
       );
@@ -73,29 +82,22 @@ export default function MoMoAccountLink({ onAccountLinked }: MoMoAccountLinkProp
     setIsLinking(true);
 
     try {
-      const success = await linkAccount({
+      const success = await linkAccount(userId, {
         phone_number: formattedPhone,
         account_name: accountName.trim(),
       });
 
       if (success) {
-        Alert.alert(
-          'Success', 
-          'MTN MoMo account linked successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setPhoneNumber('');
-                setAccountName('');
-                onAccountLinked?.();
-              }
-            }
-          ]
+        toast.success(
+          'Account Linked', 
+          'MTN MoMo account linked successfully!'
         );
+        setPhoneNumber('');
+        setAccountName('');
+        onAccountLinked?.();
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to link account. Please try again.');
+      toast.error('Linking Failed', 'Failed to link account. Please try again.');
     } finally {
       setIsLinking(false);
     }
@@ -113,7 +115,9 @@ export default function MoMoAccountLink({ onAccountLinked }: MoMoAccountLinkProp
           onPress: async () => {
             const success = await deactivateAccount(accountId);
             if (success) {
-              Alert.alert('Success', 'Account deactivated successfully');
+              toast.success('Account Deactivated', 'Account deactivated successfully');
+            } else {
+              toast.error('Error', 'Failed to deactivate account');
             }
           }
         }

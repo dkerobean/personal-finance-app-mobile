@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/design';
 import { formatCurrency } from '@/lib/formatters';
+import { CURRENCY_CONFIG } from '@/lib/constants';
 import type { HistoricalDataPoint, TimePeriodConfig } from '../../../app/(app)/networth/history';
 
 interface HistoryBreakdownTableProps {
@@ -35,24 +36,44 @@ export default function HistoryBreakdownTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
+  // Safe currency formatting helper
+  const safeCurrencyFormat = (amount: number | undefined | null, options?: any) => {
+    try {
+      const safeAmount = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
+      return formatCurrency(safeAmount, { 
+        currency: 'GHS', 
+        ...options 
+      });
+    } catch (error) {
+      console.warn('Currency formatting error:', error, 'Amount:', amount);
+      const fallbackAmount = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
+      if (options?.compact && Math.abs(fallbackAmount) >= 1000000) {
+        return `₵${(Math.abs(fallbackAmount) / 1000000).toFixed(1)}M`;
+      } else if (options?.compact && Math.abs(fallbackAmount) >= 1000) {
+        return `₵${(Math.abs(fallbackAmount) / 1000).toFixed(1)}K`;
+      }
+      return `₵${Math.abs(fallbackAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+  };
+
   // Transform data for table display
   const tableData: TableRow[] = data.map((point, index) => {
     const previousPoint = index > 0 ? data[index - 1] : null;
-    const change = previousPoint ? point.netWorth - previousPoint.netWorth : 0;
-    const changePercentage = previousPoint && previousPoint.netWorth !== 0 
-      ? (change / previousPoint.netWorth) * 100 
+    const change = previousPoint ? (point.netWorth || 0) - (previousPoint.netWorth || 0) : 0;
+    const changePercentage = previousPoint && (previousPoint.netWorth || 0) !== 0 
+      ? (change / Math.abs(previousPoint.netWorth || 1)) * 100 
       : 0;
 
     return {
       date: point.date,
-      displayDate: new Date(point.date).toLocaleDateString('en-US', {
+      displayDate: new Date(point.date).toLocaleDateString(CURRENCY_CONFIG.LOCALE, {
         month: 'short',
         day: 'numeric',
         year: timePeriod.months > 12 ? '2-digit' : 'numeric',
       }),
-      netWorth: point.netWorth,
-      assets: point.totalAssets,
-      liabilities: point.totalLiabilities,
+      netWorth: point.netWorth || 0,
+      assets: point.totalAssets || 0,
+      liabilities: point.totalLiabilities || 0,
       change,
       changePercentage,
     };
@@ -197,19 +218,19 @@ export default function HistoryBreakdownTable({
           
           <View style={[styles.rowCell, styles.numberCell]}>
             <Text style={styles.cellText}>
-              {formatCurrency(row.netWorth, { compact: true })}
+              {safeCurrencyFormat(row.netWorth, { compact: true })}
             </Text>
           </View>
           
           <View style={[styles.rowCell, styles.numberCell]}>
             <Text style={styles.cellText}>
-              {formatCurrency(row.assets, { compact: true })}
+              {safeCurrencyFormat(row.assets, { compact: true })}
             </Text>
           </View>
           
           <View style={[styles.rowCell, styles.numberCell]}>
             <Text style={styles.cellText}>
-              {formatCurrency(row.liabilities, { compact: true })}
+              {safeCurrencyFormat(row.liabilities, { compact: true })}
             </Text>
           </View>
           
@@ -218,7 +239,7 @@ export default function HistoryBreakdownTable({
               styles.cellText,
               { color: row.change >= 0 ? COLORS.success : COLORS.error }
             ]}>
-              {row.change >= 0 ? '+' : ''}{formatCurrency(row.change, { compact: true })}
+              {row.change >= 0 ? '+' : ''}{safeCurrencyFormat(Math.abs(row.change), { compact: true })}
             </Text>
             {row.changePercentage !== 0 && (
               <Text style={[
@@ -239,13 +260,13 @@ export default function HistoryBreakdownTable({
               <View style={styles.breakdownItem}>
                 <Text style={styles.breakdownLabel}>Connected Accounts</Text>
                 <Text style={styles.breakdownValue}>
-                  {formatCurrency(originalDataPoint.connectedValue)}
+                  {safeCurrencyFormat(originalDataPoint.connectedValue)}
                 </Text>
               </View>
               <View style={styles.breakdownItem}>
                 <Text style={styles.breakdownLabel}>Manual Assets</Text>
                 <Text style={styles.breakdownValue}>
-                  {formatCurrency(originalDataPoint.manualAssets)}
+                  {safeCurrencyFormat(originalDataPoint.manualAssets)}
                 </Text>
               </View>
             </View>
@@ -255,7 +276,7 @@ export default function HistoryBreakdownTable({
               <View style={styles.breakdownItem}>
                 <Text style={styles.breakdownLabel}>Manual Liabilities</Text>
                 <Text style={styles.breakdownValue}>
-                  {formatCurrency(originalDataPoint.manualLiabilities)}
+                  {safeCurrencyFormat(originalDataPoint.manualLiabilities)}
                 </Text>
               </View>
             </View>

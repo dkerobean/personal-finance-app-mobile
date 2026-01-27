@@ -7,9 +7,8 @@ export default {
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
     splash: {
-      image: "./assets/splash.png",
-      resizeMode: "contain",
-      backgroundColor: "#ffffff"
+      backgroundColor: "#006D4F",
+      resizeMode: "contain"
     },
     assetBundlePatterns: [
       "**/*"
@@ -49,6 +48,8 @@ export default {
     },
     extra: {
       oneSignalAppId: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID || "YOUR_ONESIGNAL_APP_ID",
+      mongodbUri: process.env.EXPO_PUBLIC_MONGODB_URI,
+      clerkPublishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
       eas: {
         projectId: "cc382c54-3fc2-484f-b9f9-103579b6b013"
       }

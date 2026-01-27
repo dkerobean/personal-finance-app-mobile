@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
-import { COLORS, TRANSACTIONS, TYPOGRAPHY, SHADOWS } from '@/constants/design';
+import { COLORS, TRANSACTIONS, TYPOGRAPHY, SHADOWS, SPACING } from '@/constants/design';
 
 interface TransactionSummaryCardsProps {
   totalIncome: number;
@@ -15,26 +16,42 @@ export default function TransactionSummaryCards({
   return (
     <View style={styles.container}>
       {/* Income Card */}
-      <View style={[styles.card, styles.incomeCard]}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Income</Text>
-          <View style={[styles.iconContainer, styles.incomeIconContainer]}>
-            <MaterialIcons name="arrow-upward" size={12.5} color={COLORS.primary} />
+      <LinearGradient
+        colors={['#10B981', '#059669']} // Green gradient
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.card}
+      >
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeader}>
+            <View style={styles.iconContainer}>
+              <MaterialIcons name="arrow-upward" size={18} color={COLORS.white} />
+            </View>
+            <Text style={styles.cardTitle}>Income</Text>
           </View>
+          <Text style={styles.cardAmount}>₵{totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
         </View>
-        <Text style={styles.cardAmount}>${totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-      </View>
+        <View style={styles.decorativeCircle} />
+      </LinearGradient>
 
       {/* Expense Card */}
-      <View style={[styles.card, styles.expenseCard]}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Expense</Text>
-          <View style={[styles.iconContainer, styles.expenseIconContainer]}>
-            <MaterialIcons name="arrow-downward" size={12.5} color={COLORS.accent} />
+      <LinearGradient
+        colors={['#3B82F6', '#2563EB']} // Blue gradient
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.card}
+      >
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeader}>
+            <View style={styles.iconContainer}>
+              <MaterialIcons name="arrow-downward" size={18} color={COLORS.white} />
+            </View>
+            <Text style={styles.cardTitle}>Expense</Text>
           </View>
+          <Text style={styles.cardAmount}>₵{totalExpense.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
         </View>
-        <Text style={[styles.cardAmount, styles.expenseAmount]}>${totalExpense.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-      </View>
+        <View style={styles.decorativeCircle} />
+      </LinearGradient>
     </View>
   );
 }
@@ -44,58 +61,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 15,
-    paddingHorizontal: 37,
-    marginBottom: 10,
+    gap: 12,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: 12,
   },
   card: {
     flex: 1,
-    height: 80,
-    borderRadius: 16,
+    minHeight: 100,
+    borderRadius: 20,
     padding: 16,
     justifyContent: 'space-between',
-    maxWidth: 160,
-    ...SHADOWS.sm,
+    overflow: 'hidden',
+    ...SHADOWS.md,
   },
-  incomeCard: {
-    backgroundColor: COLORS.primaryLight,
-  },
-  expenseCard: {
-    backgroundColor: COLORS.primaryLight,
+  cardContent: {
+    zIndex: 1,
   },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
   },
   cardTitle: {
-    fontSize: TYPOGRAPHY.sizes.md,
+    fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.medium,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
+    color: 'rgba(255, 255, 255, 0.95)',
+    letterSpacing: 0.3,
   },
   iconContainer: {
-    width: 25,
-    height: 25,
-    borderRadius: 6.25,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-  },
-  incomeIconContainer: {
-    borderColor: COLORS.primary,
-  },
-  expenseIconContainer: {
-    borderColor: COLORS.accent,
   },
   cardAmount: {
-    fontSize: TYPOGRAPHY.sizes.xxl,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-    lineHeight: 22,
+    fontSize: 24,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    color: COLORS.white,
+    lineHeight: 28,
+    letterSpacing: -0.5,
   },
-  expenseAmount: {
-    color: COLORS.accent,
+  decorativeCircle: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    bottom: -30,
+    right: -30,
   },
 });

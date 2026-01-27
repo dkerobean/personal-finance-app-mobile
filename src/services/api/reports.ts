@@ -1,5 +1,8 @@
-import { supabase } from '../supabaseClient';
-import { ApiResponse } from '@/types/api';
+/**
+ * Reports API - Uses Backend API
+ */
+
+import { apiClient } from '../apiClient';
 import type { MonthlyReport, ReportComparison } from '@/types/models';
 
 export interface AvailableMonth {
@@ -8,9 +11,9 @@ export interface AvailableMonth {
   total_amount: number;
 }
 
-export interface ReportsResponse {
+export interface ReportsResponse<T> {
   success: boolean;
-  data?: MonthlyReport | ReportComparison | AvailableMonth[];
+  data?: T;
   error?: {
     code: string;
     message: string;
@@ -18,45 +21,10 @@ export interface ReportsResponse {
 }
 
 class ReportsApi {
-  private getAuthHeaders = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return {
-      'Authorization': `Bearer ${session?.access_token}`,
-      'Content-Type': 'application/json',
-    };
-  };
-
-  private getBaseUrl = () => {
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    return `${supabaseUrl}/functions/v1/reports`;
-  };
-
-  getMonthlyReport = async (month: string): Promise<ApiResponse<MonthlyReport>> => {
+  getMonthlyReport = async (month: string, userId: string): Promise<{ data: MonthlyReport | null; error: { code: string; message: string } | null }> => {
     try {
-      const headers = await this.getAuthHeaders();
-      const url = `${this.getBaseUrl()}?month=${encodeURIComponent(month)}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
-
-      const result: ReportsResponse = await response.json();
-
-      if (!result.success) {
-        return {
-          data: null,
-          error: result.error || { 
-            message: 'Failed to fetch monthly report', 
-            code: 'FETCH_ERROR' 
-          },
-        };
-      }
-
-      return {
-        data: result.data as MonthlyReport,
-        error: null,
-      };
+      const response = await apiClient.get<MonthlyReport>(`/reports?userId=${encodeURIComponent(userId)}&month=${encodeURIComponent(month)}`);
+      return response;
     } catch (error) {
       console.error('Error fetching monthly report:', error);
       return {
@@ -69,76 +37,18 @@ class ReportsApi {
     }
   };
 
-  getReportComparison = async (currentMonth: string, previousMonth: string): Promise<ApiResponse<ReportComparison>> => {
+  getReportComparison = async (currentMonth: string, previousMonth: string, userId: string): Promise<{ data: ReportComparison | null; error: { code: string; message: string } | null }> => {
     try {
-      const headers = await this.getAuthHeaders();
-      const url = `${this.getBaseUrl()}/comparison?current_month=${encodeURIComponent(currentMonth)}&previous_month=${encodeURIComponent(previousMonth)}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
-
-      const result: ReportsResponse = await response.json();
-
-      if (!result.success) {
-        return {
-          data: null,
-          error: result.error || { 
-            message: 'Failed to fetch report comparison', 
-            code: 'FETCH_ERROR' 
-          },
-        };
-      }
-
-      return {
-        data: result.data as ReportComparison,
-        error: null,
-      };
+      const response = await apiClient.get<ReportComparison>(
+        `/reports/comparison?userId=${encodeURIComponent(userId)}&current_month=${encodeURIComponent(currentMonth)}&previous_month=${encodeURIComponent(previousMonth)}`
+      );
+      return response;
     } catch (error) {
       console.error('Error fetching report comparison:', error);
       return {
         data: null,
         error: {
           message: 'Network error while fetching report comparison',
-          code: 'NETWORK_ERROR',
-        },
-      };
-    }
-  };
-
-  getAvailableMonths = async (limit: number = 12): Promise<ApiResponse<AvailableMonth[]>> => {
-    try {
-      const headers = await this.getAuthHeaders();
-      const url = `${this.getBaseUrl()}/available-months?limit=${limit}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
-
-      const result: ReportsResponse = await response.json();
-
-      if (!result.success) {
-        return {
-          data: null,
-          error: result.error || { 
-            message: 'Failed to fetch available months', 
-            code: 'FETCH_ERROR' 
-          },
-        };
-      }
-
-      return {
-        data: result.data as AvailableMonth[],
-        error: null,
-      };
-    } catch (error) {
-      console.error('Error fetching available months:', error);
-      return {
-        data: null,
-        error: {
-          message: 'Network error while fetching available months',
           code: 'NETWORK_ERROR',
         },
       };

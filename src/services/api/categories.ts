@@ -1,168 +1,70 @@
-import { supabase } from '@/services/supabaseClient';
-import type { Category } from '@/types/models';
-import type { CreateCategoryRequest, UpdateCategoryRequest, ApiResponse } from '@/types/api';
-import { handleApiError, createApiResponse } from '@/services/apiClient';
+/**
+ * Categories API - Uses Backend API
+ */
+
+import { apiClient, createApiResponse, ApiResponse } from '@/services/apiClient';
+import type { Category as CategoryType } from '@/types/models';
+
+export interface CreateCategoryRequest {
+  name: string;
+  icon_name: string;
+}
+
+export interface UpdateCategoryRequest {
+  name?: string;
+  icon_name?: string;
+}
+
+const transformCategory = (cat: any): CategoryType => ({
+  id: cat._id,
+  user_id: cat.userId,
+  name: cat.name,
+  icon_name: cat.iconName,
+  created_at: cat.createdAt,
+  updated_at: cat.updatedAt,
+});
 
 export const categoriesApi = {
-  async list(): Promise<ApiResponse<Category[]>> {
-    try {
-      // Get the current authenticated user
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        // If not authenticated, only return shared categories
-        const { data, error } = await supabase
-          .from('categories')
-          .select('*')
-          .is('user_id', null)
-          .order('name');
-
-        if (error) {
-          throw error;
-        }
-
-        return createApiResponse(data || []);
-      }
-
-      // Get both user-specific and shared categories
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .or(`user_id.eq.${user.id},user_id.is.null`)
-        .order('user_id', { ascending: false }) // User categories first
-        .order('name');
-
-      if (error) {
-        throw error;
-      }
-
-      return createApiResponse(data || []);
-    } catch (error) {
-      const errorMessage = handleApiError(error);
-      return createApiResponse([] as Category[], {
-        code: 'FETCH_CATEGORIES_ERROR',
-        message: errorMessage,
-      });
+  async list(userId: string): Promise<ApiResponse<CategoryType[]>> {
+    const result = await apiClient.get<any[]>(`/categories?userId=${userId}`);
+    if (result.data) {
+      return createApiResponse(result.data.map(transformCategory));
     }
+    return createApiResponse([], result.error || undefined);
   },
 
-  async create(request: CreateCategoryRequest): Promise<ApiResponse<Category>> {
-    try {
-      // Get the current authenticated user
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        throw new Error('User not authenticated');
-      }
-
-      const { data, error } = await supabase
-        .from('categories')
-        .insert({
-          user_id: user.id, // Explicitly set the user_id
-          name: request.name,
-          icon_name: request.icon_name,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      return createApiResponse(data);
-    } catch (error) {
-      const errorMessage = handleApiError(error);
-      return createApiResponse({} as Category, {
-        code: 'CREATE_CATEGORY_ERROR',
-        message: errorMessage,
-      });
+  async getById(userId: string, id: string): Promise<ApiResponse<CategoryType>> {
+    const result = await apiClient.get<any>(`/categories/${id}?userId=${userId}`);
+    if (result.data) {
+      return createApiResponse(transformCategory(result.data));
     }
+    return createApiResponse({} as CategoryType, result.error || undefined);
   },
 
-  async update(id: string, request: UpdateCategoryRequest): Promise<ApiResponse<Category>> {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .update({
-          ...(request.name && { name: request.name }),
-          ...(request.icon_name && { icon_name: request.icon_name }),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      return createApiResponse(data);
-    } catch (error) {
-      const errorMessage = handleApiError(error);
-      return createApiResponse({} as Category, {
-        code: 'UPDATE_CATEGORY_ERROR',
-        message: errorMessage,
-      });
+  async create(userId: string, request: CreateCategoryRequest): Promise<ApiResponse<CategoryType>> {
+    const result = await apiClient.post<any>('/categories', {
+      userId,
+      name: request.name,
+      iconName: request.icon_name,
+    });
+    if (result.data) {
+      return createApiResponse(transformCategory(result.data));
     }
+    return createApiResponse({} as CategoryType, result.error || undefined);
   },
 
-  async delete(id: string): Promise<ApiResponse<void>> {
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw error;
-      }
-
-      return createApiResponse();
-    } catch (error) {
-      const errorMessage = handleApiError(error);
-      return createApiResponse(undefined, {
-        code: 'DELETE_CATEGORY_ERROR',
-        message: errorMessage,
-      });
+  async update(userId: string, id: string, request: UpdateCategoryRequest): Promise<ApiResponse<CategoryType>> {
+    const result = await apiClient.patch<any>(`/categories/${id}?userId=${userId}`, {
+      name: request.name,
+      iconName: request.icon_name,
+    });
+    if (result.data) {
+      return createApiResponse(transformCategory(result.data));
     }
+    return createApiResponse({} as CategoryType, result.error || undefined);
   },
 
-  async seedDefaults(): Promise<ApiResponse<Category[]>> {
-    try {
-      // Get the current authenticated user
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        throw new Error('User not authenticated');
-      }
-
-      const defaultCategories = [
-        { user_id: user.id, name: 'Food', icon_name: 'restaurant' },
-        { user_id: user.id, name: 'Transport', icon_name: 'car' },
-        { user_id: user.id, name: 'Salary', icon_name: 'attach-money' },
-        { user_id: user.id, name: 'Entertainment', icon_name: 'movie' },
-        { user_id: user.id, name: 'Shopping', icon_name: 'shopping-bag' },
-        { user_id: user.id, name: 'Bills', icon_name: 'receipt' },
-        { user_id: user.id, name: 'Health', icon_name: 'local-hospital' },
-        { user_id: user.id, name: 'Education', icon_name: 'school' },
-      ];
-
-      const { data, error } = await supabase
-        .from('categories')
-        .insert(defaultCategories)
-        .select();
-
-      if (error) {
-        throw error;
-      }
-
-      return createApiResponse(data || []);
-    } catch (error) {
-      const errorMessage = handleApiError(error);
-      return createApiResponse([] as Category[], {
-        code: 'SEED_CATEGORIES_ERROR',
-        message: errorMessage,
-      });
-    }
+  async delete(userId: string, id: string): Promise<ApiResponse<void>> {
+    return apiClient.delete(`/categories/${id}?userId=${userId}`);
   },
 };

@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { supabase } from '@/services/supabaseClient';
-import { useAuthStore } from '@/stores/authStore';
+import { accountsApi } from '@/services/api/accounts';
+import { useUser } from '@clerk/clerk-expo';
+import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS } from '@/constants/design';
 
 interface LinkedAccount {
   id: string;
@@ -20,21 +21,18 @@ interface AccountsOverviewCardProps {
 export default function AccountsOverviewCard({ onAccountsPress }: AccountsOverviewCardProps) {
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuthStore();
+  const { user } = useUser();
 
   const loadLinkedAccounts = async () => {
     if (!user?.id) return;
     
     try {
-      const { data: accounts, error } = await supabase
-        .from('accounts')
-        .select('id, account_name, platform_source, sync_status, last_synced_at')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .in('platform_source', ['mono', 'mtn_momo']);
-
-      if (error) throw error;
-      setLinkedAccounts(accounts || []);
+      // Use accountsApi which connects to MongoDB backend
+      const accounts = await accountsApi.getAccounts(user.id);
+      
+      // Map to local interface if necessary, or ensure backend matches
+      // Account types from MongoDB have snake_case fields which match our interface
+      setLinkedAccounts(accounts as unknown as LinkedAccount[] || []);
     } catch (error) {
       console.error('Failed to load linked accounts:', error);
       setLinkedAccounts([]);
@@ -56,7 +54,7 @@ export default function AccountsOverviewCard({ onAccountsPress }: AccountsOvervi
   };
 
   const handleAddAccount = () => {
-    router.push('/accounts/add');
+    router.push('/add-account');
   };
 
   const getPlatformIcon = (platform: string) => {
@@ -73,41 +71,11 @@ export default function AccountsOverviewCard({ onAccountsPress }: AccountsOvervi
   const getPlatformColor = (platform: string) => {
     switch (platform) {
       case 'mono':
-        return '#2563eb';
+        return COLORS.accent;
       case 'mtn_momo':
-        return '#f59e0b';
+        return COLORS.warning;
       default:
-        return '#6b7280';
-    }
-  };
-
-  const getSyncStatusColor = (status?: string) => {
-    switch (status) {
-      case 'active':
-        return '#059669';
-      case 'auth_required':
-        return '#f59e0b';
-      case 'error':
-        return '#dc2626';
-      case 'in_progress':
-        return '#2563eb';
-      default:
-        return '#6b7280';
-    }
-  };
-
-  const getSyncStatusText = (status?: string) => {
-    switch (status) {
-      case 'active':
-        return 'Active';
-      case 'auth_required':
-        return 'Needs Auth';
-      case 'error':
-        return 'Error';
-      case 'in_progress':
-        return 'Syncing';
-      default:
-        return 'Unknown';
+        return COLORS.textTertiary;
     }
   };
 
@@ -115,7 +83,7 @@ export default function AccountsOverviewCard({ onAccountsPress }: AccountsOvervi
     return (
       <View style={styles.card}>
         <View style={styles.header}>
-          <MaterialIcons name="account-balance-wallet" size={24} color="#6b7280" />
+          <MaterialIcons name="account-balance-wallet" size={24} color={COLORS.textTertiary} />
           <Text style={styles.title}>Linked Accounts</Text>
         </View>
         <View style={styles.loadingContainer}>
@@ -130,19 +98,19 @@ export default function AccountsOverviewCard({ onAccountsPress }: AccountsOvervi
     return (
       <View style={styles.card}>
         <View style={styles.header}>
-          <MaterialIcons name="account-balance-wallet" size={24} color="#6b7280" />
+          <MaterialIcons name="account-balance-wallet" size={24} color={COLORS.textTertiary} />
           <Text style={styles.title}>Connect Your Accounts</Text>
         </View>
         
         <View style={styles.emptyContainer}>
-          <MaterialIcons name="add-circle-outline" size={48} color="#d1d5db" />
+          <MaterialIcons name="add-circle-outline" size={48} color={COLORS.gray400} />
           <Text style={styles.emptyTitle}>No Accounts Linked</Text>
           <Text style={styles.emptySubtitle}>
             Link your bank or MTN MoMo account to automatically sync transactions
           </Text>
           
           <TouchableOpacity style={styles.addAccountButton} onPress={handleAddAccount}>
-            <MaterialIcons name="add" size={20} color="#ffffff" />
+            <MaterialIcons name="add" size={20} color={COLORS.white} />
             <Text style={styles.addAccountButtonText}>Add Account</Text>
           </TouchableOpacity>
         </View>
@@ -157,7 +125,7 @@ export default function AccountsOverviewCard({ onAccountsPress }: AccountsOvervi
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <MaterialIcons name="account-balance-wallet" size={24} color="#059669" />
+        <MaterialIcons name="account-balance-wallet" size={24} color={COLORS.success} />
         <Text style={styles.title}>Linked Accounts</Text>
         <View style={styles.accountsCount}>
           <Text style={styles.accountsCountText}>{linkedAccounts.length}</Text>
@@ -196,7 +164,7 @@ export default function AccountsOverviewCard({ onAccountsPress }: AccountsOvervi
         {/* Show sync status warnings */}
         {linkedAccounts.some(acc => acc.sync_status === 'auth_required') && (
           <View style={styles.warningRow}>
-            <MaterialIcons name="warning" size={16} color="#f59e0b" />
+            <MaterialIcons name="warning" size={16} color={COLORS.warning} />
             <Text style={styles.warningText}>
               Some accounts need re-authentication
             </Text>
@@ -205,7 +173,7 @@ export default function AccountsOverviewCard({ onAccountsPress }: AccountsOvervi
 
         {linkedAccounts.some(acc => acc.sync_status === 'error') && (
           <View style={styles.warningRow}>
-            <MaterialIcons name="error" size={16} color="#dc2626" />
+            <MaterialIcons name="error" size={16} color={COLORS.error} />
             <Text style={styles.warningText}>
               Some accounts have sync errors
             </Text>
@@ -216,11 +184,11 @@ export default function AccountsOverviewCard({ onAccountsPress }: AccountsOvervi
       <View style={styles.actions}>
         <TouchableOpacity style={styles.manageButton} onPress={handleManageAccounts}>
           <Text style={styles.manageButtonText}>Manage Accounts</Text>
-          <MaterialIcons name="chevron-right" size={20} color="#6b7280" />
+          <MaterialIcons name="chevron-right" size={20} color={COLORS.textTertiary} />
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.addButton} onPress={handleAddAccount}>
-          <MaterialIcons name="add" size={16} color="#2563eb" />
+          <MaterialIcons name="add" size={16} color={COLORS.accent} />
           <Text style={styles.addButtonText}>Add</Text>
         </TouchableOpacity>
       </View>
@@ -230,31 +198,27 @@ export default function AccountsOverviewCard({ onAccountsPress }: AccountsOvervi
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.lg,
+    marginVertical: SPACING.sm,
+    ...SHADOWS.md,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginLeft: 8,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textSecondary,
+    marginLeft: SPACING.sm,
     flex: 1,
   },
   accountsCount: {
-    backgroundColor: '#059669',
+    backgroundColor: COLORS.success,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -262,52 +226,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   accountsCountText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
   loadingContainer: {
-    paddingVertical: 20,
+    paddingVertical: SPACING.xl,
     alignItems: 'center',
   },
   loadingText: {
-    color: '#6b7280',
-    fontSize: 14,
+    color: COLORS.textTertiary,
+    fontSize: TYPOGRAPHY.sizes.md,
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: SPACING.xxl,
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 12,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.md,
     marginBottom: 4,
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textTertiary,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: SPACING.lg,
   },
   addAccountButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
   },
   addAccountButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.semibold,
     marginLeft: 6,
   },
   accountsSummary: {
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   accountTypeRow: {
     flexDirection: 'row',
@@ -320,14 +284,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   accountTypeText: {
-    fontSize: 14,
-    color: '#374151',
-    marginLeft: 8,
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textSecondary,
+    marginLeft: SPACING.sm,
   },
   accountTypeCount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textTertiary,
   },
   warningRow: {
     flexDirection: 'row',
@@ -336,8 +300,8 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   warningText: {
-    fontSize: 12,
-    color: '#f59e0b',
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.warning,
     marginLeft: 6,
   },
   actions: {
@@ -345,7 +309,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: COLORS.gray100,
   },
   manageButton: {
     flex: 1,
@@ -355,23 +319,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   manageButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.medium,
+    color: COLORS.textSecondary,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eff6ff',
+    backgroundColor: COLORS.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
     marginLeft: 12,
   },
   addButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#2563eb',
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.medium,
+    color: COLORS.accent,
     marginLeft: 4,
   },
 });

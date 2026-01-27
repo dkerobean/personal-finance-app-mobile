@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import { VictoryChart, VictoryLine, VictoryArea, VictoryAxis, VictoryTooltip, VictoryScatter } from 'victory-native';
+import { View, Text, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/design';
 import { formatCurrency } from '@/lib/formatters';
@@ -29,64 +29,67 @@ export default function NetWorthHistoryChart({
 }: NetWorthHistoryChartProps): React.ReactElement {
   const [selectedPoint, setSelectedPoint] = useState<HistoricalDataPoint | null>(null);
 
-  const chartWidth = screenWidth - (SPACING.xl * 2) - (SPACING.lg * 2);
+  const chartWidth = screenWidth - (SPACING.xl * 2);
   const chartHeight = height - 60; // Account for header space
 
-  // Transform data for Victory charts
-  const chartData = data.map((point, index) => ({
-    x: index,
-    y: point.netWorth,
-    date: point.date,
-    assets: point.totalAssets,
-    liabilities: point.totalLiabilities,
-    original: point,
-  }));
-
-  const assetsData = data.map((point, index) => ({
-    x: index,
-    y: point.totalAssets,
-  }));
-
-  const liabilitiesData = data.map((point, index) => ({
-    x: index,
-    y: point.totalLiabilities,
-  }));
-
-  // Calculate chart domain
-  const getYDomain = () => {
-    if (chartData.length === 0) return [0, 100000];
-    
-    const allValues = [
-      ...chartData.map(d => d.y),
-      ...(showBreakdown ? [...assetsData.map(d => d.y), ...liabilitiesData.map(d => d.y)] : []),
-    ];
-    
-    const min = Math.min(...allValues);
-    const max = Math.max(...allValues);
-    const padding = (max - min) * 0.1; // 10% padding
-    
-    return [Math.max(0, min - padding), max + padding];
+  // Transform data for react-native-chart-kit
+  const chartData = {
+    labels: data.map((point, index) => {
+      const date = new Date(point.date);
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        year: timePeriod.months > 12 ? '2-digit' : undefined 
+      });
+    }),
+    datasets: [
+      {
+        data: data.map(point => point.netWorth),
+        color: (opacity = 1) => `rgba(74, 144, 226, ${opacity})`,
+        strokeWidth: 3
+      },
+      ...(showBreakdown ? [
+        {
+          data: data.map(point => point.totalAssets),
+          color: (opacity = 1) => `rgba(34, 197, 94, ${opacity})`,
+          strokeWidth: 2
+        },
+        {
+          data: data.map(point => point.totalLiabilities),
+          color: (opacity = 1) => `rgba(239, 68, 68, ${opacity})`,
+          strokeWidth: 2
+        }
+      ] : [])
+    ]
   };
 
-  // Format date for x-axis
-  const formatXAxisLabel = (tickValue: number) => {
-    const dataPoint = chartData[Math.floor(tickValue)];
-    if (!dataPoint) return '';
-    
-    const date = new Date(dataPoint.date);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      year: timePeriod.months > 12 ? '2-digit' : undefined 
-    });
+  // Chart configuration
+  const chartConfig = {
+    backgroundColor: '#ffffff',
+    backgroundGradientFrom: '#ffffff',
+    backgroundGradientTo: '#ffffff',
+    decimalPlaces: 0,
+    color: (opacity = 1) => `rgba(74, 144, 226, ${opacity})`,
+    labelColor: () => '#6B7280',
+    style: {
+      borderRadius: BORDER_RADIUS.md
+    },
+    propsForDots: {
+      r: '4',
+      strokeWidth: '2',
+      stroke: '#ffffff'
+    },
+    formatYLabel: (value) => formatCurrency(parseFloat(value), { compact: true })
   };
 
   // Handle data point selection
-  const handlePointPress = (evt: any, datum: any) => {
-    if (!interactive) return;
+  const handlePointPress = (data: any, index: number) => {
+    if (!interactive || !data || data.length === 0) return;
     
-    const point = datum.original as HistoricalDataPoint;
-    setSelectedPoint(point);
-    onDataPointSelect?.(point);
+    const point = data[index];
+    if (point) {
+      setSelectedPoint(point);
+      onDataPointSelect?.(point);
+    }
   };
 
   // Loading state
@@ -109,7 +112,7 @@ export default function NetWorthHistoryChart({
   }
 
   // Empty state
-  if (chartData.length === 0) {
+  if (data.length === 0) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -136,155 +139,24 @@ export default function NetWorthHistoryChart({
 
       {/* Chart Container */}
       <View style={styles.chartContainer}>
-        <VictoryChart
-          width={chartWidth}
-          height={chartHeight}
-          padding={{ left: 60, top: 20, right: 20, bottom: 50 }}
-          domain={{ y: getYDomain() }}
-        >
-          {/* Background gradient area for net worth */}
-          <VictoryArea
+        <ScrollView horizontal={data.length > 6} showsHorizontalScrollIndicator={false}>
+          <LineChart
             data={chartData}
-            x="x"
-            y="y"
-            style={{
-              data: {
-                fill: `${COLORS.primary}20`,
-                fillOpacity: 0.3,
-              },
-            }}
-            animate={{
-              duration: 1000,
-              onLoad: { duration: 500 },
-            }}
+            width={Math.max(chartWidth, data.length * 60)}
+            height={chartHeight}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
+            onDataPointClick={interactive ? handlePointPress : undefined}
+            withDots={interactive}
+            withShadow={false}
+            withInnerLines={false}
+            withOuterLines={false}
+            withVerticalLines={false}
+            withHorizontalLines={true}
+            segments={4}
           />
-
-          {/* Assets line (if breakdown is enabled) */}
-          {showBreakdown && (
-            <VictoryLine
-              data={assetsData}
-              x="x"
-              y="y"
-              style={{
-                data: {
-                  stroke: COLORS.success,
-                  strokeWidth: 2,
-                  strokeOpacity: 0.7,
-                },
-              }}
-              animate={{
-                duration: 1000,
-                onLoad: { duration: 500 },
-              }}
-            />
-          )}
-
-          {/* Liabilities line (if breakdown is enabled) */}
-          {showBreakdown && (
-            <VictoryLine
-              data={liabilitiesData}
-              x="x"
-              y="y"
-              style={{
-                data: {
-                  stroke: COLORS.error,
-                  strokeWidth: 2,
-                  strokeOpacity: 0.7,
-                },
-              }}
-              animate={{
-                duration: 1000,
-                onLoad: { duration: 500 },
-              }}
-            />
-          )}
-
-          {/* Main net worth line */}
-          <VictoryLine
-            data={chartData}
-            x="x"
-            y="y"
-            style={{
-              data: {
-                stroke: COLORS.primary,
-                strokeWidth: 3,
-              },
-            }}
-            animate={{
-              duration: 1000,
-              onLoad: { duration: 500 },
-            }}
-          />
-
-          {/* Interactive scatter points */}
-          {interactive && (
-            <VictoryScatter
-              data={chartData}
-              x="x"
-              y="y"
-              size={4}
-              style={{
-                data: {
-                  fill: COLORS.primary,
-                  stroke: COLORS.white,
-                  strokeWidth: 2,
-                },
-              }}
-              events={[{
-                target: 'data',
-                eventHandlers: {
-                  onPress: (evt, datum) => handlePointPress(evt, datum),
-                },
-              }]}
-              labelComponent={
-                <VictoryTooltip
-                  style={{
-                    fill: COLORS.white,
-                    fontSize: 12,
-                    fontWeight: '600',
-                  }}
-                  flyoutStyle={{
-                    fill: COLORS.backgroundCard,
-                    stroke: COLORS.border,
-                    strokeWidth: 1,
-                  }}
-                  renderInPortal={false}
-                />
-              }
-              labels={({ datum }) => `${formatCurrency(datum.y)}\n${new Date(datum.date).toLocaleDateString()}`}
-            />
-          )}
-
-          {/* Y-axis */}
-          <VictoryAxis
-            dependentAxis
-            tickFormat={(value) => formatCurrency(value, { compact: true })}
-            style={{
-              axis: { stroke: COLORS.border },
-              grid: { stroke: COLORS.border, strokeOpacity: 0.3 },
-              tickLabels: {
-                fontSize: 12,
-                fill: COLORS.textSecondary,
-                fontFamily: 'System',
-              },
-            }}
-          />
-
-          {/* X-axis */}
-          <VictoryAxis
-            tickFormat={formatXAxisLabel}
-            tickCount={Math.min(6, chartData.length)}
-            style={{
-              axis: { stroke: COLORS.border },
-              tickLabels: {
-                fontSize: 12,
-                fill: COLORS.textSecondary,
-                fontFamily: 'System',
-                angle: chartData.length > 12 ? -45 : 0,
-              },
-            }}
-          />
-        </VictoryChart>
+        </ScrollView>
       </View>
 
       {/* Legend (if breakdown is shown) */}
@@ -358,6 +230,9 @@ const styles = StyleSheet.create({
   chartContainer: {
     alignItems: 'center',
     marginBottom: SPACING.md,
+  },
+  chart: {
+    borderRadius: BORDER_RADIUS.md,
   },
   legend: {
     flexDirection: 'row',

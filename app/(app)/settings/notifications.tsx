@@ -1,35 +1,27 @@
-import { useState, useEffect } from 'react';
-import { Alert } from 'react-native';
-import { router } from 'expo-router';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Heading,
-  ScrollView,
-  Button,
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
   Switch,
-  Spinner,
-  AlertDialog,
-  AlertDialogBackdrop,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogCloseButton,
-  AlertDialogBody,
-  AlertDialogFooter,
-  Icon,
-  useToast,
-  Toast,
-  ToastTitle,
-  ToastDescription,
-} from '@gluestack-ui/themed';
-import { ArrowLeft, Bell, TestTube2, Info, Clock, CheckCircle, AlertCircle } from 'lucide-react-native';
+  Alert,
+  ActivityIndicator,
+  RefreshControl
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Bell, TestTube2, Clock, CheckCircle, AlertCircle, ChevronLeft } from 'lucide-react-native';
 import { useAlertStore } from '@/stores/alertStore';
 import { oneSignalService } from '@/services/oneSignalService';
+import { useAppToast } from '@/hooks/useAppToast';
+import GradientHeader from '@/components/budgets/GradientHeader';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 
 export default function NotificationsScreen() {
-  const toast = useToast();
+  const toast = useAppToast();
   const {
     alertSettings,
     alertHistory,
@@ -43,11 +35,11 @@ export default function NotificationsScreen() {
   } = useAlertStore();
 
   const [isTestingNotification, setIsTestingNotification] = useState(false);
-  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<{
     granted: boolean;
     denied: boolean;
   }>({ granted: false, denied: false });
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -66,9 +58,15 @@ export default function NotificationsScreen() {
     setPermissionStatus(status);
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
   const handleToggleBudgetAlerts = async (enabled: boolean) => {
     if (enabled && permissionStatus.denied) {
-      setShowPermissionDialog(true);
+      handleRequestPermissions();
       return;
     }
 
@@ -77,23 +75,13 @@ export default function NotificationsScreen() {
     });
 
     if (success) {
-      toast.show({
-        placement: 'top',
-        render: ({ id }) => (
-          <Toast nativeID={`toast-${id}`} action="success" variant="accent">
-            <ToastTitle>Settings Updated</ToastTitle>
-            <ToastDescription>
-              Budget alerts have been {enabled ? 'enabled' : 'disabled'}
-            </ToastDescription>
-          </Toast>
-        ),
-      });
+      toast.success('Settings Updated', `Budget alerts ${enabled ? 'enabled' : 'disabled'}`);
     }
   };
 
   const handleToggleOverBudgetAlerts = async (enabled: boolean) => {
     if (enabled && permissionStatus.denied) {
-      setShowPermissionDialog(true);
+      handleRequestPermissions();
       return;
     }
 
@@ -102,17 +90,7 @@ export default function NotificationsScreen() {
     });
 
     if (success) {
-      toast.show({
-        placement: 'top',
-        render: ({ id }) => (
-          <Toast nativeID={`toast-${id}`} action="success" variant="accent">
-            <ToastTitle>Settings Updated</ToastTitle>
-            <ToastDescription>
-              Over-budget alerts have been {enabled ? 'enabled' : 'disabled'}
-            </ToastDescription>
-          </Toast>
-        ),
-      });
+      toast.success('Settings Updated', `Over-budget alerts ${enabled ? 'enabled' : 'disabled'}`);
     }
   };
 
@@ -122,23 +100,13 @@ export default function NotificationsScreen() {
     });
 
     if (success) {
-      toast.show({
-        placement: 'top',
-        render: ({ id }) => (
-          <Toast nativeID={`toast-${id}`} action="success" variant="accent">
-            <ToastTitle>Threshold Updated</ToastTitle>
-            <ToastDescription>
-              Warning threshold set to {threshold}%
-            </ToastDescription>
-          </Toast>
-        ),
-      });
+      toast.success('Threshold Updated', `Warning threshold set to ${threshold}%`);
     }
   };
 
   const handleTestNotification = async () => {
     if (permissionStatus.denied) {
-      setShowPermissionDialog(true);
+      handleRequestPermissions();
       return;
     }
 
@@ -148,32 +116,12 @@ export default function NotificationsScreen() {
       const success = await sendTestNotification();
       
       if (success) {
-        toast.show({
-          placement: 'top',
-          render: ({ id }) => (
-            <Toast nativeID={`toast-${id}`} action="success" variant="accent">
-              <ToastTitle>Test Notification Sent</ToastTitle>
-              <ToastDescription>
-                Check your notifications to verify delivery
-              </ToastDescription>
-            </Toast>
-          ),
-        });
+        toast.success('Test Sent', 'Check your notifications to verify delivery');
       } else {
-        throw new Error('Failed to send test notification');
+        throw new Error('Failed to send');
       }
     } catch (error) {
-      toast.show({
-        placement: 'top',
-        render: ({ id }) => (
-          <Toast nativeID={`toast-${id}`} action="error" variant="accent">
-            <ToastTitle>Test Failed</ToastTitle>
-            <ToastDescription>
-              Could not send test notification. Please try again.
-            </ToastDescription>
-          </Toast>
-        ),
-      });
+      toast.error('Test Failed', 'Could not send test notification');
     } finally {
       setIsTestingNotification(false);
     }
@@ -185,428 +133,538 @@ export default function NotificationsScreen() {
       
       if (result.granted) {
         setPermissionStatus({ granted: true, denied: false });
-        setShowPermissionDialog(false);
-        
-        toast.show({
-          placement: 'top',
-          render: ({ id }) => (
-            <Toast nativeID={`toast-${id}`} action="success" variant="accent">
-              <ToastTitle>Permissions Granted</ToastTitle>
-              <ToastDescription>
-                You can now receive budget alert notifications
-              </ToastDescription>
-            </Toast>
-          ),
-        });
+        toast.success('Permissions Granted', 'You can now receive budget alerts');
       } else {
         setPermissionStatus({ granted: false, denied: true });
-        
         Alert.alert(
           'Notifications Disabled',
           'To receive budget alerts, please enable notifications in your device settings.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => {
-              // This would open device settings - implementation depends on platform
-              console.log('Open device settings');
-            }},
+            { text: 'Open Settings', onPress: () => console.log('Open device settings') },
           ]
         );
       }
     } catch (error) {
       console.error('Permission request failed:', error);
-      
-      toast.show({
-        placement: 'top',
-        render: ({ id }) => (
-          <Toast nativeID={`toast-${id}`} action="error" variant="accent">
-            <ToastTitle>Permission Error</ToastTitle>
-            <ToastDescription>
-              Failed to request notification permissions
-            </ToastDescription>
-          </Toast>
-        ),
-      });
+      toast.error('Permission Error', 'Failed to request notification permissions');
     }
   };
 
   const thresholdOptions = [75, 80, 85, 90, 95];
 
+  const handleGoBack = () => {
+    router.back();
+  };
+
   if (isLoading && !alertSettings) {
     return (
-      <Box flex={1} justifyContent="center" alignItems="center" bg="$background">
-        <Spinner size="large" />
-        <Text mt="$4">Loading notification settings...</Text>
-      </Box>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading notification settings...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <Box flex={1} bg="$background">
-      <ScrollView flex={1}>
-        <VStack space="$6" p="$4">
-          {/* Header */}
-          <HStack alignItems="center" space="$3">
-            <Button variant="link" size="sm" onPress={() => router.back()}>
-              <Icon as={ArrowLeft} size="xl" color="$textLight600" />
-            </Button>
-            <VStack flex={1}>
-              <Heading size="xl">Notification Settings</Heading>
-              <Text color="$textLight600" size="sm">
-                Manage your budget alert preferences
-              </Text>
-            </VStack>
-          </HStack>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView 
+        style={styles.mainScrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={handleRefresh}
+            tintColor={COLORS.white}
+            colors={[COLORS.white]}
+          />
+        }
+      >
+        {/* Gradient Header */}
+        <GradientHeader
+          title="Notifications"
+          onBackPress={handleGoBack}
+          onCalendarPress={() => {}}
+          onNotificationPress={() => {}}
+        />
 
-          {/* Permission Status */}
+        {/* Content Card */}
+        <View style={styles.contentCard}>
+          {/* Permission Warning */}
           {permissionStatus.denied && (
-            <Box
-              bg="$warning100"
-              borderColor="$warning300"
-              borderWidth={1}
-              borderRadius="$md"
-              p="$4"
-            >
-              <HStack space="$3" alignItems="center">
-                <Icon as={Info} size="lg" color="$warning600" />
-                <VStack flex={1}>
-                  <Text color="$warning800" fontWeight="$semibold">
-                    Notifications Disabled
-                  </Text>
-                  <Text color="$warning700" size="sm">
-                    Enable notifications to receive budget alerts
-                  </Text>
-                </VStack>
-              </HStack>
-              <Button
-                variant="outline"
-                action="warning"
-                size="sm"
-                mt="$3"
-                onPress={() => setShowPermissionDialog(true)}
+            <View style={styles.warningCard}>
+              <View style={styles.warningIcon}>
+                <MaterialIcons name="notifications-off" size={24} color={COLORS.warning} />
+              </View>
+              <View style={styles.warningTextContainer}>
+                <Text style={styles.warningTitle}>Notifications Disabled</Text>
+                <Text style={styles.warningDescription}>
+                  Enable notifications to receive budget alerts
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.enableButton}
+                onPress={handleRequestPermissions}
               >
-                <Text>Enable Notifications</Text>
-              </Button>
-            </Box>
+                <Text style={styles.enableButtonText}>Enable</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* Budget Alerts Section */}
-          <VStack space="$4">
-            <VStack space="$2">
-              <Heading size="lg">Budget Alerts</Heading>
-              <Text color="$textLight600" size="sm">
-                Get notified when you're approaching or exceeding your budget limits
-              </Text>
-            </VStack>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Budget Alerts</Text>
+            <Text style={styles.sectionDescription}>
+              Get notified when you're approaching or exceeding your budget limits
+            </Text>
 
-            {/* Budget Warning Alerts Toggle */}
-            <HStack justifyContent="space-between" alignItems="center" py="$2">
-              <VStack flex={1} mr="$4">
-                <Text fontWeight="$medium">Budget Warning Alerts</Text>
-                <Text color="$textLight600" size="sm">
+            {/* Budget Warning Toggle */}
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Budget Warning Alerts</Text>
+                <Text style={styles.settingDescription}>
                   Alert when approaching budget limit ({alertSettings?.warning_threshold || 90}%)
                 </Text>
-              </VStack>
+              </View>
               <Switch
                 value={alertSettings?.budget_alerts_enabled || false}
                 onValueChange={handleToggleBudgetAlerts}
-                isDisabled={isLoading}
-                trackColor={{ true: '$primary600', false: '$trueGray300' }}
-                thumbColor={alertSettings?.budget_alerts_enabled ? '$primary100' : '$trueGray50'}
+                disabled={isLoading}
+                trackColor={{ true: COLORS.primary, false: COLORS.gray200 }}
+                thumbColor={COLORS.white}
               />
-            </HStack>
+            </View>
 
-            {/* Warning Threshold Selection */}
+            {/* Threshold Selection */}
             {alertSettings?.budget_alerts_enabled && (
-              <VStack space="$2">
-                <Text fontWeight="$medium" size="sm">Warning Threshold</Text>
-                <HStack space="$2" flexWrap="wrap">
+              <View style={styles.thresholdContainer}>
+                <Text style={styles.thresholdLabel}>Warning Threshold</Text>
+                <View style={styles.thresholdOptions}>
                   {thresholdOptions.map((threshold) => (
-                    <Button
+                    <TouchableOpacity
                       key={threshold}
-                      variant={alertSettings.warning_threshold === threshold ? 'solid' : 'outline'}
-                      action={alertSettings.warning_threshold === threshold ? 'primary' : 'secondary'}
-                      size="sm"
+                      style={[
+                        styles.thresholdButton,
+                        alertSettings.warning_threshold === threshold && styles.thresholdButtonActive
+                      ]}
                       onPress={() => handleWarningThresholdChange(threshold)}
-                      isDisabled={isLoading}
+                      disabled={isLoading}
                     >
-                      <Text>{threshold}%</Text>
-                    </Button>
+                      <Text style={[
+                        styles.thresholdText,
+                        alertSettings.warning_threshold === threshold && styles.thresholdTextActive
+                      ]}>
+                        {threshold}%
+                      </Text>
+                    </TouchableOpacity>
                   ))}
-                </HStack>
-              </VStack>
+                </View>
+              </View>
             )}
 
-            {/* Over Budget Alerts Toggle */}
-            <HStack justifyContent="space-between" alignItems="center" py="$2">
-              <VStack flex={1} mr="$4">
-                <Text fontWeight="$medium">Over-Budget Alerts</Text>
-                <Text color="$textLight600" size="sm">
+            {/* Over Budget Toggle */}
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Over-Budget Alerts</Text>
+                <Text style={styles.settingDescription}>
                   Alert when spending exceeds budget limit (100%+)
                 </Text>
-              </VStack>
+              </View>
               <Switch
                 value={alertSettings?.over_budget_alerts_enabled || false}
                 onValueChange={handleToggleOverBudgetAlerts}
-                isDisabled={isLoading}
-                trackColor={{ true: '$primary600', false: '$trueGray300' }}
-                thumbColor={alertSettings?.over_budget_alerts_enabled ? '$primary100' : '$trueGray50'}
+                disabled={isLoading}
+                trackColor={{ true: COLORS.primary, false: COLORS.gray200 }}
+                thumbColor={COLORS.white}
               />
-            </HStack>
-          </VStack>
+            </View>
+          </View>
 
           {/* Notification Methods Section */}
-          <VStack space="$4">
-            <VStack space="$2">
-              <Heading size="lg">Notification Methods</Heading>
-              <Text color="$textLight600" size="sm">
-                Choose how you want to receive budget alerts
-              </Text>
-            </VStack>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Notification Methods</Text>
+            <Text style={styles.sectionDescription}>
+              Choose how you want to receive budget alerts
+            </Text>
 
             {/* Push Notifications Toggle */}
-            <HStack justifyContent="space-between" alignItems="center" py="$2">
-              <VStack flex={1} mr="$4">
-                <Text fontWeight="$medium">Push Notifications</Text>
-                <Text color="$textLight600" size="sm">
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Push Notifications</Text>
+                <Text style={styles.settingDescription}>
                   Receive instant alerts on your device
                 </Text>
-              </VStack>
+              </View>
               <Switch
                 value={permissionStatus.granted}
                 onValueChange={(enabled) => {
                   if (enabled) {
                     handleRequestPermissions();
                   } else {
-                    // Disable push notifications
                     setPermissionStatus({ granted: false, denied: true });
                   }
                 }}
-                isDisabled={isLoading}
-                trackColor={{ true: '$primary600', false: '$trueGray300' }}
-                thumbColor={permissionStatus.granted ? '$primary100' : '$trueGray50'}
+                disabled={isLoading}
+                trackColor={{ true: COLORS.primary, false: COLORS.gray200 }}
+                thumbColor={COLORS.white}
               />
-            </HStack>
+            </View>
+          </View>
 
-            {/* Email Notifications Toggle */}
-            <HStack justifyContent="space-between" alignItems="center" py="$2">
-              <VStack flex={1} mr="$4">
-                <Text fontWeight="$medium">Email Notifications</Text>
-                <Text color="$textLight600" size="sm">
-                  Receive detailed budget alerts via email
-                </Text>
-              </VStack>
-              <Switch
-                value={alertSettings?.budget_alerts_enabled || false}
-                onValueChange={(enabled) => {
-                  // For now, use same setting as budget alerts
-                  // In future, this could be a separate setting
-                  handleToggleBudgetAlerts(enabled);
-                }}
-                isDisabled={isLoading}
-                trackColor={{ true: '$primary600', false: '$trueGray300' }}
-                thumbColor={alertSettings?.budget_alerts_enabled ? '$primary100' : '$trueGray50'}
-              />
-            </HStack>
+          {/* Test Notification Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Test Notifications</Text>
+            <Text style={styles.sectionDescription}>
+              Send a test notification to verify your settings
+            </Text>
 
-            {/* Email info box */}
-            <Box
-              bg="$info100"
-              borderColor="$info300"
-              borderWidth={1}
-              borderRadius="$md"
-              p="$3"
-            >
-              <HStack space="$2" alignItems="center">
-                <Icon as={Info} size="sm" color="$info600" />
-                <Text color="$info800" size="sm" flex={1}>
-                  Email alerts include detailed spending summaries and actionable insights. 
-                  They're sent using your registered email address.
-                </Text>
-              </HStack>
-            </Box>
-          </VStack>
-
-          {/* Test Notification */}
-          <VStack space="$4">
-            <VStack space="$2">
-              <Heading size="lg">Test Notifications</Heading>
-              <Text color="$textLight600" size="sm">
-                Send a test notification to verify your settings
-              </Text>
-            </VStack>
-
-            <Button
-              variant="outline"
-              action="secondary"
+            <TouchableOpacity 
+              style={[styles.testButton, (isTestingNotification || permissionStatus.denied) && styles.testButtonDisabled]}
               onPress={handleTestNotification}
-              isDisabled={isTestingNotification || permissionStatus.denied}
+              disabled={isTestingNotification || permissionStatus.denied}
             >
-              <HStack space="$2" alignItems="center">
-                {isTestingNotification ? (
-                  <Spinner size="small" />
-                ) : (
-                  <Icon as={TestTube2} size="lg" />
-                )}
-                <Text>
-                  {isTestingNotification ? 'Sending...' : 'Send Test Notification'}
-                </Text>
-              </HStack>
-            </Button>
-          </VStack>
-
-          {/* Alert History */}
-          <VStack space="$4">
-            <VStack space="$2">
-              <Heading size="lg">Recent Alerts</Heading>
-              <Text color="$textLight600" size="sm">
-                Your budget alert history
+              {isTestingNotification ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <TestTube2 size={20} color={COLORS.primary} />
+              )}
+              <Text style={styles.testButtonText}>
+                {isTestingNotification ? 'Sending...' : 'Send Test Notification'}
               </Text>
-            </VStack>
+            </TouchableOpacity>
+          </View>
+
+          {/* Alert History Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Alerts</Text>
+            <Text style={styles.sectionDescription}>
+              Your budget alert history
+            </Text>
 
             {alertHistory && alertHistory.length > 0 ? (
-              <VStack space="$3">
+              <View style={styles.historyList}>
                 {alertHistory.slice(0, 5).map((alert) => (
-                  <Box
-                    key={alert.id}
-                    borderColor="$borderLight200"
-                    borderWidth={1}
-                    borderRadius="$md"
-                    p="$3"
-                    bg="$backgroundLight0"
-                  >
-                    <HStack space="$3" alignItems="center">
-                      <Icon
-                        as={alert.alert_type === 'warning' ? AlertCircle : CheckCircle}
-                        size="lg"
-                        color={alert.alert_type === 'warning' ? '$warning600' : '$error600'}
+                  <View key={alert.id} style={styles.historyItem}>
+                    <View style={[
+                      styles.historyIconBg,
+                      { backgroundColor: alert.alert_type === 'warning' ? '#FEF3C7' : '#FEE2E2' }
+                    ]}>
+                      <AlertCircle 
+                        size={20} 
+                        color={alert.alert_type === 'warning' ? COLORS.warning : COLORS.error} 
                       />
-                      <VStack flex={1} space="$1">
-                        <HStack justifyContent="space-between" alignItems="center">
-                          <Text fontWeight="$medium">
-                            {alert.alert_type === 'warning' ? 'Budget Warning' : 'Budget Exceeded'}
-                          </Text>
-                          <HStack space="$1" alignItems="center">
-                            <Icon
-                              as={alert.status === 'sent' ? CheckCircle : AlertCircle}
-                              size="sm"
-                              color={alert.status === 'sent' ? '$success600' : '$error600'}
-                            />
-                            <Text
-                              size="xs"
-                              color={alert.status === 'sent' ? '$success600' : '$error600'}
-                              textTransform="capitalize"
-                            >
-                              {alert.status}
-                            </Text>
-                          </HStack>
-                        </HStack>
-                        <Text color="$textLight600" size="sm">
-                          {alert.percentage.toFixed(0)}% of ₵{alert.budget_amount.toFixed(2)} budget
+                    </View>
+                    <View style={styles.historyContent}>
+                      <View style={styles.historyHeader}>
+                        <Text style={styles.historyTitle}>
+                          {alert.alert_type === 'warning' ? 'Budget Warning' : 'Budget Exceeded'}
                         </Text>
-                        <HStack space="$2" alignItems="center">
-                          <Icon as={Clock} size="xs" color="$textLight400" />
-                          <Text color="$textLight400" size="xs">
-                            {new Date(alert.sent_at).toLocaleDateString()} at{' '}
-                            {new Date(alert.sent_at).toLocaleTimeString([], { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
+                        <View style={[
+                          styles.statusBadge,
+                          { backgroundColor: alert.status === 'sent' ? COLORS.primaryLight : '#FEE2E2' }
+                        ]}>
+                          <Text style={[
+                            styles.statusText,
+                            { color: alert.status === 'sent' ? COLORS.primary : COLORS.error }
+                          ]}>
+                            {alert.status}
                           </Text>
-                        </HStack>
-                      </VStack>
-                    </HStack>
-                  </Box>
+                        </View>
+                      </View>
+                      <Text style={styles.historyDescription}>
+                        {alert.percentage.toFixed(0)}% of ₵{alert.budget_amount.toFixed(2)} budget
+                      </Text>
+                      <View style={styles.historyTime}>
+                        <Clock size={12} color={COLORS.textTertiary} />
+                        <Text style={styles.historyTimeText}>
+                          {new Date(alert.sent_at).toLocaleDateString()} at {new Date(alert.sent_at).toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
                 ))}
-                
-                {alertHistory.length > 5 && (
-                  <Text color="$textLight600" size="sm" textAlign="center">
-                    Showing 5 most recent alerts ({alertHistory.length} total)
-                  </Text>
-                )}
-              </VStack>
+              </View>
             ) : (
-              <Box
-                borderColor="$borderLight200"
-                borderWidth={1}
-                borderRadius="$md"
-                p="$4"
-                bg="$backgroundLight0"
-                alignItems="center"
-              >
-                <Icon as={Bell} size="xl" color="$textLight400" mb="$2" />
-                <Text color="$textLight600" textAlign="center">
-                  No budget alerts yet
-                </Text>
-                <Text color="$textLight500" size="sm" textAlign="center" mt="$1">
+              <View style={styles.emptyHistory}>
+                <Bell size={48} color={COLORS.textTertiary} />
+                <Text style={styles.emptyTitle}>No budget alerts yet</Text>
+                <Text style={styles.emptyDescription}>
                   Alerts will appear here when your spending approaches budget limits
                 </Text>
-              </Box>
+              </View>
             )}
-          </VStack>
+          </View>
 
           {/* Error Display */}
           {error && (
-            <Box
-              bg="$error100"
-              borderColor="$error300"
-              borderWidth={1}
-              borderRadius="$md"
-              p="$4"
-            >
-              <Text color="$error800">{error}</Text>
-              <Button
-                variant="link"
-                action="secondary"
-                size="sm"
-                alignSelf="flex-start"
-                mt="$2"
-                onPress={clearError}
-              >
-                <Text>Dismiss</Text>
-              </Button>
-            </Box>
+            <View style={styles.errorCard}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity onPress={clearError}>
+                <Text style={styles.dismissText}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
           )}
-        </VStack>
-      </ScrollView>
 
-      {/* Permission Request Dialog */}
-      <AlertDialog isOpen={showPermissionDialog} onClose={() => setShowPermissionDialog(false)}>
-        <AlertDialogBackdrop />
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <Heading size="lg">Enable Notifications</Heading>
-            <AlertDialogCloseButton />
-          </AlertDialogHeader>
-          <AlertDialogBody>
-            <VStack space="$3">
-              <HStack space="$3" alignItems="center">
-                <Icon as={Bell} size="xl" color="$primary600" />
-                <Text>
-                  To receive budget alerts, we need permission to send you notifications.
-                </Text>
-              </HStack>
-              <Text color="$textLight600" size="sm">
-                You can change this setting anytime in your device's notification preferences.
-              </Text>
-            </VStack>
-          </AlertDialogBody>
-          <AlertDialogFooter>
-            <HStack space="$3" justifyContent="flex-end" flex={1}>
-              <Button
-                variant="outline"
-                action="secondary"
-                onPress={() => setShowPermissionDialog(false)}
-              >
-                <Text>Not Now</Text>
-              </Button>
-              <Button action="primary" onPress={handleRequestPermissions}>
-                <Text>Allow Notifications</Text>
-              </Button>
-            </HStack>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Box>
+          <View style={styles.bottomSpacing} />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: BUDGET.gradientColors.start,
+  },
+  mainScrollView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textSecondary,
+  },
+  contentCard: {
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
+    flex: 1,
+  },
+  warningCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  warningIcon: {
+    marginRight: SPACING.md,
+  },
+  warningTextContainer: {
+    flex: 1,
+  },
+  warningTitle: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: '600',
+    color: '#92400E',
+  },
+  warningDescription: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: '#B45309',
+  },
+  enableButton: {
+    backgroundColor: COLORS.warning,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  enableButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: TYPOGRAPHY.sizes.sm,
+  },
+  section: {
+    marginBottom: SPACING.xl,
+  },
+  sectionTitle: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.xs,
+  },
+  sectionDescription: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
+    marginBottom: SPACING.lg,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    ...SHADOWS.sm,
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: SPACING.md,
+  },
+  settingTitle: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  settingDescription: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
+  },
+  thresholdContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    ...SHADOWS.sm,
+  },
+  thresholdLabel: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+  },
+  thresholdOptions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  thresholdButton: {
+    flex: 1,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+    backgroundColor: COLORS.gray100,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  thresholdButtonActive: {
+    backgroundColor: COLORS.primary,
+  },
+  thresholdText: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  thresholdTextActive: {
+    color: COLORS.white,
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    gap: SPACING.sm,
+    ...SHADOWS.sm,
+  },
+  testButtonDisabled: {
+    opacity: 0.5,
+  },
+  testButtonText: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  historyList: {
+    gap: SPACING.md,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    ...SHADOWS.sm,
+  },
+  historyIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  historyContent: {
+    flex: 1,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  historyTitle: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  statusBadge: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  statusText: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  historyDescription: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  historyTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  historyTimeText: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: COLORS.textTertiary,
+  },
+  emptyHistory: {
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.xxl,
+    ...SHADOWS.sm,
+  },
+  emptyTitle: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.xs,
+  },
+  emptyDescription: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
+    textAlign: 'center',
+  },
+  errorCard: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    color: COLORS.error,
+    marginBottom: SPACING.sm,
+  },
+  dismissText: {
+    color: COLORS.error,
+    fontWeight: '600',
+    fontSize: TYPOGRAPHY.sizes.sm,
+  },
+  bottomSpacing: {
+    height: 130,
+  },
+});

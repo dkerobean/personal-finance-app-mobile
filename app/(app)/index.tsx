@@ -1,159 +1,127 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/authStore';
 import { useTransactionStore, useDashboardData } from '@/stores/transactionStore';
-import { authService } from '@/services/authService';
-import TotalBalanceCard from '@/components/dashboard/TotalBalanceCard';
+import { accountsApi } from '@/services/api/accounts';
+import { assetsApi } from '@/services/api/assets';
+import { liabilitiesApi } from '@/services/api/liabilities';
+import { Account, Asset, Liability } from '@/types/models';
+import { useUser } from '@clerk/clerk-expo';
+
+// New Design Components
+import HomeHeader from '@/components/dashboard/HomeHeader';
+import NetWorthCard from '@/components/dashboard/NetWorthCard';
+import AccountsRail from '@/components/dashboard/AccountsRail';
+import IncomeExpenseSummary from '@/components/dashboard/IncomeExpenseSummary';
 import RecentTransactions from '@/components/dashboard/RecentTransactions';
-import AccountsOverviewCard from '@/components/dashboard/AccountsOverviewCard';
-import GradientHeader from '@/components/budgets/GradientHeader';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
+
+import { COLORS, SPACING } from '@/constants/design';
 
 export default function DashboardScreen(): React.ReactElement {
-  const { user, logout } = useAuthStore();
+  const { user } = useUser();
   const { loadTransactions } = useTransactionStore();
-  const { transactions, isLoading, error, recentTransactions } = useDashboardData();
+  const { 
+    recentTransactions, 
+    totalIncome, 
+    totalExpenses, 
+    isLoading: isLoadingTransactions 
+  } = useDashboardData();
+
+  
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [liabilities, setLiabilities] = useState<Liability[]>([]);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Load Data
+  const loadData = useCallback(async () => {
+    if (!user?.id) return;
+    
+    // Parallel fetching
+    const promises = [
+      loadTransactions(user.id),
+      accountsApi.getAccounts(user.id)
+        .then(data => setAccounts(data || []))
+        .catch(err => console.error('Failed to load accounts:', err)),
+      assetsApi.list(user.id)
+        .then(response => setAssets(response.data || []))
+        .catch(err => console.error('Failed to load assets:', err)),
+      liabilitiesApi.list(user.id)
+        .then(response => setLiabilities(response.data || []))
+        .catch(err => console.error('Failed to load liabilities:', err))
+    ];
+
+    await Promise.all(promises);
+    setIsLoadingAccounts(false);
+  }, [user?.id, loadTransactions]);
 
   useEffect(() => {
-    loadTransactions();
-  }, []);
+    loadData();
+  }, [loadData]);
 
-
-  const handleSignOut = async (): Promise<void> => {
-    const result = await authService.signOut();
-    if (result.success) {
-      await logout();
-      router.replace('/(auth)/login');
-    }
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
   };
 
-  const handleRefresh = async (): Promise<void> => {
-    await loadTransactions();
-  };
-
-  const handleAddTransaction = (): void => {
-    router.push('/transactions/create');
-  };
-
-  const handleViewTransactions = (): void => {
-    router.push('/transactions');
-  };
-
-  const handleViewBudgets = (): void => {
-    router.push('/budgets');
-  };
-
-  const handleManageAccounts = (): void => {
-    router.push('/accounts');
-  };
-
-  const handleViewReports = (): void => {
-    router.push('/reports');
-  };
-
-  const handleSettings = (): void => {
-    router.push('/settings');
-  };
-
-  const handleNetWorthCalculator = (): void => {
-    router.push('/networth');
-  };
-
+  // Calculate True Net Worth: (Accounts + Assets) - Liabilities
+  const accountsTotal = accounts.reduce((acc, account) => acc + (Number(account.balance) || 0), 0);
+  const assetsTotal = assets
+    .filter(asset => asset.is_active !== false)
+    .reduce((acc, asset) => acc + (Number(asset.current_value) || 0), 0);
+  const liabilitiesTotal = liabilities
+    .filter(liability => liability.is_active !== false)
+    .reduce((acc, liability) => acc + (Number(liability.current_balance) || 0), 0);
+  
+  const netWorth = accountsTotal + assetsTotal - liabilitiesTotal;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <HomeHeader 
+        onNotificationPress={() => console.log('Notifications')}
+        onProfilePress={() => router.push('/settings')}
+      />
+
       <ScrollView 
-        style={styles.mainScrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl 
-            refreshing={isLoading} 
-            onRefresh={handleRefresh}
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
             tintColor={COLORS.primary}
-            colors={[COLORS.primary]}
           />
         }
       >
-        {/* Gradient Header Section */}
-        <GradientHeader
-          title="Hi, Welcome Back"
-          subtitle="Good Morning"
-          onCalendarPress={() => {
-            // Handle calendar press
-          }}
-          onNotificationPress={() => {
-            console.log('Notifications');
-          }}
-          showCalendar={false}
+        {/* Income/Expense Summary Card with Action Buttons */}
+        <IncomeExpenseSummary 
+          monthlyIncome={totalIncome}
+          monthlyExpense={totalExpenses}
         />
 
-        {/* Content Card */}
-        <View style={styles.contentCard}>
+        {/* Net Worth Card */}
+        <NetWorthCard 
+          balance={netWorth} 
+          onPress={() => router.push('/networth')}
+        />
 
-          {/* Total Balance Card */}
-          <TotalBalanceCard transactions={transactions} isLoading={isLoading} />
+        {/* Accounts Rail */}
+        <AccountsRail accounts={accounts} />
 
-          {/* Net Worth Link Card */}
-          <TouchableOpacity style={styles.netWorthLinkCard} onPress={handleNetWorthCalculator}>
-            <View style={styles.netWorthHeader}>
-              <Text style={styles.netWorthTitle}>Net Worth Calculator</Text>
-              <MaterialIcons name="calculate" size={24} color={COLORS.white} />
-            </View>
-            <Text style={styles.netWorthDescription}>
-              Calculate and track your total net worth
-            </Text>
-            <View style={styles.netWorthCta}>
-              <Text style={styles.netWorthCtaText}>View Details</Text>
-              <MaterialIcons name="arrow-forward" size={16} color={COLORS.white} />
-            </View>
-          </TouchableOpacity>
-
-          {/* Accounts Overview */}
-          <AccountsOverviewCard onAccountsPress={handleManageAccounts} />
-
-          {/* Quick Actions */}
-          <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleAddTransaction}>
-              <MaterialIcons name="add" size={24} color={COLORS.white} />
-              <Text style={styles.actionButtonText}>Add Transaction</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.actionButtonSecondary} onPress={handleViewTransactions}>
-              <MaterialIcons name="list" size={24} color={COLORS.primary} />
-              <Text style={styles.actionButtonSecondaryText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Budget and Reports Actions */}
-          <View style={styles.budgetActions}>
-            <TouchableOpacity style={styles.budgetButton} onPress={handleViewBudgets}>
-              <MaterialIcons name="account-balance-wallet" size={24} color={COLORS.success} />
-              <Text style={styles.budgetButtonText}>Manage Budgets</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.reportsButton} onPress={handleViewReports}>
-              <MaterialIcons name="assessment" size={24} color={COLORS.accent} />
-              <Text style={styles.reportsButtonText}>View Reports</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Recent Transactions */}
-          <RecentTransactions transactions={recentTransactions} isLoading={isLoading} />
-
-          {/* Error Display */}
-          {error && (
-            <View style={styles.errorContainer}>
-              <MaterialIcons name="error-outline" size={24} color={COLORS.error} />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          {/* Bottom spacing for navigation */}
-          <View style={styles.bottomSpacing} />
+        {/* Reusing RecentTransactions but wrapping in padded view matching design */}
+        <View style={styles.sectionContainer}>
+           <RecentTransactions 
+             transactions={recentTransactions} 
+             isLoading={isLoadingTransactions} 
+           />
         </View>
+        
+        {/* Bottom Padding */}
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -162,162 +130,12 @@ export default function DashboardScreen(): React.ReactElement {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BUDGET.gradientColors.start,
+    backgroundColor: COLORS.backgroundContent, // White background (Premium feel)
   },
-  mainScrollView: {
-    flex: 1,
+  scrollContent: {
+    paddingBottom: SPACING.xl,
   },
-  contentCard: {
-    backgroundColor: COLORS.backgroundContent,
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    marginTop: -20,
-    paddingTop: 20,
-    flex: 1,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.xl,
-    marginVertical: SPACING.md,
-    gap: SPACING.md,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.lg,
-    ...SHADOWS.md,
-  },
-  actionButtonText: {
-    color: COLORS.white,
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    marginLeft: SPACING.sm,
-  },
-  actionButtonSecondary: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.backgroundCard,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    paddingVertical: 14,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.lg,
-    ...SHADOWS.sm,
-  },
-  actionButtonSecondaryText: {
-    color: COLORS.primary,
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    marginLeft: SPACING.sm,
-  },
-  budgetActions: {
-    paddingHorizontal: SPACING.xl,
-    marginBottom: SPACING.md,
-    gap: SPACING.md,
-  },
-  budgetButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.backgroundCard,
-    borderWidth: 2,
-    borderColor: COLORS.success,
-    paddingVertical: 14,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.lg,
-    ...SHADOWS.sm,
-  },
-  budgetButtonText: {
-    color: COLORS.success,
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    marginLeft: SPACING.sm,
-  },
-  reportsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.backgroundCard,
-    borderWidth: 2,
-    borderColor: COLORS.accent,
-    paddingVertical: 14,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.lg,
-    ...SHADOWS.sm,
-  },
-  reportsButtonText: {
-    color: COLORS.accent,
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    marginLeft: SPACING.sm,
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.backgroundCard,
-    marginHorizontal: SPACING.xl,
-    marginVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.error,
-    ...SHADOWS.sm,
-  },
-  errorText: {
-    color: COLORS.error,
-    fontSize: TYPOGRAPHY.sizes.md,
-    marginLeft: SPACING.sm,
-    flex: 1,
-  },
-  bottomSpacing: {
-    height: 150,
-  },
-  // Net Worth Link Card styles
-  netWorthLinkCard: {
-    backgroundColor: COLORS.primary,
-    marginHorizontal: SPACING.xl,
-    marginVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.xl,
-    ...SHADOWS.md,
-  },
-  netWorthHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  netWorthTitle: {
-    fontSize: TYPOGRAPHY.sizes.xl,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    color: COLORS.white,
-  },
-  netWorthDescription: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.white,
-    opacity: 0.9,
-    marginBottom: SPACING.lg,
-  },
-  netWorthCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  netWorthCtaText: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.medium,
-    color: COLORS.white,
-    marginRight: SPACING.xs,
-  },
+  sectionContainer: {
+    paddingHorizontal: SPACING.lg,
+  }
 });

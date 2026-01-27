@@ -1,31 +1,40 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { COLORS, TRANSACTIONS, TYPOGRAPHY } from '@/constants/design';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '@/constants/design';
 import type { Transaction } from '@/types/models';
+import { mapIconName } from '@/utils/iconMapping';
+
+// Define transaction specific colors
+const TX_COLORS = {
+  income: {
+    bg: '#dcfce7', // Green 100
+    text: '#15803d', // Green 700
+  },
+  expense: {
+    bg: '#fee2e2', // Red 100
+    text: '#b91c1c', // Red 700
+  },
+  default: {
+    bg: '#f3f4f6', // Gray 100
+    icon: '#6b7280', // Gray 500
+  }
+};
 
 interface TransactionItemProps {
   transaction: Transaction;
   onPress: (transactionId: string) => void;
-  showSeparator?: boolean;
+  showSeparator?: boolean; // Kept for API compatibility but unused in new design
 }
 
 export default function TransactionItem({
   transaction,
   onPress,
-  showSeparator = true,
 }: TransactionItemProps): React.ReactElement {
-  const getCategoryIconColor = (categoryName?: string): string => {
-    if (!categoryName) return TRANSACTIONS.categoryColors.food;
-    
-    const category = categoryName.toLowerCase();
-    if (category.includes('salary')) return TRANSACTIONS.categoryColors.salary;
-    if (category.includes('groceries')) return TRANSACTIONS.categoryColors.groceries;
-    if (category.includes('rent')) return TRANSACTIONS.categoryColors.rent;
-    if (category.includes('transport') || category.includes('fuel')) return TRANSACTIONS.categoryColors.transport;
-    if (category.includes('food') || category.includes('dinner')) return TRANSACTIONS.categoryColors.food;
-    
-    return TRANSACTIONS.categoryColors.food; // Default
+  
+  const getIconColor = (categoryName?: string): string => {
+    // We could use category colors here, but for a cleaner look we might just use primary
+    return COLORS.primary;
   };
 
   const formatTime = (dateString: string): string => {
@@ -41,14 +50,16 @@ export default function TransactionItem({
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       month: 'short',
-      day: '2-digit',
+      day: 'numeric',
     });
   };
 
   const formatAmount = (amount: number, type: 'income' | 'expense'): string => {
-    const sign = type === 'income' ? '' : '-';
-    return `${sign}$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const sign = type === 'income' ? '+' : '-';
+    return `${sign}₵${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
+
+  const isIncome = transaction.type === 'income';
 
   return (
     <TouchableOpacity
@@ -57,125 +68,110 @@ export default function TransactionItem({
       activeOpacity={0.7}
     >
       <View style={styles.content}>
-        {/* Category Icon */}
+        {/* Icon Container */}
         <View style={[
           styles.iconContainer,
-          { backgroundColor: getCategoryIconColor(transaction.category?.name) }
+          { backgroundColor: isIncome ? TX_COLORS.income.bg : TX_COLORS.expense.bg }
         ]}>
-          <MaterialIcons
-            name={transaction.category?.icon_name as any || 'category'}
-            size={26}
-            color={COLORS.primaryLight}
+          <Ionicons
+            name={mapIconName(transaction.category?.icon_name, transaction.category?.name) as any}
+            size={20}
+            color={isIncome ? TX_COLORS.income.text : TX_COLORS.expense.text}
           />
         </View>
 
         {/* Transaction Details */}
         <View style={styles.detailsContainer}>
           <View style={styles.leftDetails}>
-            <Text style={styles.categoryName}>
-              {transaction.category?.name || 'Unknown Category'}
+            <Text style={styles.categoryName} numberOfLines={1}>
+              {transaction.category?.name || 'Uncategorized'}
             </Text>
-            {transaction.description && (
-              <Text style={styles.subcategory} numberOfLines={1}>
-                {transaction.description}
+            <View style={styles.metaRow}>
+              <Text style={styles.dateText}>
+                {formatDate(transaction.transaction_date)} • {formatTime(transaction.transaction_date)}
               </Text>
-            )}
-            <Text style={styles.dateTime}>
-              {formatTime(transaction.transaction_date)} - {formatDate(transaction.transaction_date)}
-            </Text>
+            </View>
+            {transaction.description ? (
+               <Text style={styles.noteText} numberOfLines={1}>
+                 {transaction.description}
+               </Text>
+            ) : null}
           </View>
 
           {/* Amount */}
           <View style={styles.rightDetails}>
             <Text style={[
               styles.amount,
-              { color: transaction.type === 'income' ? COLORS.success : COLORS.accent }
+              { color: isIncome ? COLORS.success : COLORS.error }
             ]}>
               {formatAmount(transaction.amount, transaction.type)}
             </Text>
           </View>
         </View>
       </View>
-
-      {/* Separator Lines */}
-      {showSeparator && (
-        <View style={styles.separatorContainer}>
-          <View style={[styles.separator, styles.leftSeparator]} />
-          <View style={[styles.separator, styles.rightSeparator]} />
-        </View>
-      )}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: TRANSACTIONS.transactionItem.paddingVertical,
-    paddingHorizontal: TRANSACTIONS.transactionItem.paddingHorizontal,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    marginBottom: 8,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: COLORS.white,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.xl,
+    ...SHADOWS.sm,
   },
   iconContainer: {
-    width: TRANSACTIONS.transactionItem.iconSize,
-    height: TRANSACTIONS.transactionItem.iconSize,
-    borderRadius: TRANSACTIONS.transactionItem.iconBorderRadius,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: SPACING.md,
   },
   detailsContainer: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start', // Align to top
   },
   leftDetails: {
     flex: 1,
+    marginRight: SPACING.sm,
   },
   rightDetails: {
     alignItems: 'flex-end',
+    justifyContent: 'center',
+    height: 44, // Align vertically with icon
   },
   categoryName: {
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.medium,
-    color: COLORS.textSecondary,
-    fontFamily: 'Poppins',
+    fontWeight: '600',
+    color: COLORS.textPrimary,
     marginBottom: 2,
   },
-  subcategory: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontWeight: TYPOGRAPHY.weights.light,
-    color: COLORS.textSecondary,
-    fontFamily: 'Poppins',
-    marginBottom: 2,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  dateTime: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontWeight: TYPOGRAPHY.weights.semibold,
-    color: COLORS.accent,
-    fontFamily: 'Poppins',
+  dateText: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: COLORS.textTertiary,
+    fontWeight: '500',
+  },
+  noteText: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: COLORS.textSecondary,
+    marginTop: 2,
   },
   amount: {
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.medium,
-    fontFamily: 'Poppins',
-  },
-  separatorContainer: {
-    flexDirection: 'row',
-    marginTop: TRANSACTIONS.transactionItem.paddingVertical,
-    paddingHorizontal: 16,
-  },
-  separator: {
-    height: TRANSACTIONS.transactionItem.separatorWidth,
-    backgroundColor: TRANSACTIONS.transactionItem.separatorColor,
-  },
-  leftSeparator: {
-    width: 93,
-  },
-  rightSeparator: {
-    flex: 1,
-    marginLeft: 16,
+    fontWeight: '700',
   },
 });

@@ -1,12 +1,19 @@
 import React, { useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { Stack, router, usePathname } from 'expo-router';
+import { useAuth } from '@clerk/clerk-expo';
 import { useAuthStore } from '@/stores/authStore';
 import BottomNavigation from '@/components/navigation/BottomNavigation';
 import { COLORS } from '@/constants/design';
 
 export default function AppLayout(): React.ReactElement {
-  const { isAuthenticated, isLoading, hydrated, initialize } = useAuthStore();
+  const { isSignedIn, isLoaded } = useAuth();
+  const { isLoading: isStoreLoading, hydrated, initialize } = useAuthStore();
+  
+  const isAuthenticated = !!isSignedIn;
+  // Consider app loading if Clerk isn't loaded or if store is loading
+  const isLoading = !isLoaded || isStoreLoading;
+  
   const pathname = usePathname();
 
   useEffect(() => {

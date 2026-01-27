@@ -11,6 +11,11 @@ export const colors = {
   background: '#ffffff',   // Pure white for clean backgrounds
   surface: '#f9fafb',     // Very subtle gray for secondary surfaces
   border: '#e5e7eb',      // Light gray for subtle borders
+
+  // Brand Colors
+  brandPrimary: '#006D4F', // Deep Green
+  brandSecondary: '#FFFFFF', // White
+  brandAccent: '#10B981', // Lighter Green
   
   // Text Colors (High Contrast)
   text: {

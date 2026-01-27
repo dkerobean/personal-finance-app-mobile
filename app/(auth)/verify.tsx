@@ -6,11 +6,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  SafeAreaView,
+  Image,
+  StatusBar,
+  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSignUp } from '@clerk/clerk-expo';
 import { authService } from '@/services/authService';
-import { useAuthStore } from '@/stores/authStore';
 
 export default function VerifyScreen(): React.ReactElement {
   const params = useLocalSearchParams<{ email: string; firstName?: string }>();
@@ -21,10 +24,10 @@ export default function VerifyScreen(): React.ReactElement {
   const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const setSession = useAuthStore((state) => state.setSession);
-  const setUser = useAuthStore((state) => state.setUser);
+  const { isLoaded, signUp, setActive } = useSignUp();
 
   const handleVerifyCode = async (): Promise<void> => {
+    if (!isLoaded) return;
     if (!verificationCode.trim()) {
       setError('Please enter the verification code');
       return;
@@ -34,29 +37,48 @@ export default function VerifyScreen(): React.ReactElement {
     setError(null);
 
     try {
-      const result = await authService.verifyOtp(email, verificationCode);
+      const completeSignUp = await signUp.attemptEmailAddressVerification({
+        code: verificationCode,
+      });
 
-      if (!result.success) {
-        setError(result.message || 'Verification failed');
-        Alert.alert('Error', result.message || 'Verification failed');
-        return;
-      }
-
-      // Email verified successfully, redirect to login
-      Alert.alert(
-        'Success', 
-        'Email verified successfully! You can now sign in.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              router.replace('/(auth)/login');
+      if (completeSignUp.status === 'complete') {
+        const userId = completeSignUp.createdUserId;
+        if (userId) {
+            // Sync to MongoDB
+             try {
+                // We might need full name here, but we only have params.
+                // Assuming register.tsx passed them or we sync later.
+                // For now, sync with available info.
+                await authService.syncUserToDatabase(
+                   userId, 
+                   email,
+                   firstName
+               );
+           } catch (syncError) {
+                console.error("Failed to sync user to MongoDB:", syncError);
+           }
+        }
+        
+        await setActive({ session: completeSignUp.createdSessionId });
+        
+        Alert.alert(
+          'Success', 
+          'Email verified successfully! Welcome to Kippo.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                router.replace('/(app)');
+              },
             },
-          },
-        ]
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Verification failed';
+          ]
+        );
+      } else {
+        setError('Verification incomplete. Please check your email.');
+      }
+    } catch (err: any) {
+       console.error(JSON.stringify(err, null, 2));
+      const message = err.errors?.[0]?.message || 'Verification failed';
       setError(message);
       Alert.alert('Error', message);
     } finally {
@@ -65,20 +87,15 @@ export default function VerifyScreen(): React.ReactElement {
   };
 
   const handleResendCode = async (): Promise<void> => {
+    if (!isLoaded) return;
     setIsResending(true);
     setError(null);
 
     try {
-      const result = await authService.resendVerificationCode(email, firstName);
-      
-      if (result.success) {
-        Alert.alert('Success', result.message || 'Verification code resent to your email!');
-      } else {
-        setError(result.message || 'Failed to resend verification code');
-        Alert.alert('Error', result.message || 'Failed to resend verification code');
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to resend verification code';
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      Alert.alert('Success', 'Verification code resent to your email!');
+    } catch (err: any) {
+      const message = err.errors?.[0]?.message || 'Failed to resend code';
       setError(message);
       Alert.alert('Error', message);
     } finally {
@@ -87,83 +104,125 @@ export default function VerifyScreen(): React.ReactElement {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Verify Your Email</Text>
-          <Text style={styles.subtitle}>
-            We've sent a verification code to {email}. Enter it below to complete your registration.
-          </Text>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Verification Code</Text>
-            <TextInput
-              style={[styles.input, error ? styles.inputError : null]}
-              placeholder="Enter verification code"
-              value={verificationCode}
-              onChangeText={(text) => {
-                setVerificationCode(text);
-                setError(null);
-              }}
-              keyboardType="numeric"
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={6}
-            />
-            {error && <Text style={styles.errorText}>{error}</Text>}
-          </View>
-
-          <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled]}
-            onPress={handleVerifyCode}
-            disabled={isLoading}
-          >
-            <Text style={styles.buttonText}>
-              {isLoading ? 'Verifying...' : 'Verify Email'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.resendButton, isResending && styles.buttonDisabled]} 
-            onPress={handleResendCode}
-            disabled={isResending}
-          >
-            <Text style={styles.resendButtonText}>
-              {isResending ? 'Resending...' : "Didn't receive the code? Resend"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#006D4F" />
+      
+      <View style={styles.topSection}>
+        <Image 
+          source={require('../../assets/kippo-logo-white.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <Text style={styles.title}>Verification</Text>
       </View>
-    </SafeAreaView>
+
+      <View style={styles.bottomSection}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            <View style={styles.header}>
+            <Text style={styles.headerTitle}>Verify Your Email</Text>
+            <Text style={styles.subtitle}>
+                We've sent a verification code to {email}. Enter it below to complete your registration.
+            </Text>
+            </View>
+
+            <View style={styles.form}>
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Verification Code</Text>
+                <View style={[styles.inputContainer, error ? styles.inputError : null]}>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="123456"
+                        placeholderTextColor="#94A3B8"
+                        value={verificationCode}
+                        onChangeText={(text) => {
+                            setVerificationCode(text);
+                            setError(null);
+                        }}
+                        keyboardType="numeric"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        maxLength={6}
+                    />
+                </View>
+                {error && <Text style={styles.errorText}>{error}</Text>}
+            </View>
+
+            <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleVerifyCode}
+                disabled={isLoading}
+            >
+                {isLoading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                    <Text style={styles.buttonText}>Verify Email</Text>
+                )}
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+                style={[styles.resendButton, isResending && styles.buttonDisabled]} 
+                onPress={handleResendCode}
+                disabled={isResending}
+            >
+                <Text style={styles.resendButtonText}>
+                {isResending ? 'Resending...' : "Didn't receive the code? Resend"}
+                </Text>
+            </TouchableOpacity>
+            </View>
+        </ScrollView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#006D4F',
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 48,
+  topSection: {
+    height: '30%',
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  logo: {
+    width: 60,
+    height: 60,
+    marginBottom: 16,
+    tintColor: '#FFFFFF',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    overflow: 'hidden',
+  },
+  scrollContent: {
+    padding: 32,
+    paddingTop: 48,
+    flexGrow: 1,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
   },
-  title: {
-    fontSize: 28,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#0F172A',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -174,45 +233,65 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#374151',
+    fontSize: 14,
+    color: '#64748B',
     marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    alignSelf: 'flex-start',
+    zIndex: 1,
+    marginLeft: 12,
+    paddingHorizontal: 4,
+    position: 'absolute',
+    top: -10,
+  },
+  inputContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    height: 56,
+    justifyContent: 'center',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: '#ffffff',
+    fontSize: 20,
+    color: '#0F172A',
+    height: '100%',
     textAlign: 'center',
-    letterSpacing: 4,
+    letterSpacing: 8,
+    fontWeight: '600',
   },
   inputError: {
-    borderColor: '#ef4444',
+    borderColor: '#EF4444',
   },
   errorText: {
-    color: '#ef4444',
+    color: '#EF4444',
     fontSize: 14,
     marginTop: 4,
     textAlign: 'center',
   },
   button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    backgroundColor: '#006D4F',
+    borderRadius: 30,
+    height: 56,
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    shadowColor: '#006D4F',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 18,
     fontWeight: '600',
   },
   resendButton: {
@@ -220,8 +299,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   resendButtonText: {
-    color: '#2563eb',
+    color: '#006D4F',
     fontSize: 14,
-    textDecorationLine: 'underline',
+    fontWeight: '600',
   },
 });

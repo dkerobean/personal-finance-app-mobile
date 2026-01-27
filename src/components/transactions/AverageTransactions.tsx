@@ -51,7 +51,7 @@ export default function AverageTransactions({
 
   const formatAmount = (amount: number, type: 'income' | 'expense'): string => {
     const sign = type === 'income' ? '' : '';
-    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `₵${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   return (
