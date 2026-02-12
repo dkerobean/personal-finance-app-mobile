@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 import type { Liability, LiabilityCategory } from '@/types/models';
+import { formatCurrency } from '@/lib/formatters';
 
 interface LiabilityItemProps {
   liability: Liability;
@@ -25,6 +26,21 @@ const CATEGORY_COLORS: Record<LiabilityCategory, string> = {
   mortgages: '#991B1B', // Darker red
   business_debt: '#7F1D1D', // Very dark red
   other: '#6B7280', // Gray
+};
+
+const extractDescriptionMeta = (rawDescription?: string): { clean: string; customType: string } => {
+  if (!rawDescription) {
+    return { clean: '', customType: '' };
+  }
+
+  const customType = rawDescription.match(/\[\[custom_type:(.*?)\]\]/i)?.[1]?.trim() || '';
+  const clean = rawDescription
+    .replace(/\[\[custom_category:.*?\]\]/gi, '')
+    .replace(/\[\[custom_type:.*?\]\]/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return { clean, customType };
 };
 
 export default function LiabilityItem({
@@ -51,13 +67,6 @@ export default function LiabilityItem({
     });
   };
 
-  const formatAmount = (amount: number): string => {
-    return `$${amount.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`;
-  };
-
   const getLiabilityTypeDisplayName = (type: string): string => {
     return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
@@ -69,7 +78,7 @@ export default function LiabilityItem({
 
   const getMonthlyPaymentDisplay = (monthlyPayment?: number): string | null => {
     if (!monthlyPayment) return null;
-    return `${formatAmount(monthlyPayment)}/mo`;
+    return `${formatCurrency(monthlyPayment)}/mo`;
   };
 
   const handlePress = () => {
@@ -80,6 +89,10 @@ export default function LiabilityItem({
     event.stopPropagation();
     onDeletePress?.(liability);
   };
+  const descriptionMeta = extractDescriptionMeta(liability.description);
+  const typeLabel =
+    liability.custom_type?.trim() || descriptionMeta.customType || getLiabilityTypeDisplayName(liability.liability_type);
+  const categoryLabel = liability.custom_category?.trim();
 
   return (
     <TouchableOpacity onPress={handlePress} style={styles.container} activeOpacity={0.7}>
@@ -105,8 +118,14 @@ export default function LiabilityItem({
           </Text>
           <View style={styles.detailsRow}>
             <Text style={styles.liabilityType}>
-              {getLiabilityTypeDisplayName(liability.liability_type)}
+              {typeLabel}
             </Text>
+            {categoryLabel ? (
+              <>
+                <Text style={styles.dot}>•</Text>
+                <Text style={styles.liabilityType}>{categoryLabel}</Text>
+              </>
+            ) : null}
             <Text style={styles.dot}>•</Text>
             <Text style={styles.lastUpdated}>
               Updated {formatDate(liability.updated_at)}
@@ -132,17 +151,17 @@ export default function LiabilityItem({
             )}
           </View>
 
-          {liability.description && (
+          {descriptionMeta.clean ? (
             <Text style={styles.description} numberOfLines={1}>
-              {liability.description}
+              {descriptionMeta.clean}
             </Text>
-          )}
+          ) : null}
         </View>
 
         {/* Right Section - Balance and Actions */}
         <View style={styles.rightSection}>
           <Text style={styles.currentBalance}>
-            {formatAmount(liability.current_balance)}
+            {formatCurrency(liability.current_balance)}
           </Text>
           
           {/* Show balance change if original balance exists */}
@@ -154,7 +173,7 @@ export default function LiabilityItem({
                 : styles.balanceIncrease
             ]}>
               {liability.current_balance < liability.original_balance ? '' : '+'}
-              {formatAmount(liability.current_balance - liability.original_balance)}
+              {formatCurrency(liability.current_balance - liability.original_balance)}
             </Text>
           )}
           

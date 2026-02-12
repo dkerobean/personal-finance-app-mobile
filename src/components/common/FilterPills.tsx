@@ -1,11 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, LayoutChangeEvent } from 'react-native';
-import Animated, { 
-  useAnimatedStyle, 
-  withSpring, 
-  useSharedValue,
-  withTiming
-} from 'react-native-reanimated';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '@/constants/design';
 
 export type FilterType = 'all' | 'income' | 'expense';
@@ -22,9 +16,6 @@ const FILTER_OPTIONS: { label: string; value: FilterType }[] = [
 ];
 
 export default function FilterPills({ activeFilter, onFilterChange }: FilterPillsProps) {
-  // We'll use a simple background highlight approach for now
-  // For a more complex "sliding" pill, we'd need to measure layouts
-  
   return (
     <View style={styles.container}>
       <View style={styles.pillContainer}>
@@ -61,33 +52,34 @@ export default function FilterPills({ activeFilter, onFilterChange }: FilterPill
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   pillContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.backgroundCard,
-    borderRadius: BORDER_RADIUS.xl,
+    backgroundColor: COLORS.gray50,
+    borderRadius: 999,
     padding: 4,
-    ...SHADOWS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
   },
   filterOption: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: 999,
   },
   activeFilterOption: {
     backgroundColor: COLORS.primary,
     ...SHADOWS.sm,
   },
   activeIncome: {
-    backgroundColor: COLORS.success,
+    backgroundColor: '#0F9D77',
   },
   activeExpense: {
-    backgroundColor: COLORS.error,
+    backgroundColor: '#EF4444',
   },
   filterText: {
-    fontSize: TYPOGRAPHY.sizes.sm,
+    fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: '600',
     color: COLORS.textSecondary,
   },

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
+import { COLORS, TYPOGRAPHY, SPACING, SHADOWS } from '@/constants/design';
 import type { Transaction } from '@/types/models';
 import TransactionItem from './TransactionItem';
 
@@ -41,8 +41,12 @@ export default function NotableTransactions({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Notable Transactions</Text>
-      <View style={styles.transactionsList}>
+      <View style={styles.sectionCard}>
+        <View style={styles.headerRow}>
+          <Text style={styles.sectionTitle}>Notable Transactions</Text>
+          <Text style={styles.sectionBadge}>Largest movements</Text>
+        </View>
+
         {notableTransactions.map((transaction, index) => (
           <TransactionItem
             key={`notable-${transaction.id}`}
@@ -58,19 +62,34 @@ export default function NotableTransactions({
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: SPACING.xl,
+    marginTop: SPACING.xs,
+    paddingHorizontal: SPACING.lg,
+  },
+  sectionCard: {
+    borderRadius: 24,
+    backgroundColor: COLORS.white,
+    paddingVertical: SPACING.lg,
+    ...SHADOWS.md,
+  },
+  headerRow: {
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: TYPOGRAPHY.weights.semibold,
     color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-    paddingHorizontal: 37,
-    marginBottom: SPACING.md,
   },
-  transactionsList: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    marginHorizontal: 20,
+  sectionBadge: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: COLORS.primary,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: 99,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 6,
   },
 });

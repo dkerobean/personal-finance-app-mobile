@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS, BUDGET } from '@/constants/design';
 import GradientHeader from '@/components/budgets/GradientHeader';
-
 import NetWorthHistoryChart from '@/components/networth/history/NetWorthHistoryChart';
 import TimePeriodSelector from '@/components/networth/history/TimePeriodSelector';
 import TrendInsights from '@/components/networth/history/TrendInsights';
 import HistoryBreakdownTable from '@/components/networth/history/HistoryBreakdownTable';
 import ExportOptions from '@/components/networth/history/ExportOptions';
 import { useNetWorthStore } from '@/stores/netWorthStore';
+import { useUser } from '@clerk/clerk-expo';
+import { formatCurrency } from '@/lib/formatters';
 
 export interface TimePeriodConfig {
   label: string;
@@ -44,66 +46,52 @@ export default function NetWorthHistoryScreen(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getHistoricalData = useNetWorthStore(state => state.getHistoricalData);
-  const loadHistoricalData = useNetWorthStore(state => state.loadHistoricalData);
+  const getHistoricalData = useNetWorthStore((state) => state.getHistoricalData);
+  const loadHistoricalData = useNetWorthStore((state) => state.loadHistoricalData);
+  const { user } = useUser();
 
-  useEffect(() => {
-    loadData();
-  }, [selectedPeriod]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    if (!user?.id) return;
     setIsLoading(true);
     setError(null);
 
     try {
-      await loadHistoricalData();
+      await loadHistoricalData(
+        user.id,
+        selectedPeriod.months > 0 ? selectedPeriod.months : undefined
+      );
       const data = await getHistoricalData(selectedPeriod.months);
-      
-      if (data.length === 0) {
-        const mockData = generateMockHistoricalData(selectedPeriod.months);
-        setHistoricalData(mockData);
-      } else {
-        setHistoricalData(data);
-      }
-    } catch (err) {
-      setError('Failed to load historical data');
-      console.error('Error loading historical data:', err);
+      setHistoricalData(data);
+    } catch (_err) {
+      setHistoricalData([]);
+      setError('Failed to load historical data from your account.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id, loadHistoricalData, getHistoricalData, selectedPeriod.months]);
 
-  const generateMockHistoricalData = (months: number): HistoricalDataPoint[] => {
-    const data: HistoricalDataPoint[] = [];
-    const now = new Date();
-    const actualMonths = months === -1 ? 24 : months;
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-    for (let i = actualMonths - 1; i >= 0; i--) {
-      const date = new Date(now);
-      date.setMonth(date.getMonth() - i);
-      
-      const baseNetWorth = 50000;
-      const trend = (actualMonths - i) * 1500;
-      const volatility = (Math.random() - 0.5) * 8000;
-      const netWorth = baseNetWorth + trend + volatility;
-      
-      const assets = netWorth + 35000 + (Math.random() * 5000);
-      const liabilities = assets - netWorth;
-      
-      data.push({
-        date: date.toISOString().split('T')[0],
-        netWorth: Math.max(0, netWorth),
-        totalAssets: Math.max(0, assets),
-        totalLiabilities: Math.max(0, liabilities),
-        connectedValue: assets * 0.6,
-        manualAssets: assets * 0.4,
-        manualLiabilities: liabilities * 0.8,
-        monthOverMonth: i === actualMonths - 1 ? 0 : ((netWorth - (data[data.length - 1]?.netWorth || netWorth)) / (data[data.length - 1]?.netWorth || netWorth)) * 100,
-      });
+  const summary = useMemo(() => {
+    if (historicalData.length < 1) {
+      return {
+        current: 0,
+        start: 0,
+        absoluteChange: 0,
+        percentageChange: 0,
+      };
     }
 
-    return data;
-  };
+    const sorted = [...historicalData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const start = sorted[0].netWorth;
+    const current = sorted[sorted.length - 1].netWorth;
+    const absoluteChange = current - start;
+    const percentageChange = start !== 0 ? (absoluteChange / Math.abs(start)) * 100 : 0;
+
+    return { current, start, absoluteChange, percentageChange };
+  }, [historicalData]);
 
   const handlePeriodChange = (period: TimePeriodConfig) => {
     setSelectedPeriod(period);
@@ -113,9 +101,7 @@ export default function NetWorthHistoryScreen(): React.ReactElement {
     await loadData();
   };
 
-  const handleExport = async (format: 'csv' | 'image' | 'share') => {
-    console.log(`Exporting data in ${format} format`);
-  };
+  const handleExport = async (_format: 'csv' | 'image' | 'share') => {};
 
   const handleGoBack = () => {
     if (router.canGoBack()) {
@@ -125,33 +111,50 @@ export default function NetWorthHistoryScreen(): React.ReactElement {
     }
   };
 
+  const changePositive = summary.absoluteChange >= 0;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
-      
-      <ScrollView 
+
+      <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl 
-            refreshing={isLoading} 
+          <RefreshControl
+            refreshing={isLoading}
             onRefresh={handleRefresh}
             tintColor={COLORS.white}
             colors={[COLORS.white]}
           />
         }
       >
-        {/* Gradient Header */}
         <GradientHeader
           title="Net Worth History"
+          subtitle="Your financial trend over time"
           onBackPress={handleGoBack}
-          onCalendarPress={() => {}}
-          onNotificationPress={() => {}}
+          showCalendar={false}
+          showNotification={false}
         />
 
-        {/* Content Card */}
         <View style={styles.contentCard}>
-          {/* Time Period Selector */}
+          <LinearGradient
+            colors={['#033327', COLORS.primary, COLORS.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.summaryCard}
+          >
+            <Text style={styles.summaryLabel}>Latest Net Worth</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(summary.current)}</Text>
+            <Text style={styles.summaryMeta}>
+              {changePositive ? '+' : '-'}
+              {formatCurrency(Math.abs(summary.absoluteChange))} ({changePositive ? '+' : ''}
+              {summary.percentageChange.toFixed(1)}%) in {selectedPeriod.label}
+            </Text>
+          </LinearGradient>
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
           <View style={styles.sectionContainer}>
             <TimePeriodSelector
               periods={TIME_PERIODS}
@@ -161,29 +164,21 @@ export default function NetWorthHistoryScreen(): React.ReactElement {
             />
           </View>
 
-          {/* Historical Chart */}
           <View style={styles.sectionContainer}>
             <NetWorthHistoryChart
               data={historicalData}
               timePeriod={selectedPeriod}
               height={300}
-              interactive={true}
-              showBreakdown={true}
+              interactive
+              showBreakdown
               isLoading={isLoading}
-              onDataPointSelect={(point) => console.log('Selected:', point)}
             />
           </View>
 
-          {/* Trend Insights */}
           <View style={styles.sectionContainer}>
-            <TrendInsights
-              data={historicalData}
-              timePeriod={selectedPeriod}
-              isLoading={isLoading}
-            />
+            <TrendInsights data={historicalData} timePeriod={selectedPeriod} isLoading={isLoading} />
           </View>
 
-          {/* Export Options */}
           <View style={styles.sectionContainer}>
             <ExportOptions
               onExport={handleExport}
@@ -193,13 +188,12 @@ export default function NetWorthHistoryScreen(): React.ReactElement {
             />
           </View>
 
-          {/* Historical Breakdown Table */}
           <View style={styles.sectionContainer}>
             <HistoryBreakdownTable
               data={historicalData}
               timePeriod={selectedPeriod}
               isLoading={isLoading}
-              showCategoryBreakdown={true}
+              showCategoryBreakdown
             />
           </View>
 
@@ -223,8 +217,42 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     marginTop: -20,
-    paddingTop: SPACING.xl,
+    paddingTop: SPACING.lg,
     flex: 1,
+  },
+  summaryCard: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
+    borderRadius: 24,
+    padding: SPACING.lg,
+    ...SHADOWS.lg,
+  },
+  summaryLabel: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  summaryValue: {
+    marginTop: SPACING.xs,
+    color: COLORS.white,
+    fontSize: 34,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    letterSpacing: -0.7,
+  },
+  summaryMeta: {
+    marginTop: SPACING.sm,
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+  },
+  errorText: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
+    color: COLORS.error,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.medium,
   },
   sectionContainer: {
     marginHorizontal: SPACING.lg,

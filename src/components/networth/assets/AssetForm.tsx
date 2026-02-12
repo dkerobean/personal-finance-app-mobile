@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,16 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 import type { Asset, AssetCategory, AssetType, CreateAssetRequest, UpdateAssetRequest } from '@/types/models';
-import { validateAsset } from '@/lib/validators';
+
+const CURRENCY_PREFIX = 'GH¢';
+const CUSTOM_CATEGORY_REGEX = /\[\[custom_category:(.*?)\]\]/i;
+const CUSTOM_TYPE_REGEX = /\[\[custom_type:(.*?)\]\]/i;
 
 interface AssetFormProps {
   initialData?: Asset;
@@ -32,12 +35,12 @@ const ASSET_CATEGORIES: { key: AssetCategory; label: string; types: AssetType[] 
   {
     key: 'investments',
     label: 'Investments',
-    types: ['stocks', 'bonds', 'mutual_funds', 'etf', 'cryptocurrency', 'retirement_account']
+    types: ['stocks', 'bonds', 'mutual_funds', 'etf', 'cryptocurrency', 'retirement_account', 'treasury_bill', 'pension_fund']
   },
   {
     key: 'cash',
     label: 'Cash & Savings',
-    types: ['savings', 'checking', 'money_market', 'cd', 'foreign_currency']
+    types: ['savings', 'checking', 'money_market', 'cd', 'foreign_currency', 'mobile_money_wallet', 'emergency_fund', 'fixed_deposit']
   },
   {
     key: 'vehicles',
@@ -61,6 +64,29 @@ const ASSET_CATEGORIES: { key: AssetCategory; label: string; types: AssetType[] 
   },
 ];
 
+const sanitizeCustomValue = (value: string): string => value.replace(/\]\]/g, '').trim();
+
+const extractCustomMeta = (rawDescription?: string): {
+  cleanDescription: string;
+  customCategory: string;
+  customType: string;
+} => {
+  if (!rawDescription) {
+    return { cleanDescription: '', customCategory: '', customType: '' };
+  }
+
+  const customCategory = rawDescription.match(CUSTOM_CATEGORY_REGEX)?.[1]?.trim() || '';
+  const customType = rawDescription.match(CUSTOM_TYPE_REGEX)?.[1]?.trim() || '';
+
+  const cleanDescription = rawDescription
+    .replace(/\[\[custom_category:.*?\]\]/gi, '')
+    .replace(/\[\[custom_type:.*?\]\]/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return { cleanDescription, customCategory, customType };
+};
+
 export default function AssetForm({
   initialData,
   onSave,
@@ -69,6 +95,7 @@ export default function AssetForm({
   isLoading = false,
   mode,
 }: AssetFormProps): React.ReactElement {
+  const parsedMeta = useMemo(() => extractCustomMeta(initialData?.description), [initialData?.description]);
   
   // Form state
   const [name, setName] = useState(initialData?.name || '');
@@ -79,7 +106,9 @@ export default function AssetForm({
   const [purchaseDate, setPurchaseDate] = useState<Date | null>(
     initialData?.purchase_date ? new Date(initialData.purchase_date) : null
   );
-  const [description, setDescription] = useState(initialData?.description || '');
+  const [description, setDescription] = useState(parsedMeta.cleanDescription);
+  const [customCategoryName, setCustomCategoryName] = useState(initialData?.custom_category || parsedMeta.customCategory);
+  const [customAssetTypeName, setCustomAssetTypeName] = useState(initialData?.custom_type || parsedMeta.customType);
   
   // UI state
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -106,11 +135,16 @@ export default function AssetForm({
       etf: 'ETF',
       cryptocurrency: 'Cryptocurrency',
       retirement_account: 'Retirement Account',
+      treasury_bill: 'Treasury Bill',
+      pension_fund: 'Pension Fund',
       savings: 'Savings Account',
       checking: 'Checking Account',
       money_market: 'Money Market',
       cd: 'Certificate of Deposit',
       foreign_currency: 'Foreign Currency',
+      mobile_money_wallet: 'Mobile Money Wallet',
+      emergency_fund: 'Emergency Fund',
+      fixed_deposit: 'Fixed Deposit',
       car: 'Car',
       motorcycle: 'Motorcycle',
       boat: 'Boat',
@@ -128,18 +162,15 @@ export default function AssetForm({
   };
 
   const validateForm = (): boolean => {
-    const validation = validateAsset({
-      name: name.trim(),
-      category,
-      asset_type: assetType,
-      current_value: parseFloat(currentValue) || 0,
-      original_value: originalValue ? parseFloat(originalValue) : undefined,
-      purchase_date: purchaseDate?.toISOString().split('T')[0],
-      description: description.trim() || undefined,
-    });
+    const newErrors: Record<string, string> = {};
 
-    if (!validation.isValid) {
-      setErrors(validation.errors);
+    if (!name.trim()) newErrors.name = 'Name is required';
+    if (!currentValue) newErrors.current_value = 'Value is required';
+    if (category === 'other' && !customCategoryName.trim()) newErrors.custom_category = 'Add your custom category';
+    if (assetType === 'other' && !customAssetTypeName.trim()) newErrors.custom_type = 'Add your custom asset type';
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return false;
     }
 
@@ -156,6 +187,8 @@ export default function AssetForm({
       name: name.trim(),
       category,
       asset_type: assetType,
+      custom_category: category === 'other' ? sanitizeCustomValue(customCategoryName) : undefined,
+      custom_type: assetType === 'other' ? sanitizeCustomValue(customAssetTypeName) : undefined,
       current_value: parseFloat(currentValue),
       original_value: originalValue ? parseFloat(originalValue) : undefined,
       purchase_date: purchaseDate?.toISOString().split('T')[0],
@@ -175,6 +208,14 @@ export default function AssetForm({
   };
 
   const currentCategory = ASSET_CATEGORIES.find(cat => cat.key === category);
+  const categoryDisplayLabel =
+    category === 'other' && customCategoryName.trim()
+      ? `Other • ${customCategoryName.trim()}`
+      : currentCategory?.label || 'Select Category';
+  const assetTypeDisplayLabel =
+    assetType === 'other' && customAssetTypeName.trim()
+      ? `Other • ${customAssetTypeName.trim()}`
+      : getAssetTypeLabel(assetType);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -200,11 +241,25 @@ export default function AssetForm({
           onPress={() => setShowCategoryPicker(true)}
           disabled={isLoading}
         >
-          <Text style={styles.pickerText}>{currentCategory?.label || 'Select Category'}</Text>
+          <Text style={styles.pickerText}>{categoryDisplayLabel}</Text>
           <MaterialIcons name="arrow-drop-down" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
         {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
       </View>
+      {category === 'other' && (
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Custom Category*</Text>
+          <TextInput
+            style={[styles.input, errors.custom_category && styles.inputError]}
+            value={customCategoryName}
+            onChangeText={setCustomCategoryName}
+            placeholder="e.g., Farm Assets"
+            placeholderTextColor={COLORS.textTertiary}
+            editable={!isLoading}
+          />
+          {errors.custom_category && <Text style={styles.errorText}>{errors.custom_category}</Text>}
+        </View>
+      )}
 
       {/* Asset Type Selection */}
       <View style={styles.fieldContainer}>
@@ -214,17 +269,31 @@ export default function AssetForm({
           onPress={() => setShowTypePicker(true)}
           disabled={isLoading}
         >
-          <Text style={styles.pickerText}>{getAssetTypeLabel(assetType)}</Text>
+          <Text style={styles.pickerText}>{assetTypeDisplayLabel}</Text>
           <MaterialIcons name="arrow-drop-down" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
         {errors.asset_type && <Text style={styles.errorText}>{errors.asset_type}</Text>}
       </View>
+      {assetType === 'other' && (
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Custom Asset Type*</Text>
+          <TextInput
+            style={[styles.input, errors.custom_type && styles.inputError]}
+            value={customAssetTypeName}
+            onChangeText={setCustomAssetTypeName}
+            placeholder="e.g., Kiosk Inventory"
+            placeholderTextColor={COLORS.textTertiary}
+            editable={!isLoading}
+          />
+          {errors.custom_type && <Text style={styles.errorText}>{errors.custom_type}</Text>}
+        </View>
+      )}
 
       {/* Current Value */}
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Current Value*</Text>
         <View style={styles.currencyInputContainer}>
-          <Text style={styles.currencySymbol}>$</Text>
+          <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
           <TextInput
             style={[styles.currencyInput, errors.current_value && styles.inputError]}
             value={currentValue}
@@ -242,7 +311,7 @@ export default function AssetForm({
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Original Value (Optional)</Text>
         <View style={styles.currencyInputContainer}>
-          <Text style={styles.currencySymbol}>$</Text>
+          <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
           <TextInput
             style={[styles.currencyInput, errors.original_value && styles.inputError]}
             value={originalValue}
@@ -410,18 +479,41 @@ export default function AssetForm({
 
       {/* Date Picker */}
       {showDatePicker && (
-        <DateTimePicker
-          value={purchaseDate || new Date()}
-          mode="date"
-          display="default"
-          maximumDate={new Date()}
-          onChange={(event, selectedDate) => {
-            setShowDatePicker(false);
-            if (selectedDate) {
-              setPurchaseDate(selectedDate);
-            }
-          }}
-        />
+        Platform.OS === 'ios' ? (
+          <View style={styles.modal}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Date</Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={{ color: COLORS.primary, fontSize: TYPOGRAPHY.sizes.md, fontWeight: '600' }}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={purchaseDate || new Date()}
+                mode="date"
+                display="spinner"
+                maximumDate={new Date()}
+                onChange={(event, selectedDate) => {
+                   if (selectedDate) setPurchaseDate(selectedDate);
+                }}
+                style={{ height: 200 }}
+              />
+            </View>
+          </View>
+        ) : (
+          <DateTimePicker
+            value={purchaseDate || new Date()}
+            mode="date"
+            display="default"
+            maximumDate={new Date()}
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(false);
+              if (selectedDate) {
+                setPurchaseDate(selectedDate);
+              }
+            }}
+          />
+        )
       )}
     </ScrollView>
   );
@@ -497,6 +589,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontFamily: 'Poppins',
     paddingLeft: SPACING.md,
+    minWidth: 34,
   },
   currencyInput: {
     flex: 1,

@@ -11,10 +11,16 @@ const liabilitySchema = new mongoose.Schema(
     },
     liabilityType: { 
       type: String, 
-      enum: ['mortgage', 'auto_loan', 'personal_loan', 'credit_card', 'student_loan', 'business_loan', 'other'],
+      enum: [
+        'mortgage', 'auto_loan', 'personal_loan', 'credit_card', 'student_loan', 'business_loan',
+        'overdraft', 'payday_loan', 'buy_now_pay_later', 'medical_debt', 'tax_debt', 'utility_bill',
+        'other'
+      ],
       required: true 
     },
     currentBalance: { type: Number, required: true, min: 0 },
+    customCategory: { type: String, trim: true, maxlength: 80 },
+    customType: { type: String, trim: true, maxlength: 80 },
     originalBalance: Number,
     interestRate: { type: Number, min: 0, max: 100 },
     monthlyPayment: { type: Number, min: 0 },

@@ -13,8 +13,8 @@ const assetSchema = new mongoose.Schema(
       type: String, 
       enum: [
         'real_estate', 'land', 'rental_property',
-        'stocks', 'bonds', 'mutual_funds', 'etf', 'cryptocurrency', 'retirement_account',
-        'savings', 'checking', 'money_market', 'cd', 'foreign_currency',
+        'stocks', 'bonds', 'mutual_funds', 'etf', 'cryptocurrency', 'retirement_account', 'treasury_bill', 'pension_fund',
+        'savings', 'checking', 'money_market', 'cd', 'foreign_currency', 'mobile_money_wallet', 'emergency_fund', 'fixed_deposit',
         'car', 'motorcycle', 'boat', 'rv',
         'jewelry', 'art', 'collectibles', 'electronics',
         'business_equity', 'business_assets', 'intellectual_property',
@@ -23,6 +23,8 @@ const assetSchema = new mongoose.Schema(
       required: true 
     },
     currentValue: { type: Number, required: true, min: 0 },
+    customCategory: { type: String, trim: true, maxlength: 80 },
+    customType: { type: String, trim: true, maxlength: 80 },
     originalValue: Number,
     purchaseDate: Date,
     description: String,

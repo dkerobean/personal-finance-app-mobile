@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,15 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 import type { Liability, LiabilityCategory, LiabilityType, CreateLiabilityRequest, UpdateLiabilityRequest } from '@/types/models';
-import { validateLiability } from '@/lib/validators';
+
+const CURRENCY_PREFIX = 'GH¢';
+const CUSTOM_CATEGORY_REGEX = /\[\[custom_category:(.*?)\]\]/i;
+const CUSTOM_TYPE_REGEX = /\[\[custom_type:(.*?)\]\]/i;
 
 interface LiabilityFormProps {
   initialData?: Liability;
@@ -27,12 +29,12 @@ const LIABILITY_CATEGORIES: { key: LiabilityCategory; label: string; types: Liab
   {
     key: 'loans',
     label: 'Loans',
-    types: ['personal_loan', 'auto_loan', 'student_loan']
+    types: ['personal_loan', 'auto_loan', 'student_loan', 'payday_loan']
   },
   {
     key: 'credit_cards',
     label: 'Credit Cards',
-    types: ['credit_card']
+    types: ['credit_card', 'buy_now_pay_later', 'overdraft']
   },
   {
     key: 'mortgages',
@@ -47,9 +49,32 @@ const LIABILITY_CATEGORIES: { key: LiabilityCategory; label: string; types: Liab
   {
     key: 'other',
     label: 'Other Debts',
-    types: ['other']
+    types: ['other', 'medical_debt', 'tax_debt', 'utility_bill']
   },
 ];
+
+const sanitizeCustomValue = (value: string): string => value.replace(/\]\]/g, '').trim();
+
+const extractCustomMeta = (rawDescription?: string): {
+  cleanDescription: string;
+  customCategory: string;
+  customType: string;
+} => {
+  if (!rawDescription) {
+    return { cleanDescription: '', customCategory: '', customType: '' };
+  }
+
+  const customCategory = rawDescription.match(CUSTOM_CATEGORY_REGEX)?.[1]?.trim() || '';
+  const customType = rawDescription.match(CUSTOM_TYPE_REGEX)?.[1]?.trim() || '';
+
+  const cleanDescription = rawDescription
+    .replace(/\[\[custom_category:.*?\]\]/gi, '')
+    .replace(/\[\[custom_type:.*?\]\]/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return { cleanDescription, customCategory, customType };
+};
 
 export default function LiabilityForm({
   initialData,
@@ -59,6 +84,7 @@ export default function LiabilityForm({
   isLoading = false,
   mode,
 }: LiabilityFormProps): React.ReactElement {
+  const parsedMeta = useMemo(() => extractCustomMeta(initialData?.description), [initialData?.description]);
   
   // Form state
   const [name, setName] = useState(initialData?.name || '');
@@ -71,7 +97,9 @@ export default function LiabilityForm({
   const [dueDate, setDueDate] = useState<Date | null>(
     initialData?.due_date ? new Date(initialData.due_date) : null
   );
-  const [description, setDescription] = useState(initialData?.description || '');
+  const [description, setDescription] = useState(parsedMeta.cleanDescription);
+  const [customCategoryName, setCustomCategoryName] = useState(initialData?.custom_category || parsedMeta.customCategory);
+  const [customLiabilityTypeName, setCustomLiabilityTypeName] = useState(initialData?.custom_type || parsedMeta.customType);
   
   // UI state
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -95,31 +123,44 @@ export default function LiabilityForm({
       credit_card: 'Credit Card',
       student_loan: 'Student Loan',
       business_loan: 'Business Loan',
+      overdraft: 'Overdraft',
+      payday_loan: 'Payday Loan',
+      buy_now_pay_later: 'Buy Now Pay Later',
+      medical_debt: 'Medical Debt',
+      tax_debt: 'Tax Debt',
+      utility_bill: 'Utility Bill',
       other: 'Other',
     };
     return labels[type] || type;
   };
 
   const validateForm = (): boolean => {
-    const validation = validateLiability({
-      name: name.trim(),
-      category,
-      liability_type: liabilityType,
-      current_balance: parseFloat(currentBalance) || 0,
-      original_balance: originalBalance ? parseFloat(originalBalance) : undefined,
-      interest_rate: interestRate ? parseFloat(interestRate) : undefined,
-      monthly_payment: monthlyPayment ? parseFloat(monthlyPayment) : undefined,
-      due_date: dueDate?.toISOString().split('T')[0],
-      description: description.trim() || undefined,
-    });
+    const newErrors: Record<string, string> = {};
 
-    if (!validation.isValid) {
-      // Convert error array to error object
-      const errorObj: Record<string, string> = {};
-      validation.errors.forEach((error, index) => {
-        errorObj[`error_${index}`] = error;
-      });
-      setErrors(errorObj);
+    if (!name.trim()) {
+      newErrors.name = 'Debt name is required';
+    }
+    if (!currentBalance) {
+      newErrors.current_balance = 'Current balance is required';
+    }
+    if (currentBalance && (isNaN(parseFloat(currentBalance)) || parseFloat(currentBalance) < 0)) {
+      newErrors.current_balance = 'Enter a valid amount';
+    }
+    if (interestRate && (isNaN(parseFloat(interestRate)) || parseFloat(interestRate) < 0 || parseFloat(interestRate) > 100)) {
+      newErrors.interest_rate = 'Interest rate must be between 0 and 100';
+    }
+    if (monthlyPayment && (isNaN(parseFloat(monthlyPayment)) || parseFloat(monthlyPayment) < 0)) {
+      newErrors.monthly_payment = 'Enter a valid monthly payment';
+    }
+    if (category === 'other' && !customCategoryName.trim()) {
+      newErrors.custom_category = 'Add your custom category';
+    }
+    if (liabilityType === 'other' && !customLiabilityTypeName.trim()) {
+      newErrors.custom_type = 'Add your custom debt type';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return false;
     }
 
@@ -136,6 +177,8 @@ export default function LiabilityForm({
       name: name.trim(),
       category,
       liability_type: liabilityType,
+      custom_category: category === 'other' ? sanitizeCustomValue(customCategoryName) : undefined,
+      custom_type: liabilityType === 'other' ? sanitizeCustomValue(customLiabilityTypeName) : undefined,
       current_balance: parseFloat(currentBalance),
       original_balance: originalBalance ? parseFloat(originalBalance) : undefined,
       interest_rate: interestRate ? parseFloat(interestRate) : undefined,
@@ -166,6 +209,14 @@ export default function LiabilityForm({
   };
 
   const currentCategory = LIABILITY_CATEGORIES.find(cat => cat.key === category);
+  const categoryDisplayLabel =
+    category === 'other' && customCategoryName.trim()
+      ? `Other • ${customCategoryName.trim()}`
+      : currentCategory?.label || 'Select Category';
+  const liabilityTypeDisplayLabel =
+    liabilityType === 'other' && customLiabilityTypeName.trim()
+      ? `Other • ${customLiabilityTypeName.trim()}`
+      : getLiabilityTypeLabel(liabilityType);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -191,11 +242,25 @@ export default function LiabilityForm({
           onPress={() => setShowCategoryPicker(true)}
           disabled={isLoading}
         >
-          <Text style={styles.pickerText}>{currentCategory?.label || 'Select Category'}</Text>
+          <Text style={styles.pickerText}>{categoryDisplayLabel}</Text>
           <MaterialIcons name="arrow-drop-down" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
         {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
       </View>
+      {category === 'other' && (
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Custom Category*</Text>
+          <TextInput
+            style={[styles.input, errors.custom_category && styles.inputError]}
+            value={customCategoryName}
+            onChangeText={setCustomCategoryName}
+            placeholder="e.g., Family Debt"
+            placeholderTextColor={COLORS.textTertiary}
+            editable={!isLoading}
+          />
+          {errors.custom_category && <Text style={styles.errorText}>{errors.custom_category}</Text>}
+        </View>
+      )}
 
       {/* Liability Type Selection */}
       <View style={styles.fieldContainer}>
@@ -205,17 +270,31 @@ export default function LiabilityForm({
           onPress={() => setShowTypePicker(true)}
           disabled={isLoading}
         >
-          <Text style={styles.pickerText}>{getLiabilityTypeLabel(liabilityType)}</Text>
+          <Text style={styles.pickerText}>{liabilityTypeDisplayLabel}</Text>
           <MaterialIcons name="arrow-drop-down" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
         {errors.liability_type && <Text style={styles.errorText}>{errors.liability_type}</Text>}
       </View>
+      {liabilityType === 'other' && (
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Custom Debt Type*</Text>
+          <TextInput
+            style={[styles.input, errors.custom_type && styles.inputError]}
+            value={customLiabilityTypeName}
+            onChangeText={setCustomLiabilityTypeName}
+            placeholder="e.g., Informal Loan"
+            placeholderTextColor={COLORS.textTertiary}
+            editable={!isLoading}
+          />
+          {errors.custom_type && <Text style={styles.errorText}>{errors.custom_type}</Text>}
+        </View>
+      )}
 
       {/* Current Balance */}
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Current Balance*</Text>
         <View style={styles.currencyInputContainer}>
-          <Text style={styles.currencySymbol}>$</Text>
+          <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
           <TextInput
             style={[styles.currencyInput, errors.current_balance && styles.inputError]}
             value={currentBalance}
@@ -233,7 +312,7 @@ export default function LiabilityForm({
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Original Balance (Optional)</Text>
         <View style={styles.currencyInputContainer}>
-          <Text style={styles.currencySymbol}>$</Text>
+          <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
           <TextInput
             style={[styles.currencyInput, errors.original_balance && styles.inputError]}
             value={originalBalance}
@@ -270,7 +349,7 @@ export default function LiabilityForm({
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Monthly Payment (Optional)</Text>
         <View style={styles.currencyInputContainer}>
-          <Text style={styles.currencySymbol}>$</Text>
+          <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
           <TextInput
             style={[styles.currencyInput, errors.monthly_payment && styles.inputError]}
             value={monthlyPayment}
@@ -527,6 +606,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontFamily: 'Poppins',
     paddingLeft: SPACING.md,
+    minWidth: 34,
   },
   percentageSymbol: {
     fontSize: TYPOGRAPHY.sizes.md,

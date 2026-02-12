@@ -40,7 +40,7 @@ export class NetWorthSnapshotService {
       }
 
       // Calculate current net worth
-      const netWorthData = await NetWorthService.calculateNetWorth();
+      const netWorthData = await NetWorthService.calculateNetWorth(userId);
       
       // Create snapshot
       const snapshotDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format

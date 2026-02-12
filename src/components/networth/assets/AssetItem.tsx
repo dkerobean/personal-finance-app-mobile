@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 import type { Asset, AssetCategory } from '@/types/models';
+import { formatCurrency } from '@/lib/formatters';
 
 interface AssetItemProps {
   asset: Asset;
@@ -31,6 +32,21 @@ const CATEGORY_COLORS: Record<AssetCategory, string> = {
   other: '#6B7280', // Gray
 };
 
+const extractDescriptionMeta = (rawDescription?: string): { clean: string; customType: string } => {
+  if (!rawDescription) {
+    return { clean: '', customType: '' };
+  }
+
+  const customType = rawDescription.match(/\[\[custom_type:(.*?)\]\]/i)?.[1]?.trim() || '';
+  const clean = rawDescription
+    .replace(/\[\[custom_category:.*?\]\]/gi, '')
+    .replace(/\[\[custom_type:.*?\]\]/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return { clean, customType };
+};
+
 export default function AssetItem({
   asset,
   onPress,
@@ -55,13 +71,6 @@ export default function AssetItem({
     });
   };
 
-  const formatAmount = (amount: number): string => {
-    return `$${amount.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`;
-  };
-
   const getAssetTypeDisplayName = (type: string): string => {
     return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
@@ -74,6 +83,9 @@ export default function AssetItem({
     event.stopPropagation();
     onDeletePress?.(asset);
   };
+  const descriptionMeta = extractDescriptionMeta(asset.description);
+  const typeLabel = asset.custom_type?.trim() || descriptionMeta.customType || getAssetTypeDisplayName(asset.asset_type);
+  const categoryLabel = asset.custom_category?.trim();
 
   return (
     <TouchableOpacity onPress={handlePress} style={styles.container} activeOpacity={0.7}>
@@ -99,24 +111,30 @@ export default function AssetItem({
           </Text>
           <View style={styles.detailsRow}>
             <Text style={styles.assetType}>
-              {getAssetTypeDisplayName(asset.asset_type)}
+              {typeLabel}
             </Text>
+            {categoryLabel ? (
+              <>
+                <Text style={styles.dot}>•</Text>
+                <Text style={styles.assetType}>{categoryLabel}</Text>
+              </>
+            ) : null}
             <Text style={styles.dot}>•</Text>
             <Text style={styles.lastUpdated}>
               Updated {formatDate(asset.updated_at)}
             </Text>
           </View>
-          {asset.description && (
+          {descriptionMeta.clean ? (
             <Text style={styles.description} numberOfLines={1}>
-              {asset.description}
+              {descriptionMeta.clean}
             </Text>
-          )}
+          ) : null}
         </View>
 
         {/* Right Section - Value and Actions */}
         <View style={styles.rightSection}>
           <Text style={styles.currentValue}>
-            {formatAmount(asset.current_value)}
+            {formatCurrency(asset.current_value)}
           </Text>
           {asset.original_value && asset.original_value !== asset.current_value && (
             <Text style={[
@@ -126,7 +144,7 @@ export default function AssetItem({
                 : styles.valueLoss
             ]}>
               {asset.current_value > asset.original_value ? '+' : ''}
-              {formatAmount(asset.current_value - asset.original_value)}
+              {formatCurrency(asset.current_value - asset.original_value)}
             </Text>
           )}
           

@@ -30,6 +30,9 @@ export interface NetWorthSnapshot {
   netWorth: number;
   assets: number;
   liabilities: number;
+  connectedAssets: number;
+  manualAssets: number;
+  manualLiabilities: number;
   timestamp: string;
 }
 
@@ -85,25 +88,45 @@ interface NetWorthActions {
   resetCalculationError: () => void;
   
   // Historical Data Actions
-  loadHistoricalData: () => Promise<void>;
+  loadHistoricalData: (userId?: string, months?: number) => Promise<void>;
   addNetWorthSnapshot: (snapshot: NetWorthSnapshot) => void;
   getHistoricalData: (months?: number) => Promise<HistoricalDataPoint[]>;
   getHistoricalDataByDateRange: (startDate: Date, endDate: Date) => Promise<HistoricalDataPoint[]>;
   
   // Asset actions
-  loadAssets: () => Promise<void>;
-  createAsset: (assetData: CreateAssetRequest) => Promise<boolean>;
-  updateAsset: (id: string, updates: UpdateAssetRequest) => Promise<boolean>;
-  deleteAsset: (id: string) => Promise<boolean>;
+  loadAssets: (userId: string) => Promise<void>;
+  createAsset: (userId: string, assetData: CreateAssetRequest) => Promise<boolean>;
+  updateAsset: (userId: string, id: string, updates: UpdateAssetRequest) => Promise<boolean>;
+  deleteAsset: (userId: string, id: string) => Promise<boolean>;
   
-  // Future liability actions (placeholders)
-  loadLiabilities: () => Promise<void>;
-  createLiability: (liabilityData: CreateLiabilityRequest) => Promise<boolean>;
-  updateLiability: (id: string, updates: UpdateLiabilityRequest) => Promise<boolean>;
-  deleteLiability: (id: string) => Promise<boolean>;
+  // Liability actions
+  loadLiabilities: (userId: string) => Promise<void>;
+  createLiability: (userId: string, liabilityData: CreateLiabilityRequest) => Promise<boolean>;
+  updateLiability: (userId: string, id: string, updates: UpdateLiabilityRequest) => Promise<boolean>;
+  deleteLiability: (userId: string, id: string) => Promise<boolean>;
 }
 
 interface NetWorthStore extends NetWorthState, NetWorthActions {}
+
+const toHistoricalDataPoint = (
+  snapshot: NetWorthSnapshot,
+  index: number,
+  snapshots: NetWorthSnapshot[]
+): HistoricalDataPoint => {
+  const previousSnapshot = index > 0 ? snapshots[index - 1] : null;
+  const monthOverMonth = previousSnapshot ? snapshot.netWorth - previousSnapshot.netWorth : 0;
+
+  return {
+    date: snapshot.timestamp,
+    netWorth: snapshot.netWorth,
+    totalAssets: snapshot.assets,
+    totalLiabilities: snapshot.liabilities,
+    connectedValue: snapshot.connectedAssets,
+    manualAssets: snapshot.manualAssets,
+    manualLiabilities: snapshot.manualLiabilities,
+    monthOverMonth,
+  };
+};
 
 export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
   // Initial state
@@ -215,38 +238,57 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
   resetCalculationError: () => set({ calculationError: null }),
 
   // Historical Data Actions
-  loadHistoricalData: async () => {
+  loadHistoricalData: async (userId?: string, months?: number) => {
     set({ isLoadingHistory: true });
 
     try {
-      // Generate mock historical data for now - in production this would come from an API
-      const mockHistoricalData: NetWorthSnapshot[] = [];
-      const currentDate = new Date();
-      
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date(currentDate);
-        date.setMonth(date.getMonth() - i);
-        
-        const monthName = date.toLocaleDateString('en-US', { month: 'short' });
-        const baseNetWorth = 50000;
-        const randomVariation = (Math.random() - 0.5) * 20000;
-        const trendGrowth = i * 2000;
-        
-        const assets = baseNetWorth + trendGrowth + randomVariation + 30000;
-        const liabilities = 30000 - (i * 500) + (Math.random() - 0.5) * 5000;
-        
-        mockHistoricalData.push({
-          month: monthName,
-          netWorth: assets - liabilities,
-          assets: Math.max(0, assets),
-          liabilities: Math.max(0, liabilities),
-          timestamp: date.toISOString(),
-        });
+      if (!userId) {
+        set({ historicalData: [] });
+        return;
       }
 
-      set({ historicalData: mockHistoricalData });
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
+      const query = new URLSearchParams({ userId });
+      if (typeof months === 'number' && months > 0) {
+        query.set('months', String(months));
+      }
+
+      const response = await fetch(`${API_URL}/networth/history?${query.toString()}`);
+      
+      if (!response.ok) {
+        console.log('[NetWorthStore] No historical data available yet');
+        set({ historicalData: [] });
+        return;
+      }
+
+      const json = await response.json();
+      const snapshots = json.data || [];
+      
+      // Convert API response to NetWorthSnapshot format
+      const historicalData: NetWorthSnapshot[] = snapshots.map((snapshot: any) => {
+        const date = new Date(snapshot.createdAt);
+        const assetBreakdown = snapshot.breakdown?.assets || {};
+        const connectedAssets = Number(assetBreakdown.accounts ?? 0);
+        const totalAssets = Number(snapshot.totalAssets || 0);
+        const manualAssets = Number(assetBreakdown.manual ?? totalAssets - connectedAssets);
+        const totalLiabilities = Number(snapshot.totalLiabilities || 0);
+
+        return {
+          month: date.toLocaleDateString('en-US', { month: 'short' }),
+          netWorth: Number(snapshot.netWorth || 0),
+          assets: totalAssets,
+          liabilities: totalLiabilities,
+          connectedAssets,
+          manualAssets: Math.max(0, manualAssets),
+          manualLiabilities: totalLiabilities,
+          timestamp: snapshot.createdAt,
+        };
+      });
+
+      set({ historicalData });
     } catch (error) {
       console.error('Error loading historical data:', error);
+      set({ historicalData: [] });
     } finally {
       set({ isLoadingHistory: false });
     }
@@ -269,23 +311,7 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
     const { historicalData } = get();
     
     // Convert NetWorthSnapshot to HistoricalDataPoint format
-    const convertedData: HistoricalDataPoint[] = historicalData.map((snapshot, index, array) => {
-      const previousSnapshot = index > 0 ? array[index - 1] : null;
-      const monthOverMonth = previousSnapshot 
-        ? snapshot.netWorth - previousSnapshot.netWorth 
-        : 0;
-      
-      return {
-        date: snapshot.timestamp,
-        netWorth: snapshot.netWorth,
-        totalAssets: snapshot.assets,
-        totalLiabilities: snapshot.liabilities,
-        connectedValue: snapshot.assets * 0.6, // Assume 60% connected
-        manualAssets: snapshot.assets * 0.4,   // Assume 40% manual
-        manualLiabilities: snapshot.liabilities, // Assume all manual for now
-        monthOverMonth,
-      };
-    });
+    const convertedData: HistoricalDataPoint[] = historicalData.map(toHistoricalDataPoint);
 
     // Filter by months if specified
     if (months && months !== -1) {
@@ -304,23 +330,7 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
     const { historicalData } = get();
     
     // Convert NetWorthSnapshot to HistoricalDataPoint format
-    const convertedData: HistoricalDataPoint[] = historicalData.map((snapshot, index, array) => {
-      const previousSnapshot = index > 0 ? array[index - 1] : null;
-      const monthOverMonth = previousSnapshot 
-        ? snapshot.netWorth - previousSnapshot.netWorth 
-        : 0;
-      
-      return {
-        date: snapshot.timestamp,
-        netWorth: snapshot.netWorth,
-        totalAssets: snapshot.assets,
-        totalLiabilities: snapshot.liabilities,
-        connectedValue: snapshot.assets * 0.6, // Assume 60% connected
-        manualAssets: snapshot.assets * 0.4,   // Assume 40% manual
-        manualLiabilities: snapshot.liabilities, // Assume all manual for now
-        monthOverMonth,
-      };
-    });
+    const convertedData: HistoricalDataPoint[] = historicalData.map(toHistoricalDataPoint);
 
     // Filter by date range
     return convertedData.filter(point => {
@@ -330,13 +340,13 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
   },
 
   // Asset actions
-  loadAssets: async () => {
+  loadAssets: async (userId: string) => {
     const { setError } = get();
     
     set({ isLoadingAssets: true, error: null });
 
     try {
-      const response = await assetsApi.list();
+      const response = await assetsApi.list(userId);
       
       if (response.error) {
         setError(response.error.message);
@@ -359,13 +369,13 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
     }
   },
 
-  createAsset: async (assetData) => {
+  createAsset: async (userId: string, assetData) => {
     const { setError, loadAssets } = get();
     
     set({ isLoading: true, error: null });
 
     try {
-      const response = await assetsApi.create(assetData);
+      const response = await assetsApi.create(userId, assetData);
       
       if (response.error) {
         setError(response.error.message);
@@ -380,7 +390,7 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
       }
 
       // Reload assets to ensure consistency
-      await loadAssets();
+      await loadAssets(userId);
       return true;
     } catch (error) {
       setError('Failed to create asset');
@@ -391,7 +401,7 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
     }
   },
 
-  updateAsset: async (id, updates) => {
+  updateAsset: async (userId: string, id, updates) => {
     const { setError, loadAssets } = get();
     
     set({ isLoading: true, error: null });
@@ -406,30 +416,30 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
       );
       set({ assets: optimisticAssets });
 
-      const response = await assetsApi.update(id, updates);
+      const response = await assetsApi.update(userId, id, updates);
       
       if (response.error) {
         setError(response.error.message);
         // Revert optimistic update
-        await loadAssets();
+        await loadAssets(userId);
         return false;
       }
 
       // Reload assets to ensure consistency
-      await loadAssets();
+      await loadAssets(userId);
       return true;
     } catch (error) {
       setError('Failed to update asset');
       console.error('Error updating asset:', error);
       // Revert optimistic update
-      await loadAssets();
+      await loadAssets(userId);
       return false;
     } finally {
       set({ isLoading: false });
     }
   },
 
-  deleteAsset: async (id) => {
+  deleteAsset: async (userId: string, id) => {
     const { setError, loadAssets } = get();
     
     set({ isLoading: true, error: null });
@@ -440,12 +450,12 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
       const optimisticAssets = assets.filter(asset => asset.id !== id);
       set({ assets: optimisticAssets });
 
-      const response = await assetsApi.delete(id);
+      const response = await assetsApi.delete(userId, id);
       
       if (response.error) {
         setError(response.error.message);
         // Revert optimistic update
-        await loadAssets();
+        await loadAssets(userId);
         return false;
       }
 
@@ -455,7 +465,7 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
       setError('Failed to delete asset');
       console.error('Error deleting asset:', error);
       // Revert optimistic update
-      await loadAssets();
+      await loadAssets(userId);
       return false;
     } finally {
       set({ isLoading: false });
@@ -463,13 +473,13 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
   },
 
   // Liability actions
-  loadLiabilities: async () => {
+  loadLiabilities: async (userId: string) => {
     const { setError } = get();
     
     set({ isLoadingLiabilities: true, error: null });
 
     try {
-      const response = await liabilitiesApi.list();
+      const response = await liabilitiesApi.list(userId);
       
       if (response.error) {
         setError(response.error.message);
@@ -492,13 +502,13 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
     }
   },
 
-  createLiability: async (liabilityData) => {
+  createLiability: async (userId: string, liabilityData) => {
     const { setError, loadLiabilities } = get();
     
     set({ isLoading: true, error: null });
 
     try {
-      const response = await liabilitiesApi.create(liabilityData);
+      const response = await liabilitiesApi.create(userId, liabilityData);
       
       if (response.error) {
         setError(response.error.message);
@@ -513,7 +523,7 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
       }
 
       // Reload liabilities to ensure consistency
-      await loadLiabilities();
+      await loadLiabilities(userId);
       return true;
     } catch (error) {
       setError('Failed to create liability');
@@ -524,7 +534,7 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
     }
   },
 
-  updateLiability: async (id, updates) => {
+  updateLiability: async (userId: string, id, updates) => {
     const { setError, loadLiabilities } = get();
     
     set({ isLoading: true, error: null });
@@ -539,30 +549,30 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
       );
       set({ liabilities: optimisticLiabilities });
 
-      const response = await liabilitiesApi.update(id, updates);
+      const response = await liabilitiesApi.update(userId, id, updates);
       
       if (response.error) {
         setError(response.error.message);
         // Revert optimistic update
-        await loadLiabilities();
+        await loadLiabilities(userId);
         return false;
       }
 
       // Reload liabilities to ensure consistency
-      await loadLiabilities();
+      await loadLiabilities(userId);
       return true;
     } catch (error) {
       setError('Failed to update liability');
       console.error('Error updating liability:', error);
       // Revert optimistic update
-      await loadLiabilities();
+      await loadLiabilities(userId);
       return false;
     } finally {
       set({ isLoading: false });
     }
   },
 
-  deleteLiability: async (id) => {
+  deleteLiability: async (userId: string, id) => {
     const { setError, loadLiabilities } = get();
     
     set({ isLoading: true, error: null });
@@ -573,12 +583,12 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
       const optimisticLiabilities = liabilities.filter(liability => liability.id !== id);
       set({ liabilities: optimisticLiabilities });
 
-      const response = await liabilitiesApi.delete(id);
+      const response = await liabilitiesApi.delete(userId, id);
       
       if (response.error) {
         setError(response.error.message);
         // Revert optimistic update
-        await loadLiabilities();
+        await loadLiabilities(userId);
         return false;
       }
 
@@ -588,7 +598,7 @@ export const useNetWorthStore = create<NetWorthStore>((set, get) => ({
       setError('Failed to delete liability');
       console.error('Error deleting liability:', error);
       // Revert optimistic update
-      await loadLiabilities();
+      await loadLiabilities(userId);
       return false;
     } finally {
       set({ isLoading: false });

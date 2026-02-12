@@ -32,6 +32,8 @@ app.use('/api/assets', routes.assets);
 app.use('/api/liabilities', routes.liabilities);
 app.use('/api/mono', routes.mono);
 app.use('/api/reports', routes.reports);
+app.use('/api/networth', routes.networth);
+app.use('/api/notifications', routes.notifications);
 
 // Error handling
 app.use((err, req, res, next) => {

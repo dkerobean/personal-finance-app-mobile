@@ -45,7 +45,20 @@ router.get('/totals', async (req, res) => {
 // Create liability
 router.post('/', async (req, res) => {
   try {
-    const { userId, name, category, liabilityType, currentBalance, originalBalance, interestRate, monthlyPayment, dueDate, description } = req.body;
+    const {
+      userId,
+      name,
+      category,
+      liabilityType,
+      currentBalance,
+      customCategory,
+      customType,
+      originalBalance,
+      interestRate,
+      monthlyPayment,
+      dueDate,
+      description,
+    } = req.body;
 
     if (!userId || !name || !category || !liabilityType || currentBalance === undefined) {
       return res.status(400).json({ error: 'userId, name, category, liabilityType, currentBalance are required' });
@@ -53,6 +66,7 @@ router.post('/', async (req, res) => {
 
     const liability = await Liability.create({
       userId, name, category, liabilityType, currentBalance, originalBalance, interestRate, monthlyPayment,
+      customCategory, customType,
       dueDate: dueDate ? new Date(dueDate) : undefined,
       description, isActive: true,
     });

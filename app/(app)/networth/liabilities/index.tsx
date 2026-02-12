@@ -1,72 +1,78 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  TouchableOpacity, 
-  ActivityIndicator, 
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
   StyleSheet,
   Modal,
-  RefreshControl
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useUser } from '@clerk/clerk-expo';
 import { useNetWorthStore } from '@/stores/netWorthStore';
 import type { Liability, LiabilityCategory } from '@/types/models';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, BUDGET } from '@/constants/design';
 import { useAppToast } from '@/hooks/useAppToast';
 import GradientHeader from '@/components/budgets/GradientHeader';
 import { LiabilitiesList } from '@/components/networth/liabilities';
+import { formatCurrency } from '@/lib/formatters';
 
-const LIABILITY_CATEGORIES = [
+const LIABILITY_CATEGORIES: Array<{ key: LiabilityCategory | 'all'; label: string; icon: string }> = [
   { key: 'all', label: 'All Debts', icon: 'account-balance' },
   { key: 'loans', label: 'Loans', icon: 'account-balance' },
   { key: 'credit_cards', label: 'Credit Cards', icon: 'credit-card' },
   { key: 'mortgages', label: 'Mortgages', icon: 'home' },
-  { key: 'business_debt', label: 'Business Debt', icon: 'business' },
+  { key: 'business_debt', label: 'Business Debt', icon: 'business-center' },
   { key: 'other', label: 'Other Debts', icon: 'category' },
 ];
 
 export default function LiabilitiesScreen() {
   const router = useRouter();
   const toast = useAppToast();
+  const { user } = useUser();
   const [selectedCategory, setSelectedCategory] = useState<LiabilityCategory | 'all'>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
-  const {
-    liabilities,
-    isLoadingLiabilities,
-    error,
-    loadLiabilities,
-    deleteLiability,
-    clearError,
-  } = useNetWorthStore();
+
+  const { liabilities, isLoadingLiabilities, error, loadLiabilities, deleteLiability, clearError } = useNetWorthStore();
 
   useEffect(() => {
-    loadLiabilities();
-  }, []);
+    if (user?.id) {
+      loadLiabilities(user.id);
+    }
+  }, [user?.id, loadLiabilities]);
 
   const handleRefresh = async () => {
+    if (!user?.id) return;
     setRefreshing(true);
-    await loadLiabilities();
+    await loadLiabilities(user.id);
     setRefreshing(false);
   };
 
   const handleDeletePress = (liability: Liability) => {
-    toast.warning('Delete Liability', `Delete "${liability.name}"?`);
-    handleDeleteConfirm(liability.id);
-  };
-
-  const handleDeleteConfirm = async (liabilityId: string) => {
-    const success = await deleteLiability(liabilityId);
-    if (success) {
-      toast.success('Deleted', 'Liability removed successfully');
-    } else if (error) {
-      toast.error('Error', error);
-    }
+    Alert.alert('Delete Liability', `Are you sure you want to delete "${liability.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          if (!user?.id) return;
+          const success = await deleteLiability(user.id, liability.id);
+          if (success) {
+            toast.success('Deleted', 'Liability removed successfully');
+          } else {
+            toast.error('Error', 'Failed to delete liability');
+          }
+        },
+      },
+    ]);
   };
 
   const handleLiabilityPress = (liabilityId: string) => {
@@ -77,34 +83,18 @@ export default function LiabilitiesScreen() {
     router.push('/networth/liabilities/add');
   };
 
-  const handleGoBack = () => {
-    router.back();
-  };
-
-  const toggleSortOrder = () => {
-    setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return `₵${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-  };
-
   const summaryData = useMemo(() => {
     let filteredLiabilities = liabilities;
-    
     if (selectedCategory !== 'all') {
-      filteredLiabilities = liabilities.filter(liability => liability.category === selectedCategory);
+      filteredLiabilities = filteredLiabilities.filter((liability) => liability.category === selectedCategory);
     }
 
-    filteredLiabilities = [...filteredLiabilities].sort((a, b) => {
-      return sortOrder === 'desc' 
-        ? b.current_balance - a.current_balance 
-        : a.current_balance - b.current_balance;
-    });
+    filteredLiabilities = [...filteredLiabilities].sort((a, b) =>
+      sortOrder === 'desc' ? b.current_balance - a.current_balance : a.current_balance - b.current_balance
+    );
 
     const totalBalance = filteredLiabilities.reduce((sum, liability) => sum + liability.current_balance, 0);
     const liabilityCount = filteredLiabilities.length;
-
     return { filteredLiabilities, totalBalance, liabilityCount };
   }, [liabilities, selectedCategory, sortOrder]);
 
@@ -121,76 +111,74 @@ export default function LiabilitiesScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={handleRefresh}
-            tintColor={COLORS.white}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.white} />}
       >
-        {/* Gradient Header */}
         <GradientHeader
-          title="My Liabilities"
-          onBackPress={handleGoBack}
-          onCalendarPress={() => {}}
-          onNotificationPress={() => {}}
+          title="Liabilities"
+          subtitle="Track debts and obligations"
+          onBackPress={() => router.back()}
+          showCalendar={false}
+          showNotification={false}
         />
 
-        {/* Content Card */}
         <View style={styles.contentCard}>
-          {/* Summary Card */}
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryIconBg}>
-              <MaterialIcons name="trending-down" size={28} color={COLORS.error} />
-            </View>
+          <LinearGradient
+            colors={['#7F1D1D', '#B91C1C', '#EF4444']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.summaryCard}
+          >
             <Text style={styles.summaryLabel}>Total Liabilities</Text>
             <Text style={styles.summaryAmount}>{formatCurrency(summaryData.totalBalance)}</Text>
-            <Text style={styles.summaryCount}>{summaryData.liabilityCount} debts</Text>
-          </View>
+            <Text style={styles.summaryCount}>{summaryData.liabilityCount} debt entries</Text>
+          </LinearGradient>
 
-          {/* Filter Row */}
-          <View style={styles.filterRow}>
-            <TouchableOpacity 
-              style={styles.filterButton}
-              onPress={() => setShowCategoryFilter(true)}
-            >
-              <MaterialIcons name="filter-list" size={20} color={COLORS.error} />
+          <View style={styles.controlsRow}>
+            <TouchableOpacity style={styles.filterButton} onPress={() => setShowCategoryFilter(true)} activeOpacity={0.86}>
+              <MaterialIcons name="filter-list" size={18} color={COLORS.error} />
               <Text style={styles.filterButtonText}>
-                {selectedCategory === 'all' ? 'All Categories' : LIABILITY_CATEGORIES.find(c => c.key === selectedCategory)?.label}
+                {selectedCategory === 'all'
+                  ? 'All Categories'
+                  : LIABILITY_CATEGORIES.find((item) => item.key === selectedCategory)?.label}
               </Text>
-              <MaterialIcons name="keyboard-arrow-down" size={20} color={COLORS.error} />
+              <MaterialIcons name="keyboard-arrow-down" size={18} color={COLORS.error} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.sortButton} onPress={toggleSortOrder}>
-              <MaterialIcons 
-                name={sortOrder === 'desc' ? 'arrow-downward' : 'arrow-upward'} 
-                size={20} 
-                color={COLORS.textSecondary} 
-              />
+            <TouchableOpacity
+              style={styles.sortButton}
+              onPress={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+              activeOpacity={0.86}
+            >
+              <MaterialIcons name={sortOrder === 'desc' ? 'south' : 'north'} size={20} color={COLORS.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          {/* Liabilities List */}
+          {error ? (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity onPress={clearError}>
+                <MaterialIcons name="close" size={18} color={COLORS.error} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           {summaryData.filteredLiabilities.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconBg}>
-                <MaterialIcons name="money-off" size={48} color={COLORS.textTertiary} />
+                <MaterialIcons name="money-off" size={42} color={COLORS.textTertiary} />
               </View>
               <Text style={styles.emptyTitle}>No liabilities yet</Text>
-              <Text style={styles.emptyDescription}>
-                Add your first liability to track your debts
-              </Text>
-              <TouchableOpacity style={styles.addButton} onPress={handleCreatePress}>
+              <Text style={styles.emptyDescription}>Add your first liability to complete your net worth picture.</Text>
+              <TouchableOpacity style={styles.addButton} onPress={handleCreatePress} activeOpacity={0.86}>
                 <MaterialIcons name="add" size={20} color={COLORS.white} />
                 <Text style={styles.addButtonText}>Add Liability</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <LiabilitiesList 
+            <LiabilitiesList
               liabilities={summaryData.filteredLiabilities}
               onLiabilityPress={handleLiabilityPress}
               onDeletePress={handleDeletePress}
@@ -201,14 +189,12 @@ export default function LiabilitiesScreen() {
         </View>
       </ScrollView>
 
-      {/* FAB */}
       {summaryData.filteredLiabilities.length > 0 && (
-        <TouchableOpacity style={styles.fab} onPress={handleCreatePress}>
+        <TouchableOpacity style={styles.fab} onPress={handleCreatePress} activeOpacity={0.9}>
           <MaterialIcons name="add" size={28} color={COLORS.white} />
         </TouchableOpacity>
       )}
 
-      {/* Category Filter Modal */}
       <Modal
         visible={showCategoryFilter}
         transparent
@@ -219,46 +205,34 @@ export default function LiabilitiesScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filter by Category</Text>
-              <TouchableOpacity 
-                style={styles.modalCloseButton}
-                onPress={() => setShowCategoryFilter(false)}
-              >
-                <MaterialIcons name="close" size={24} color={COLORS.textSecondary} />
+              <TouchableOpacity onPress={() => setShowCategoryFilter(false)} style={styles.modalCloseButton}>
+                <MaterialIcons name="close" size={22} color={COLORS.textSecondary} />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.categoryList}>
               {LIABILITY_CATEGORIES.map((category) => (
                 <TouchableOpacity
                   key={category.key}
-                  style={[
-                    styles.categoryItem,
-                    selectedCategory === category.key && styles.categoryItemSelected
-                  ]}
+                  style={[styles.categoryItem, selectedCategory === category.key && styles.categoryItemSelected]}
                   onPress={() => {
-                    setSelectedCategory(category.key as LiabilityCategory | 'all');
+                    setSelectedCategory(category.key);
                     setShowCategoryFilter(false);
                   }}
                 >
-                  <View style={[
-                    styles.categoryIconBg,
-                    selectedCategory === category.key && styles.categoryIconBgSelected
-                  ]}>
-                    <MaterialIcons 
-                      name={category.icon as any} 
-                      size={24} 
-                      color={selectedCategory === category.key ? COLORS.white : COLORS.error} 
+                  <View style={[styles.categoryIconBg, selectedCategory === category.key && styles.categoryIconBgSelected]}>
+                    <MaterialIcons
+                      name={category.icon as any}
+                      size={22}
+                      color={selectedCategory === category.key ? COLORS.white : COLORS.error}
                     />
                   </View>
-                  <Text style={[
-                    styles.categoryText,
-                    selectedCategory === category.key && styles.categoryTextSelected
-                  ]}>
+                  <Text style={[styles.categoryText, selectedCategory === category.key && styles.categoryTextSelected]}>
                     {category.label}
                   </Text>
-                  {selectedCategory === category.key && (
-                    <MaterialIcons name="check-circle" size={24} color={COLORS.error} />
-                  )}
+                  {selectedCategory === category.key ? (
+                    <MaterialIcons name="check-circle" size={22} color={COLORS.error} />
+                  ) : null}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -292,46 +266,41 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     marginTop: -20,
-    paddingTop: SPACING.xl,
+    paddingTop: SPACING.lg,
     paddingHorizontal: SPACING.lg,
     minHeight: 600,
   },
   summaryCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.xl,
-    alignItems: 'center',
+    borderRadius: 24,
+    padding: SPACING.lg,
     marginBottom: SPACING.lg,
-    ...SHADOWS.md,
-  },
-  summaryIconBg: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FEE2E2',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.md,
+    ...SHADOWS.lg,
   },
   summaryLabel: {
+    color: COLORS.white,
     fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.textTertiary,
-    marginBottom: SPACING.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
   summaryAmount: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: COLORS.error,
-    marginBottom: SPACING.xs,
+    color: COLORS.white,
+    fontSize: 34,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    marginTop: SPACING.xs,
+    letterSpacing: -0.7,
   },
   summaryCount: {
+    color: COLORS.white,
+    marginTop: SPACING.sm,
     fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.textTertiary,
+    fontWeight: TYPOGRAPHY.weights.medium,
+    opacity: 0.95,
   },
-  filterRow: {
+  controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
     gap: SPACING.sm,
   },
   filterButton: {
@@ -339,26 +308,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: 16,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
     gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
     ...SHADOWS.sm,
   },
   filterButtonText: {
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.sm,
     color: COLORS.error,
-    fontWeight: '600',
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
   sortButton: {
     width: 44,
     height: 44,
+    borderRadius: 14,
     backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.sm,
+  },
+  errorBanner: {
+    marginBottom: SPACING.md,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  errorText: {
+    flex: 1,
+    color: COLORS.error,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.medium,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -376,7 +367,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: '600',
+    fontWeight: TYPOGRAPHY.weights.semibold,
     color: COLORS.textPrimary,
     marginBottom: SPACING.sm,
   },
@@ -385,6 +376,7 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
     textAlign: 'center',
     marginBottom: SPACING.xl,
+    fontWeight: TYPOGRAPHY.weights.medium,
   },
   addButton: {
     flexDirection: 'row',
@@ -392,19 +384,19 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.error,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: 999,
     gap: SPACING.sm,
     ...SHADOWS.md,
   },
   addButtonText: {
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: '600',
+    fontWeight: TYPOGRAPHY.weights.bold,
     color: COLORS.white,
   },
   fab: {
     position: 'absolute',
     right: SPACING.lg,
-    bottom: 120,
+    bottom: 118,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -415,27 +407,27 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: BORDER_RADIUS.xxl,
-    borderTopRightRadius: BORDER_RADIUS.xxl,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     maxHeight: '70%',
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     padding: SPACING.xl,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   modalTitle: {
     fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: '700',
     color: COLORS.textPrimary,
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
   modalCloseButton: {
     padding: SPACING.xs,
@@ -449,16 +441,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    marginBottom: SPACING.sm,
+    borderRadius: 14,
+    marginTop: SPACING.sm,
   },
   categoryItemSelected: {
     backgroundColor: '#FEE2E2',
   },
   categoryIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#FEE2E2',
     alignItems: 'center',
     justifyContent: 'center',
@@ -471,11 +463,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textPrimary,
-    fontWeight: '500',
+    fontWeight: TYPOGRAPHY.weights.medium,
   },
   categoryTextSelected: {
     color: COLORS.error,
-    fontWeight: '600',
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
   bottomSpacing: {
     height: 130,

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, RefreshControl, FlatList } from 'react-native';
 import type { Liability } from '@/types/models';
 import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 import LiabilityItem from './LiabilityItem';
+import { formatCurrency } from '@/lib/formatters';
 
 interface LiabilitiesListProps {
   liabilities: Liability[];
@@ -63,10 +64,7 @@ export default function LiabilitiesList({
   };
 
   const formatCategoryTotal = (total: number): string => {
-    return `$${total.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`;
+    return formatCurrency(total);
   };
 
   // Create flat list data with headers

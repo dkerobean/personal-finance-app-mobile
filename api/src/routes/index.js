@@ -7,6 +7,7 @@ const assets = require('./assets');
 const liabilities = require('./liabilities');
 const mono = require('./mono');
 const reports = require('./reports');
+const notifications = require('./notifications');
 
 module.exports = {
   users,
@@ -18,5 +19,7 @@ module.exports = {
   liabilities,
   mono,
   reports,
+  networth: require('./networth'),
+  notifications,
 };
 

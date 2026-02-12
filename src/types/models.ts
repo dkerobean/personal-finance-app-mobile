@@ -230,6 +230,7 @@ export interface MonthlyReport {
     category_name?: string;
     date: string;
   };
+  recentTransactions?: Transaction[]; // List of transactions for the month
 }
 
 export interface CategorySpending {
@@ -268,15 +269,18 @@ export interface ReportComparison {
 export type AssetCategory = 'property' | 'investments' | 'cash' | 'vehicles' | 'personal' | 'business' | 'other';
 export type AssetType = 
   | 'real_estate' | 'land' | 'rental_property'
-  | 'stocks' | 'bonds' | 'mutual_funds' | 'etf' | 'cryptocurrency' | 'retirement_account'
-  | 'savings' | 'checking' | 'money_market' | 'cd' | 'foreign_currency'
+  | 'stocks' | 'bonds' | 'mutual_funds' | 'etf' | 'cryptocurrency' | 'retirement_account' | 'treasury_bill' | 'pension_fund'
+  | 'savings' | 'checking' | 'money_market' | 'cd' | 'foreign_currency' | 'mobile_money_wallet' | 'emergency_fund' | 'fixed_deposit'
   | 'car' | 'motorcycle' | 'boat' | 'rv'
   | 'jewelry' | 'art' | 'collectibles' | 'electronics'
   | 'business_equity' | 'business_assets' | 'intellectual_property'
   | 'other';
 
 export type LiabilityCategory = 'loans' | 'credit_cards' | 'mortgages' | 'business_debt' | 'other';
-export type LiabilityType = 'mortgage' | 'auto_loan' | 'personal_loan' | 'credit_card' | 'student_loan' | 'business_loan' | 'other';
+export type LiabilityType =
+  | 'mortgage' | 'auto_loan' | 'personal_loan' | 'credit_card' | 'student_loan' | 'business_loan'
+  | 'overdraft' | 'payday_loan' | 'buy_now_pay_later' | 'medical_debt' | 'tax_debt' | 'utility_bill'
+  | 'other';
 
 export interface Asset {
   id: string;
@@ -284,6 +288,8 @@ export interface Asset {
   name: string;
   category: AssetCategory;
   asset_type: AssetType;
+  custom_category?: string;
+  custom_type?: string;
   current_value: number;
   original_value?: number;
   purchase_date?: string;
@@ -299,6 +305,8 @@ export interface Liability {
   name: string;
   category: LiabilityCategory;
   liability_type: LiabilityType;
+  custom_category?: string;
+  custom_type?: string;
   current_balance: number;
   original_balance?: number;
   interest_rate?: number;
@@ -348,6 +356,8 @@ export interface CreateAssetRequest {
   name: string;
   category: AssetCategory;
   asset_type: AssetType;
+  custom_category?: string;
+  custom_type?: string;
   current_value: number;
   original_value?: number;
   purchase_date?: string;
@@ -358,6 +368,8 @@ export interface UpdateAssetRequest {
   name?: string;
   category?: AssetCategory;
   asset_type?: AssetType;
+  custom_category?: string;
+  custom_type?: string;
   current_value?: number;
   original_value?: number;
   purchase_date?: string;
@@ -369,6 +381,8 @@ export interface CreateLiabilityRequest {
   name: string;
   category: LiabilityCategory;
   liability_type: LiabilityType;
+  custom_category?: string;
+  custom_type?: string;
   current_balance: number;
   original_balance?: number;
   interest_rate?: number;
@@ -381,6 +395,8 @@ export interface UpdateLiabilityRequest {
   name?: string;
   category?: LiabilityCategory;
   liability_type?: LiabilityType;
+  custom_category?: string;
+  custom_type?: string;
   current_balance?: number;
   original_balance?: number;
   interest_rate?: number;

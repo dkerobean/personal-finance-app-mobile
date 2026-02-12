@@ -1,75 +1,80 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  TouchableOpacity, 
-  ActivityIndicator, 
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
   StyleSheet,
   Modal,
-  RefreshControl
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useUser } from '@clerk/clerk-expo';
 import { useNetWorthStore } from '@/stores/netWorthStore';
 import type { Asset, AssetCategory } from '@/types/models';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, BUDGET } from '@/constants/design';
 import { useAppToast } from '@/hooks/useAppToast';
 import GradientHeader from '@/components/budgets/GradientHeader';
 import { AssetsList } from '@/components/networth/assets';
+import { formatCurrency } from '@/lib/formatters';
 
-const ASSET_CATEGORIES = [
+const ASSET_CATEGORIES: Array<{ key: AssetCategory | 'all'; label: string; icon: string }> = [
   { key: 'all', label: 'All Assets', icon: 'account-balance' },
   { key: 'property', label: 'Property', icon: 'home' },
   { key: 'investments', label: 'Investments', icon: 'trending-up' },
   { key: 'cash', label: 'Cash', icon: 'account-balance-wallet' },
   { key: 'vehicles', label: 'Vehicles', icon: 'directions-car' },
   { key: 'personal', label: 'Personal', icon: 'diamond' },
-  { key: 'business', label: 'Business', icon: 'business' },
+  { key: 'business', label: 'Business', icon: 'business-center' },
   { key: 'other', label: 'Other', icon: 'category' },
 ];
 
 export default function AssetsScreen() {
   const router = useRouter();
   const toast = useAppToast();
+  const { user } = useUser();
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory | 'all'>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
-  const {
-    assets,
-    isLoading,
-    error,
-    loadAssets,
-    deleteAsset,
-    clearError,
-  } = useNetWorthStore();
+
+  const { assets, isLoadingAssets, error, loadAssets, deleteAsset, clearError } = useNetWorthStore();
 
   useEffect(() => {
-    loadAssets();
-  }, []);
+    if (user?.id) {
+      loadAssets(user.id);
+    }
+  }, [user?.id, loadAssets]);
 
   const handleRefresh = async () => {
+    if (!user?.id) return;
     setRefreshing(true);
-    await loadAssets();
+    await loadAssets(user.id);
     setRefreshing(false);
   };
 
   const handleDeletePress = (asset: Asset) => {
-    // Use native alert for confirmation
-    toast.warning('Delete Asset', `Delete "${asset.name}"?`);
-    handleDeleteConfirm(asset.id);
-  };
-
-  const handleDeleteConfirm = async (assetId: string) => {
-    const success = await deleteAsset(assetId);
-    if (success) {
-      toast.success('Deleted', 'Asset removed successfully');
-    } else if (error) {
-      toast.error('Error', error);
-    }
+    Alert.alert('Delete Asset', `Are you sure you want to delete "${asset.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          if (!user?.id) return;
+          const success = await deleteAsset(user.id, asset.id);
+          if (success) {
+            toast.success('Deleted', 'Asset removed successfully');
+          } else {
+            toast.error('Error', 'Failed to delete asset');
+          }
+        },
+      },
+    ]);
   };
 
   const handleAssetPress = (assetId: string) => {
@@ -80,38 +85,22 @@ export default function AssetsScreen() {
     router.push('/networth/assets/add');
   };
 
-  const handleGoBack = () => {
-    router.back();
-  };
-
-  const toggleSortOrder = () => {
-    setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return `₵${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-  };
-
   const summaryData = useMemo(() => {
     let filteredAssets = assets;
-    
     if (selectedCategory !== 'all') {
-      filteredAssets = assets.filter(asset => asset.category === selectedCategory);
+      filteredAssets = filteredAssets.filter((asset) => asset.category === selectedCategory);
     }
 
-    filteredAssets = [...filteredAssets].sort((a, b) => {
-      return sortOrder === 'desc' 
-        ? b.current_value - a.current_value 
-        : a.current_value - b.current_value;
-    });
+    filteredAssets = [...filteredAssets].sort((a, b) =>
+      sortOrder === 'desc' ? b.current_value - a.current_value : a.current_value - b.current_value
+    );
 
     const totalValue = filteredAssets.reduce((sum, asset) => sum + asset.current_value, 0);
     const assetCount = filteredAssets.length;
-
     return { filteredAssets, totalValue, assetCount };
   }, [assets, selectedCategory, sortOrder]);
 
-  if (isLoading && assets.length === 0) {
+  if (isLoadingAssets && assets.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -124,94 +113,86 @@ export default function AssetsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={handleRefresh}
-            tintColor={COLORS.white}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.white} />}
       >
-        {/* Gradient Header */}
         <GradientHeader
-          title="My Assets"
-          onBackPress={handleGoBack}
-          onCalendarPress={() => {}}
-          onNotificationPress={() => {}}
+          title="Assets"
+          subtitle="Track everything you own"
+          onBackPress={() => router.back()}
+          showCalendar={false}
+          showNotification={false}
         />
 
-        {/* Content Card */}
         <View style={styles.contentCard}>
-          {/* Summary Card */}
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryIconBg}>
-              <MaterialIcons name="trending-up" size={28} color={COLORS.success} />
-            </View>
-            <Text style={styles.summaryLabel}>Total Assets</Text>
+          <LinearGradient
+            colors={['#033327', COLORS.primary, COLORS.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.summaryCard}
+          >
+            <Text style={styles.summaryLabel}>Total Asset Value</Text>
             <Text style={styles.summaryAmount}>{formatCurrency(summaryData.totalValue)}</Text>
-            <Text style={styles.summaryCount}>{summaryData.assetCount} assets</Text>
-          </View>
+            <Text style={styles.summaryCount}>{summaryData.assetCount} asset entries</Text>
+          </LinearGradient>
 
-          {/* Filter Row */}
-          <View style={styles.filterRow}>
-            <TouchableOpacity 
-              style={styles.filterButton}
-              onPress={() => setShowCategoryFilter(true)}
-            >
-              <MaterialIcons name="filter-list" size={20} color={COLORS.primary} />
+          <View style={styles.controlsRow}>
+            <TouchableOpacity style={styles.filterButton} onPress={() => setShowCategoryFilter(true)} activeOpacity={0.86}>
+              <MaterialIcons name="filter-list" size={18} color={COLORS.primary} />
               <Text style={styles.filterButtonText}>
-                {selectedCategory === 'all' ? 'All Categories' : ASSET_CATEGORIES.find(c => c.key === selectedCategory)?.label}
+                {selectedCategory === 'all'
+                  ? 'All Categories'
+                  : ASSET_CATEGORIES.find((item) => item.key === selectedCategory)?.label}
               </Text>
-              <MaterialIcons name="keyboard-arrow-down" size={20} color={COLORS.primary} />
+              <MaterialIcons name="keyboard-arrow-down" size={18} color={COLORS.primary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.sortButton} onPress={toggleSortOrder}>
-              <MaterialIcons 
-                name={sortOrder === 'desc' ? 'arrow-downward' : 'arrow-upward'} 
-                size={20} 
-                color={COLORS.textSecondary} 
-              />
+            <TouchableOpacity
+              style={styles.sortButton}
+              onPress={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+              activeOpacity={0.86}
+            >
+              <MaterialIcons name={sortOrder === 'desc' ? 'south' : 'north'} size={20} color={COLORS.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          {/* Assets List */}
+          {error ? (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity onPress={clearError}>
+                <MaterialIcons name="close" size={18} color={COLORS.error} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           {summaryData.filteredAssets.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconBg}>
-                <MaterialIcons name="account-balance" size={48} color={COLORS.textTertiary} />
+                <MaterialIcons name="account-balance-wallet" size={42} color={COLORS.textTertiary} />
               </View>
               <Text style={styles.emptyTitle}>No assets yet</Text>
-              <Text style={styles.emptyDescription}>
-                Add your first asset to start tracking your net worth
-              </Text>
-              <TouchableOpacity style={styles.addButton} onPress={handleCreatePress}>
+              <Text style={styles.emptyDescription}>Add your first asset to start tracking net worth.</Text>
+              <TouchableOpacity style={styles.addButton} onPress={handleCreatePress} activeOpacity={0.86}>
                 <MaterialIcons name="add" size={20} color={COLORS.white} />
                 <Text style={styles.addButtonText}>Add Asset</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <AssetsList 
-              assets={summaryData.filteredAssets}
-              onAssetPress={handleAssetPress}
-              onDeletePress={handleDeletePress}
-            />
+            <AssetsList assets={summaryData.filteredAssets} onAssetPress={handleAssetPress} onDeletePress={handleDeletePress} />
           )}
 
           <View style={styles.bottomSpacing} />
         </View>
       </ScrollView>
 
-      {/* FAB */}
       {summaryData.filteredAssets.length > 0 && (
-        <TouchableOpacity style={styles.fab} onPress={handleCreatePress}>
+        <TouchableOpacity style={styles.fab} onPress={handleCreatePress} activeOpacity={0.9}>
           <MaterialIcons name="add" size={28} color={COLORS.white} />
         </TouchableOpacity>
       )}
 
-      {/* Category Filter Modal */}
       <Modal
         visible={showCategoryFilter}
         transparent
@@ -222,46 +203,34 @@ export default function AssetsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filter by Category</Text>
-              <TouchableOpacity 
-                style={styles.modalCloseButton}
-                onPress={() => setShowCategoryFilter(false)}
-              >
-                <MaterialIcons name="close" size={24} color={COLORS.textSecondary} />
+              <TouchableOpacity onPress={() => setShowCategoryFilter(false)} style={styles.modalCloseButton}>
+                <MaterialIcons name="close" size={22} color={COLORS.textSecondary} />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView style={styles.categoryList}>
               {ASSET_CATEGORIES.map((category) => (
                 <TouchableOpacity
                   key={category.key}
-                  style={[
-                    styles.categoryItem,
-                    selectedCategory === category.key && styles.categoryItemSelected
-                  ]}
+                  style={[styles.categoryItem, selectedCategory === category.key && styles.categoryItemSelected]}
                   onPress={() => {
-                    setSelectedCategory(category.key as AssetCategory | 'all');
+                    setSelectedCategory(category.key);
                     setShowCategoryFilter(false);
                   }}
                 >
-                  <View style={[
-                    styles.categoryIconBg,
-                    selectedCategory === category.key && styles.categoryIconBgSelected
-                  ]}>
-                    <MaterialIcons 
-                      name={category.icon as any} 
-                      size={24} 
-                      color={selectedCategory === category.key ? COLORS.white : COLORS.primary} 
+                  <View style={[styles.categoryIconBg, selectedCategory === category.key && styles.categoryIconBgSelected]}>
+                    <MaterialIcons
+                      name={category.icon as any}
+                      size={22}
+                      color={selectedCategory === category.key ? COLORS.white : COLORS.primary}
                     />
                   </View>
-                  <Text style={[
-                    styles.categoryText,
-                    selectedCategory === category.key && styles.categoryTextSelected
-                  ]}>
+                  <Text style={[styles.categoryText, selectedCategory === category.key && styles.categoryTextSelected]}>
                     {category.label}
                   </Text>
-                  {selectedCategory === category.key && (
-                    <MaterialIcons name="check-circle" size={24} color={COLORS.primary} />
-                  )}
+                  {selectedCategory === category.key ? (
+                    <MaterialIcons name="check-circle" size={22} color={COLORS.primary} />
+                  ) : null}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -295,46 +264,41 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     marginTop: -20,
-    paddingTop: SPACING.xl,
+    paddingTop: SPACING.lg,
     paddingHorizontal: SPACING.lg,
     minHeight: 600,
   },
   summaryCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.xl,
-    alignItems: 'center',
+    borderRadius: 24,
+    padding: SPACING.lg,
     marginBottom: SPACING.lg,
-    ...SHADOWS.md,
-  },
-  summaryIconBg: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#DCFCE7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.md,
+    ...SHADOWS.lg,
   },
   summaryLabel: {
+    color: COLORS.white,
     fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.textTertiary,
-    marginBottom: SPACING.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
   summaryAmount: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: COLORS.success,
-    marginBottom: SPACING.xs,
+    color: COLORS.white,
+    fontSize: 34,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    marginTop: SPACING.xs,
+    letterSpacing: -0.7,
   },
   summaryCount: {
+    color: COLORS.white,
+    marginTop: SPACING.sm,
     fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.textTertiary,
+    fontWeight: TYPOGRAPHY.weights.medium,
+    opacity: 0.95,
   },
-  filterRow: {
+  controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
     gap: SPACING.sm,
   },
   filterButton: {
@@ -342,26 +306,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: 16,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
     gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
     ...SHADOWS.sm,
   },
   filterButtonText: {
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.sm,
     color: COLORS.primary,
-    fontWeight: '600',
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
   sortButton: {
     width: 44,
     height: 44,
+    borderRadius: 14,
     backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.sm,
+  },
+  errorBanner: {
+    marginBottom: SPACING.md,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  errorText: {
+    flex: 1,
+    color: COLORS.error,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.medium,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -379,7 +365,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: '600',
+    fontWeight: TYPOGRAPHY.weights.semibold,
     color: COLORS.textPrimary,
     marginBottom: SPACING.sm,
   },
@@ -388,6 +374,7 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
     textAlign: 'center',
     marginBottom: SPACING.xl,
+    fontWeight: TYPOGRAPHY.weights.medium,
   },
   addButton: {
     flexDirection: 'row',
@@ -395,19 +382,19 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: 999,
     gap: SPACING.sm,
     ...SHADOWS.md,
   },
   addButtonText: {
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: '600',
+    fontWeight: TYPOGRAPHY.weights.bold,
     color: COLORS.white,
   },
   fab: {
     position: 'absolute',
     right: SPACING.lg,
-    bottom: 120,
+    bottom: 118,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -418,27 +405,27 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: BORDER_RADIUS.xxl,
-    borderTopRightRadius: BORDER_RADIUS.xxl,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     maxHeight: '70%',
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     padding: SPACING.xl,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   modalTitle: {
     fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: '700',
     color: COLORS.textPrimary,
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
   modalCloseButton: {
     padding: SPACING.xs,
@@ -452,16 +439,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    marginBottom: SPACING.sm,
+    borderRadius: 14,
+    marginTop: SPACING.sm,
   },
   categoryItemSelected: {
     backgroundColor: COLORS.primaryLight,
   },
   categoryIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: COLORS.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
@@ -474,11 +461,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textPrimary,
-    fontWeight: '500',
+    fontWeight: TYPOGRAPHY.weights.medium,
   },
   categoryTextSelected: {
     color: COLORS.primary,
-    fontWeight: '600',
+    fontWeight: TYPOGRAPHY.weights.semibold,
   },
   bottomSpacing: {
     height: 130,

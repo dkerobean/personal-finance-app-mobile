@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Asset, Liability, NetWorthCalculation } from '@/types/models';
+import { Asset, Liability } from '@/types/models';
 
 export interface NetWorthData {
   netWorth: number;
@@ -51,85 +51,50 @@ const LIABILITY_COLORS: Record<string, string> = {
 };
 
 export class NetWorthService {
-  static async calculateNetWorth(): Promise<NetWorthData> {
+  static async calculateNetWorth(userId: string): Promise<NetWorthData> {
+    if (!userId) {
+      throw new Error('userId is required');
+    }
+    return this.getNetWorth(userId);
+  }
+
+  static async getNetWorth(userId: string): Promise<NetWorthData> {
+    if (!userId) {
+      throw new Error('userId is required');
+    }
+
     try {
-      // Get user session
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        // Return mock data if no user authenticated
-        return this.getMockNetWorthData();
+      const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(
+        `${apiBaseUrl}/networth/current?userId=${encodeURIComponent(userId)}&_t=${Date.now()}`
+      );
+      const json = await response.json();
+
+      if (!response.ok) {
+        throw new Error(json?.error || 'Failed to fetch net worth');
       }
 
-      // Fetch assets
-      const { data: assets, error: assetsError } = await supabase
-        .from('assets')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-
-      if (assetsError) {
-        console.error('Error fetching assets:', assetsError);
-        return this.getMockNetWorthData();
-      }
-
-      // Fetch liabilities
-      const { data: liabilities, error: liabilitiesError } = await supabase
-        .from('liabilities')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-
-      if (liabilitiesError) {
-        console.error('Error fetching liabilities:', liabilitiesError);
-        return this.getMockNetWorthData();
-      }
-
-      // Fetch account balances for cash assets
-      const { data: accounts, error: accountsError } = await supabase
-        .from('accounts')
-        .select('balance, account_type')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-
-      if (accountsError) {
-        console.error('Error fetching accounts:', accountsError);
-      }
-
-      // Calculate totals
-      const totalAssets = this.calculateTotalAssets(assets || [], accounts || []);
-      const totalLiabilities = this.calculateTotalLiabilities(liabilities || []);
-      const netWorth = totalAssets - totalLiabilities;
-
-      // Calculate monthly income/expenses from recent transactions
-      const { monthlyIncome, monthlyExpenses } = await this.calculateMonthlyIncomeExpenses(user.id);
-      const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0;
-
-      // Get previous month's net worth for change calculation
-      const { monthlyChange, monthlyChangePercentage } = await this.calculateMonthlyChange(user.id, netWorth);
-
-      // Calculate breakdowns
-      const assetsBreakdown = this.calculateAssetsBreakdown(assets || [], accounts || []);
-      const liabilitiesBreakdown = this.calculateLiabilitiesBreakdown(liabilities || []);
+      const data = json?.data || {};
 
       return {
-        netWorth,
-        totalAssets,
-        totalLiabilities,
-        monthlyChange,
-        monthlyChangePercentage,
-        assetsBreakdown,
-        liabilitiesBreakdown,
-        monthlyIncome,
-        monthlyExpenses,
-        savingsRate: Math.max(0, savingsRate),
+        netWorth: Number(data.netWorth ?? 0),
+        totalAssets: Number(data.totalAssets ?? 0),
+        totalLiabilities: Number(data.totalLiabilities ?? 0),
+        monthlyChange: Number(data.monthlyChange ?? 0),
+        monthlyChangePercentage: Number(data.monthlyChangePercentage ?? 0),
+        assetsBreakdown: Array.isArray(data.assetsBreakdown) ? data.assetsBreakdown : [],
+        liabilitiesBreakdown: Array.isArray(data.liabilitiesBreakdown) ? data.liabilitiesBreakdown : [],
+        monthlyIncome: Number(data.monthlyIncome ?? 0),
+        monthlyExpenses: Number(data.monthlyExpenses ?? 0),
+        savingsRate: Number(data.savingsRate ?? 0),
       };
-
     } catch (error) {
-      console.error('Error calculating net worth:', error);
-      return this.getMockNetWorthData();
+      console.error('Failed to get net worth from API:', error);
+      throw error;
     }
   }
+
+
 
   private static calculateTotalAssets(assets: Asset[], accounts: any[]): number {
     const assetsTotal = assets.reduce((total, asset) => total + Number(asset.current_value), 0);
@@ -265,30 +230,6 @@ export class NetWorthService {
       itemCount: data.count,
       isConnected: false, // Liabilities are typically manual entries
     }));
-  }
-
-  private static getMockNetWorthData(): NetWorthData {
-    return {
-      netWorth: 125000,
-      totalAssets: 275000,
-      totalLiabilities: 150000,
-      monthlyChange: 5500,
-      monthlyChangePercentage: 4.6,
-      assetsBreakdown: [
-        { category: 'property', amount: 180000, percentage: 65.5, color: '#4CAF50', type: 'asset', itemCount: 1, isConnected: false },
-        { category: 'investments', amount: 45000, percentage: 16.4, color: '#2196F3', type: 'asset', itemCount: 3, isConnected: false },
-        { category: 'cash', amount: 35000, percentage: 12.7, color: '#00BCD4', type: 'asset', itemCount: 2, isConnected: true },
-        { category: 'vehicles', amount: 15000, percentage: 5.4, color: '#FF9800', type: 'asset', itemCount: 1, isConnected: false },
-      ],
-      liabilitiesBreakdown: [
-        { category: 'mortgages', amount: 120000, percentage: 80, color: '#FF5722', type: 'liability', itemCount: 1, isConnected: false },
-        { category: 'credit_cards', amount: 18000, percentage: 12, color: '#E91E63', type: 'liability', itemCount: 2, isConnected: false },
-        { category: 'loans', amount: 12000, percentage: 8, color: '#F44336', type: 'liability', itemCount: 1, isConnected: false },
-      ],
-      monthlyIncome: 8500,
-      monthlyExpenses: 6200,
-      savingsRate: 27,
-    };
   }
 
   static async saveNetWorthSnapshot(userId: string, netWorthData: NetWorthData): Promise<void> {

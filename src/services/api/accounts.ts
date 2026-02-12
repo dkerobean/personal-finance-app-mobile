@@ -1,6 +1,6 @@
 import { Account } from '@/types/models';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 export const accountsApi = {
   getAccounts: async (userId: string): Promise<Account[]> => {
@@ -62,14 +62,26 @@ export const accountsApi = {
     }
   },
 
-  linkMonoAccount: async (code: string, userId: string): Promise<Account> => {
+  linkMonoAccount: async (
+    code: string,
+    userId: string,
+    options?: {
+      expectedAccountType?: 'bank' | 'mobile_money';
+      expectedCountry?: string;
+    }
+  ): Promise<Account> => {
     try {
       const response = await fetch(`${API_URL}/mono/exchange-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ code, userId }),
+        body: JSON.stringify({
+          code,
+          userId,
+          expectedAccountType: options?.expectedAccountType,
+          expectedCountry: options?.expectedCountry,
+        }),
       });
 
       const data = await response.json();

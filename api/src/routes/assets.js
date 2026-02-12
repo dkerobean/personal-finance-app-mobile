@@ -45,7 +45,18 @@ router.get('/totals', async (req, res) => {
 // Create asset
 router.post('/', async (req, res) => {
   try {
-    const { userId, name, category, assetType, currentValue, originalValue, purchaseDate, description } = req.body;
+    const {
+      userId,
+      name,
+      category,
+      assetType,
+      currentValue,
+      customCategory,
+      customType,
+      originalValue,
+      purchaseDate,
+      description,
+    } = req.body;
 
     if (!userId || !name || !category || !assetType || currentValue === undefined) {
       return res.status(400).json({ error: 'userId, name, category, assetType, currentValue are required' });
@@ -53,6 +64,7 @@ router.post('/', async (req, res) => {
 
     const asset = await Asset.create({
       userId, name, category, assetType, currentValue, originalValue,
+      customCategory, customType,
       purchaseDate: purchaseDate ? new Date(purchaseDate) : undefined,
       description, isActive: true,
     });

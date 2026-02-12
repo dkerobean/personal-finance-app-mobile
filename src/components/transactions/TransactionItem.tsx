@@ -27,6 +27,8 @@ interface TransactionItemProps {
   showSeparator?: boolean; // Kept for API compatibility but unused in new design
 }
 
+import InteractivePressable from '@/components/common/InteractivePressable';
+
 export default function TransactionItem({
   transaction,
   onPress,
@@ -62,10 +64,9 @@ export default function TransactionItem({
   const isIncome = transaction.type === 'income';
 
   return (
-    <TouchableOpacity
+    <InteractivePressable
       style={styles.container}
       onPress={() => onPress(transaction.id)}
-      activeOpacity={0.7}
     >
       <View style={styles.content}>
         {/* Icon Container */}
@@ -109,7 +110,7 @@ export default function TransactionItem({
           </View>
         </View>
       </View>
-    </TouchableOpacity>
+    </InteractivePressable>
   );
 }
 

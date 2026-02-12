@@ -11,6 +11,7 @@ interface GradientHeaderProps {
   onNotificationPress?: () => void;
   showCalendar?: boolean;
   showNotification?: boolean;
+  leftAccessory?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -22,6 +23,7 @@ export default function GradientHeader({
   onNotificationPress,
   showCalendar = true,
   showNotification = true,
+  leftAccessory,
 }: GradientHeaderProps): React.ReactElement {
   return (
     <View style={styles.container}>
@@ -31,11 +33,13 @@ export default function GradientHeader({
       <View style={styles.headerSection}>
         {/* Left Section - Back Button */}
         <View style={styles.leftSection}>
-          {onBackPress && (
+          {leftAccessory ? (
+            leftAccessory
+          ) : onBackPress ? (
             <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
               <MaterialIcons name="arrow-back" size={20} color={COLORS.white} />
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
 
         {/* Center Section - Title */}
@@ -76,7 +80,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
   },
   leftSection: {
-    width: 50,
+    width: 56,
     alignItems: 'flex-start',
   },
   backButton: {
@@ -94,7 +98,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.normal,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: COLORS.white,
     marginTop: 2,
   },
   rightSection: {

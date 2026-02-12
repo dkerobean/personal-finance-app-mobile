@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { TrendingUp, TrendingDown } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowDownRight, ArrowUpRight, Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '@/constants/design';
 
@@ -10,90 +10,103 @@ interface IncomeExpenseSummaryProps {
   monthlyExpense: number;
 }
 
-export default function IncomeExpenseSummary({ monthlyIncome, monthlyExpense }: IncomeExpenseSummaryProps) {
+const formatCurrency = (amount: number): string => {
+  return `GH¢${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+export default function IncomeExpenseSummary({
+  monthlyIncome,
+  monthlyExpense,
+}: IncomeExpenseSummaryProps) {
   const router = useRouter();
-  
-  const formatCurrency = (amount: number): string => {
-    return `₵${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
 
-  // Calculate expense ratio (what % of income is spent)
+  const netCashflow = monthlyIncome - monthlyExpense;
   const expenseRatio = monthlyIncome > 0 ? (monthlyExpense / monthlyIncome) * 100 : 0;
-  const expensePercentage = Math.min(Math.round(expenseRatio), 100);
-  
-  // Determine status message
-  const getStatusMessage = () => {
-    if (expenseRatio < 30) return { text: `${expensePercentage}% of your income spent. Excellent!`, color: COLORS.success };
-    if (expenseRatio < 60) return { text: `${expensePercentage}% of your income spent. Looks good.`, color: COLORS.primary };
-    if (expenseRatio < 90) return { text: `${expensePercentage}% of your income spent. Be mindful.`, color: COLORS.warning };
-    return { text: `${expensePercentage}% of your income spent. Review budget!`, color: COLORS.error };
+  const spentPercentage = Math.max(0, Math.min(100, Math.round(expenseRatio)));
+  const savingsPotential = Math.max(netCashflow, 0);
+
+  const getSpendingSignal = () => {
+    if (expenseRatio < 40) return 'Excellent control';
+    if (expenseRatio < 70) return 'Healthy pace';
+    if (expenseRatio < 90) return 'Watch spending';
+    return 'Review budget now';
   };
 
-  const status = getStatusMessage();
+  const signal = getSpendingSignal();
 
   return (
     <View style={styles.container}>
-      {/* Stats Card */}
-      <View style={styles.card}>
-        {/* Income and Expense Row */}
-        <View style={styles.statsRow}>
-          {/* Total Income */}
-          <View style={styles.statColumn}>
-            <View style={styles.statHeader}>
-              <MaterialIcons name="south-west" size={16} color={COLORS.white} />
-              <Text style={styles.statLabel}>Total Income</Text>
-            </View>
-            <Text style={styles.incomeAmount}>{formatCurrency(monthlyIncome)}</Text>
+      <LinearGradient
+        colors={['#033327', COLORS.primary, COLORS.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.card}
+      >
+        <View style={styles.topRow}>
+          <View>
+            <Text style={styles.snapshotLabel}>Monthly Snapshot</Text>
+            <Text style={styles.snapshotSubLabel}>Income vs spending</Text>
           </View>
 
-          {/* Divider */}
-          <View style={styles.divider} />
-
-          {/* Total Expense */}
-          <View style={styles.statColumn}>
-            <View style={styles.statHeader}>
-              <MaterialIcons name="north-east" size={16} color={COLORS.white} />
-              <Text style={styles.statLabel}>Total Expense</Text>
-            </View>
-            <Text style={styles.expenseAmount}>-{formatCurrency(monthlyExpense)}</Text>
+          <View style={styles.netChip}>
+            <Text style={styles.netChipLabel}>Net</Text>
+            <Text style={styles.netChipAmount}>
+              {netCashflow >= 0 ? '+' : '-'}
+              {formatCurrency(Math.abs(netCashflow))}
+            </Text>
           </View>
         </View>
 
-        {/* Progress Bar */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressFill, { width: `${Math.min(expensePercentage, 100)}%` }]} />
-            <View style={styles.progressLabels}>
-              <Text style={styles.progressPercent}>{expensePercentage}%</Text>
-              <Text style={styles.progressTotal}>{formatCurrency(monthlyIncome)}</Text>
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <View style={styles.metricIconWrap}>
+              <ArrowDownRight size={16} color="#D1FAE5" />
             </View>
+            <Text style={styles.metricLabel}>Income</Text>
+            <Text style={styles.metricValue}>{formatCurrency(monthlyIncome)}</Text>
+          </View>
+
+          <View style={styles.metricCard}>
+            <View style={[styles.metricIconWrap, styles.metricIconWrapExpense]}>
+              <ArrowUpRight size={16} color="#FECACA" />
+            </View>
+            <Text style={styles.metricLabel}>Expense</Text>
+            <Text style={styles.metricValue}>-{formatCurrency(monthlyExpense)}</Text>
           </View>
         </View>
 
-        {/* Status Message */}
-        <View style={styles.statusContainer}>
-          <MaterialIcons name="check-circle" size={18} color={status.color} />
-          <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
+        <View style={styles.progressBlock}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${spentPercentage}%` }]} />
+          </View>
+          <View style={styles.progressMeta}>
+            <Text style={styles.progressText}>Spent {spentPercentage}% of monthly income</Text>
+            <Text style={styles.signalText}>{signal}</Text>
+          </View>
         </View>
-      </View>
 
-      {/* Action Buttons */}
+        <View style={styles.saveRow}>
+          <Text style={styles.saveLabel}>Available to save</Text>
+          <Text style={styles.saveValue}>{formatCurrency(savingsPotential)}</Text>
+        </View>
+      </LinearGradient>
+
       <View style={styles.actionButtons}>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.incomeButton]} 
+        <TouchableOpacity
+          style={[styles.actionButton, styles.incomeButton]}
           onPress={() => router.push('/transactions/create?type=income')}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          <TrendingUp size={20} color={COLORS.white} style={{ marginRight: 8 }} />
+          <Plus size={16} color={COLORS.white} />
           <Text style={styles.actionButtonText}>Add Income</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.expenseButton]} 
+        <TouchableOpacity
+          style={[styles.actionButton, styles.expenseButton]}
           onPress={() => router.push('/transactions/create?type=expense')}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          <TrendingDown size={20} color={COLORS.white} style={{ marginRight: 8 }} />
+          <Plus size={16} color={COLORS.white} />
           <Text style={styles.actionButtonText}>Add Expense</Text>
         </TouchableOpacity>
       </View>
@@ -104,120 +117,155 @@ export default function IncomeExpenseSummary({ monthlyIncome, monthlyExpense }: 
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.xl,
-  },
-  card: {
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.xxl,
-    padding: SPACING.xl,
-    ...SHADOWS.lg,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    marginBottom: SPACING.xl,
-  },
-  statColumn: {
-    flex: 1,
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-    gap: SPACING.xs,
-  },
-  statLabel: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.white,
-    opacity: 0.9,
-  },
-  divider: {
-    width: 1,
-    backgroundColor: COLORS.white,
-    opacity: 0.3,
-    marginHorizontal: SPACING.md,
-  },
-  incomeAmount: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  expenseAmount: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  progressSection: {
     marginBottom: SPACING.lg,
   },
-  progressBarContainer: {
-    position: 'relative',
-    height: 44,
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.xl,
+  card: {
+    borderRadius: BORDER_RADIUS.xxl,
+    padding: SPACING.lg,
+    ...SHADOWS.lg,
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.lg,
+  },
+  snapshotLabel: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  snapshotSubLabel: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: '#FFFFFF',
+    marginTop: 2,
+  },
+  netChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: 'rgba(2, 44, 34, 0.45)',
+    alignItems: 'flex-end',
+  },
+  netChipLabel: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  netChipAmount: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  metricCard: {
+    flex: 1,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  metricIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(2, 44, 34, 0.35)',
+    marginBottom: SPACING.sm,
+  },
+  metricIconWrapExpense: {
+    backgroundColor: 'rgba(127, 29, 29, 0.35)',
+  },
+  metricLabel: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: '#FFFFFF',
+    marginBottom: SPACING.xs,
+  },
+  metricValue: {
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  progressBlock: {
+    marginTop: SPACING.lg,
+  },
+  progressTrack: {
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     overflow: 'hidden',
   },
   progressFill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: COLORS.primaryDark,
-    borderRadius: BORDER_RADIUS.xl,
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#CCFBF1',
   },
-  progressLabels: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
+  progressMeta: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-  },
-  progressPercent: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  progressTotal: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: SPACING.sm,
     gap: SPACING.sm,
   },
-  statusText: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    fontWeight: '600',
+  progressText: {
     flex: 1,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  signalText: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  saveRow: {
+    marginTop: SPACING.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  saveLabel: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  saveValue: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   actionButtons: {
     flexDirection: 'row',
-    marginTop: SPACING.lg,
-    gap: SPACING.md,
+    marginTop: SPACING.md,
+    gap: SPACING.sm,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: SPACING.md,
+    gap: SPACING.xs,
     ...SHADOWS.sm,
   },
   incomeButton: {
-    backgroundColor: COLORS.success,
+    backgroundColor: COLORS.primaryDark,
   },
   expenseButton: {
     backgroundColor: COLORS.error,
   },
   actionButtonText: {
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.white,
   },
 });

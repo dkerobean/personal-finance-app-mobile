@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, RefreshControl, FlatList } from 'react-native';
 import type { Asset } from '@/types/models';
 import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 import AssetItem from './AssetItem';
+import { formatCurrency } from '@/lib/formatters';
 
 interface AssetsListProps {
   assets: Asset[];
@@ -65,10 +66,7 @@ export default function AssetsList({
   };
 
   const formatCategoryTotal = (total: number): string => {
-    return `$${total.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`;
+    return formatCurrency(total);
   };
 
   // Create flat list data with headers

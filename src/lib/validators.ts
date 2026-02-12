@@ -85,7 +85,7 @@ export const validateLiabilityBalance = (value: number | string): { isValid: boo
   if (numValue < 0.01) {
     return {
       isValid: false,
-      message: 'Liability balance must be at least $0.01',
+      message: 'Liability balance must be at least GH¢0.01',
     };
   }
 
@@ -235,9 +235,21 @@ export const validateDueDate = (dateString: string): { isValid: boolean; message
 
 // Category validation arrays
 const ASSET_CATEGORIES = ['property', 'investments', 'cash', 'vehicles', 'personal', 'business', 'other'] as const;
-const ASSET_TYPES = ['real_estate', 'stocks', 'bonds', 'savings', 'checking', 'cryptocurrency', 'car', 'jewelry', 'art', 'other'] as const;
+const ASSET_TYPES = [
+  'real_estate', 'land', 'rental_property',
+  'stocks', 'bonds', 'mutual_funds', 'etf', 'cryptocurrency', 'retirement_account', 'treasury_bill', 'pension_fund',
+  'savings', 'checking', 'money_market', 'cd', 'foreign_currency', 'mobile_money_wallet', 'emergency_fund', 'fixed_deposit',
+  'car', 'motorcycle', 'boat', 'rv',
+  'jewelry', 'art', 'collectibles', 'electronics',
+  'business_equity', 'business_assets', 'intellectual_property',
+  'other'
+] as const;
 const LIABILITY_CATEGORIES = ['loans', 'credit_cards', 'mortgages', 'business_debt', 'other'] as const;
-const LIABILITY_TYPES = ['mortgage', 'auto_loan', 'personal_loan', 'credit_card', 'student_loan', 'business_loan', 'other'] as const;
+const LIABILITY_TYPES = [
+  'mortgage', 'auto_loan', 'personal_loan', 'credit_card', 'student_loan', 'business_loan',
+  'overdraft', 'payday_loan', 'buy_now_pay_later', 'medical_debt', 'tax_debt', 'utility_bill',
+  'other'
+] as const;
 
 export const validateAssetCategory = (category: string): { isValid: boolean; message?: string } => {
   if (!ASSET_CATEGORIES.includes(category as any)) {

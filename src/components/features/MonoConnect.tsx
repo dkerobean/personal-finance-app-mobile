@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { MonoProvider, MonoConnectButton, useMonoConnect } from '@mono.co/connect-react-native';
+import { MonoProvider, useMonoConnect } from '@mono.co/connect-react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import { LinkIcon } from 'lucide-react-native';
 import { accountsApi } from '../../services/api/accounts';
@@ -9,9 +9,17 @@ import { COLORS, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from '../../constants/desi
 
 interface MonoConnectProps {
   onSuccess?: () => void;
+  expectedAccountType?: 'bank' | 'mobile_money';
+  expectedCountry?: string;
+  buttonLabel?: string;
 }
 
-export const MonoConnect: React.FC<MonoConnectProps> = ({ onSuccess }) => {
+export const MonoConnect: React.FC<MonoConnectProps> = ({
+  onSuccess,
+  expectedAccountType,
+  expectedCountry,
+  buttonLabel,
+}) => {
   const { userId } = useAuth();
   const toast = useAppToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -24,7 +32,10 @@ export const MonoConnect: React.FC<MonoConnectProps> = ({ onSuccess }) => {
 
     setIsLoading(true);
     try {
-      await accountsApi.linkMonoAccount(code, userId);
+      await accountsApi.linkMonoAccount(code, userId, {
+        expectedAccountType,
+        expectedCountry,
+      });
       toast.success('Account Linked', 'Your account has been successfully linked via Mono.');
       if (onSuccess) onSuccess();
     } catch (error) {
@@ -46,14 +57,20 @@ export const MonoConnect: React.FC<MonoConnectProps> = ({ onSuccess }) => {
         onSuccess={handleSuccess}
         onClose={handleClose}
       >
-        <MonoConnectButtonRender isLoading={isLoading} />
+        <MonoConnectButtonRender isLoading={isLoading} buttonLabel={buttonLabel} />
       </MonoProvider>
     </View>
   );
 };
 
 // Custom button renderer using Design System
-const MonoConnectButtonRender = ({ isLoading }: { isLoading: boolean }) => {
+const MonoConnectButtonRender = ({
+  isLoading,
+  buttonLabel,
+}: {
+  isLoading: boolean;
+  buttonLabel?: string;
+}) => {
   const { init } = useMonoConnect();
 
   return (
@@ -69,7 +86,7 @@ const MonoConnectButtonRender = ({ isLoading }: { isLoading: boolean }) => {
         <LinkIcon size={20} color={COLORS.white} style={{ marginRight: 8 }} />
       )}
       <Text style={styles.buttonText}>
-        {isLoading ? 'Connecting...' : 'Link Bank or Mobile Money'}
+        {isLoading ? 'Connecting...' : buttonLabel || 'Link Bank or Mobile Money'}
       </Text>
     </TouchableOpacity>
   );

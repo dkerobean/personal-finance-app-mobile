@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { isSyncedTransaction } from '@/services/api/transactions';
@@ -51,7 +51,7 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
   };
 
   // Get the 5 most recent transactions
-  const recentTransactions = transactions
+  const recentTransactions = [...transactions]
     .sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime())
     .slice(0, 5);
 
@@ -102,12 +102,16 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.transactionsList} showsVerticalScrollIndicator={false}>
-        {recentTransactions.map((transaction) => (
+      <View style={styles.transactionsList}>
+        {recentTransactions.map((transaction, index) => (
           <TouchableOpacity
             key={transaction.id}
-            style={styles.transactionItem}
+            style={[
+              styles.transactionItem,
+              index === recentTransactions.length - 1 && styles.lastTransactionItem,
+            ]}
             onPress={() => handleTransactionPress(transaction.id)}
+            activeOpacity={0.75}
           >
             <View style={styles.transactionLeft}>
               <View style={[
@@ -146,13 +150,13 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
                 styles.transactionAmount,
                 transaction.type === 'income' ? styles.incomeAmount : styles.expenseAmount
               ]}>
-                {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount).replace('GH₵', 'GH¢')}
               </Text>
               <MaterialIcons name="chevron-right" size={20} color={COLORS.textTertiary} />
             </View>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -162,8 +166,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundCard,
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING.lg,
-    marginHorizontal: SPACING.lg,
     marginVertical: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
     ...SHADOWS.md,
   },
   header: {
@@ -225,16 +230,18 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: '600',
   },
-  transactionsList: {
-    maxHeight: 320,
-  },
+  transactionsList: {},
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: SPACING.md,
+    paddingVertical: SPACING.md + 2,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
+  },
+  lastTransactionItem: {
+    borderBottomWidth: 0,
+    paddingBottom: SPACING.xs,
   },
   transactionLeft: {
     flexDirection: 'row',
@@ -242,9 +249,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
@@ -267,7 +274,7 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: '500',
+    fontWeight: '600',
     color: COLORS.textPrimary,
   },
   transactionDate: {
@@ -285,7 +292,7 @@ const styles = StyleSheet.create({
   },
   transactionAmount: {
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: '600',
+    fontWeight: '700',
     marginRight: SPACING.xs,
   },
   incomeAmount: {

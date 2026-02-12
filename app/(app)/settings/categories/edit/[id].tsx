@@ -17,6 +17,7 @@ import { useCustomAlert } from '@/hooks/useCustomAlert';
 import CustomAlert from '@/components/ui/CustomAlert';
 import type { Category } from '@/types/models';
 import { COLORS, BORDER_RADIUS, SPACING, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
+import { useAuth } from '@clerk/clerk-expo';
 
 const ICON_CATEGORIES = {
   'Financial': ['attach-money', 'payment', 'account-balance', 'savings', 'credit-card', 'account-balance-wallet'],
@@ -39,6 +40,7 @@ const AVAILABLE_ICONS = Object.values(ICON_CATEGORIES).flat();
 export default function EditCategoryScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { userId } = useAuth();
   const { categories, updateCategory, isLoading, error } = useCategoryStore();
   const { alert, alertProps } = useCustomAlert();
 
@@ -76,8 +78,13 @@ export default function EditCategoryScreen() {
 
   const handleSubmit = async () => {
     if (!category || !validateForm()) return;
+    if (!userId) {
+      alert('Sign In Required', 'Please sign in to update categories.');
+      return;
+    }
 
     const success = await updateCategory(
+      userId,
       category.id,
       name.trim() !== category.name ? name.trim() : undefined,
       selectedIcon !== category.icon_name ? selectedIcon : undefined

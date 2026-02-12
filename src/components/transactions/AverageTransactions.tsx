@@ -50,47 +50,49 @@ export default function AverageTransactions({
   }
 
   const formatAmount = (amount: number, type: 'income' | 'expense'): string => {
-    const sign = type === 'income' ? '' : '';
     return `₵${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>
-        Average Spending by Category{selectedMonth ? ` - ${selectedMonth}` : ''}
-      </Text>
-      
-      <View style={styles.averagesList}>
-        {averagesArray.map((item, index) => (
-          <View key={`${item.category}-${index}`} style={styles.averageItem}>
-            <View style={styles.averageInfo}>
-              <View style={[styles.iconContainer, { 
-                backgroundColor: item.type === 'income' ? COLORS.success : COLORS.accent 
-              }]}>
-                <MaterialIcons
-                  name={item.icon as any}
-                  size={20}
-                  color={COLORS.white}
-                />
+      <View style={styles.sectionCard}>
+        <View style={styles.headerRow}>
+          <Text style={styles.sectionTitle}>Category Averages</Text>
+          <Text style={styles.headerMeta}>{selectedMonth || 'All Months'}</Text>
+        </View>
+
+        <View style={styles.averagesList}>
+          {averagesArray.map((item, index) => (
+            <View key={`${item.category}-${index}`} style={styles.averageItem}>
+              <View style={styles.averageInfo}>
+                <View style={[styles.iconContainer, { 
+                  backgroundColor: item.type === 'income' ? COLORS.success : COLORS.error
+                }]}>
+                  <MaterialIcons
+                    name={item.icon as any}
+                    size={20}
+                    color={COLORS.white}
+                  />
+                </View>
+                <View style={styles.averageDetails}>
+                  <Text style={styles.categoryName}>{item.category}</Text>
+                  <Text style={styles.transactionCount}>
+                    {item.transactionCount} transaction{item.transactionCount > 1 ? 's' : ''}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.averageDetails}>
-                <Text style={styles.categoryName}>{item.category}</Text>
-                <Text style={styles.transactionCount}>
-                  {item.transactionCount} transaction{item.transactionCount > 1 ? 's' : ''}
+
+              <View style={styles.averageAmount}>
+                <Text style={[styles.amount, { 
+                  color: item.type === 'income' ? COLORS.success : COLORS.error
+                }]}>
+                  {formatAmount(item.average, item.type)}
                 </Text>
+                <Text style={styles.averageLabel}>avg</Text>
               </View>
             </View>
-            
-            <View style={styles.averageAmount}>
-              <Text style={[styles.amount, { 
-                color: item.type === 'income' ? COLORS.success : COLORS.accent 
-              }]}>
-                {formatAmount(item.average, item.type)}
-              </Text>
-              <Text style={styles.averageLabel}>avg</Text>
-            </View>
-          </View>
-        ))}
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -98,28 +100,47 @@ export default function AverageTransactions({
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: SPACING.xl,
-    paddingHorizontal: 37,
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+  },
+  sectionCard: {
+    borderRadius: 24,
+    backgroundColor: COLORS.white,
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    ...SHADOWS.md,
+  },
+  headerRow: {
+    marginBottom: SPACING.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
   sectionTitle: {
     fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: TYPOGRAPHY.weights.semibold,
     color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-    marginBottom: SPACING.md,
+  },
+  headerMeta: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: COLORS.primary,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: 99,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 6,
   },
   averagesList: {
     backgroundColor: 'transparent',
-    borderRadius: 0,
-    padding: 0,
   },
   averageItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 208, 158, 0.1)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.gray100,
   },
   averageInfo: {
     flexDirection: 'row',
@@ -141,12 +162,10 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.medium,
     color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
   },
   transactionCount: {
     fontSize: TYPOGRAPHY.sizes.sm,
     color: COLORS.textTertiary,
-    fontFamily: 'Poppins',
     marginTop: 2,
   },
   averageAmount: {
@@ -155,12 +174,10 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.semibold,
-    fontFamily: 'Poppins',
   },
   averageLabel: {
     fontSize: TYPOGRAPHY.sizes.xs,
     color: COLORS.textTertiary,
-    fontFamily: 'Poppins',
     marginTop: 2,
   },
 });
