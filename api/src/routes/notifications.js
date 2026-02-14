@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Notification = require('../models/Notification');
+const { sendNotification } = require('../services/onesignal');
 
 // GET /api/notifications - Get all notifications for a user
 router.get('/', async (req, res) => {
@@ -119,6 +120,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'userId, type, title, and message are required' });
     }
 
+    // ... existing code ...
+
     const notification = new Notification({
       userId,
       type,
@@ -129,6 +132,22 @@ router.post('/', async (req, res) => {
     });
 
     await notification.save();
+
+    // Send Push Notification
+    // We strive to send push for all notifications created via this endpoint
+    // The OneSignal service handles the check for missing keys
+    try {
+      await sendNotification({
+        include_external_user_ids: [userId],
+        title,
+        message,
+        data: { ...data, notificationId: notification._id }
+      });
+    } catch (pushError) {
+      console.error('Failed to send push notification:', pushError);
+      // We don't fail the request if push fails
+    }
+
     res.status(201).json({ data: notification });
   } catch (error) {
     console.error('Error creating notification:', error);

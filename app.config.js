@@ -47,7 +47,7 @@ export default {
       typedRoutes: true
     },
     extra: {
-      oneSignalAppId: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID || "YOUR_ONESIGNAL_APP_ID",
+      oneSignalAppId: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID,
       mongodbUri: process.env.EXPO_PUBLIC_MONGODB_URI,
       clerkPublishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
       eas: {

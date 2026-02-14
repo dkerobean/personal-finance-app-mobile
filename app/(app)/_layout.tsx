@@ -7,7 +7,7 @@ import BottomNavigation from '@/components/navigation/BottomNavigation';
 import { COLORS } from '@/constants/design';
 
 export default function AppLayout(): React.ReactElement {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, userId } = useAuth();
   const { isLoading: isStoreLoading, hydrated, initialize } = useAuthStore();
   
   const isAuthenticated = !!isSignedIn;
@@ -46,6 +46,18 @@ export default function AppLayout(): React.ReactElement {
       return () => clearTimeout(redirectTimeout);
     }
   }, [isAuthenticated, isLoading, hydrated]);
+
+  // Initialize OneSignal when authenticated
+  useEffect(() => {
+    if (isAuthenticated && isSignedIn && isLoaded && userId) {
+      console.log('Initializing OneSignal for user:', userId);
+      // Dynamic import to avoid circular dependencies if any
+      const { oneSignalService } = require('@/services/oneSignalService');
+      oneSignalService.initialize(userId).catch((err: any) => {
+        console.error('Failed to initialize OneSignal:', err);
+      });
+    }
+  }, [isAuthenticated, isSignedIn, isLoaded, userId]);
 
   // Show loading while auth is being initialized or while navigating
   if (!hydrated || (isLoading && !isAuthenticated)) {
