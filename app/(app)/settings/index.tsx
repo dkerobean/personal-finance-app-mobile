@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Grid3x3, Smartphone, Bell, LogOut, ChevronRight, UserRound } from 'lucide-react-native';
+import { Grid3x3, Smartphone, Bell, LogOut, ChevronRight, UserRound, ShieldAlert } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { Image } from 'expo-image';
@@ -53,6 +53,15 @@ const settingsOptions: SettingsOption[] = [
     iconComponent: Bell,
     iconBgColor: '#FEF9C3',
     route: '/settings/notifications',
+    section: 'preferences',
+  },
+  {
+    id: 'account',
+    title: 'Account & Data',
+    description: 'Review account actions, including permanent deletion',
+    iconComponent: ShieldAlert,
+    iconBgColor: '#FEE2E2',
+    route: '/settings/account',
     section: 'preferences',
   },
 ];

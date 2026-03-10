@@ -12,7 +12,7 @@ interface InsightCardsProps {
   savingsRate: number;
 }
 
-interface Insight Item {
+interface InsightItem {
   icon: React.ReactNode;
   title: string;
   value: string;
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   grid: {
-    flex Direction: 'row',
+    flexDirection: 'row',
     flexWrap: 'wrap',
     gap: SPACING.sm,
   },

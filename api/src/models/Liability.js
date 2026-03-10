@@ -14,6 +14,7 @@ const liabilitySchema = new mongoose.Schema(
       enum: [
         'mortgage', 'auto_loan', 'personal_loan', 'credit_card', 'student_loan', 'business_loan',
         'overdraft', 'payday_loan', 'buy_now_pay_later', 'medical_debt', 'tax_debt', 'utility_bill',
+        'line_of_credit', 'margin_loan', 'family_loan', 'home_equity_loan', 'vendor_payable', 'legal_obligation',
         'other'
       ],
       required: true 

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Liability } = require('../models');
+const { createNetWorthSnapshotForUser } = require('../services/netWorthSnapshotService');
 
 // Get all liabilities for user
 router.get('/', async (req, res) => {
@@ -71,6 +72,8 @@ router.post('/', async (req, res) => {
       description, isActive: true,
     });
 
+    await createNetWorthSnapshotForUser(userId);
+
     res.status(201).json({ data: liability });
   } catch (error) {
     console.error('Error creating liability:', error);
@@ -95,6 +98,8 @@ router.patch('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Liability not found' });
     }
 
+    await createNetWorthSnapshotForUser(userId);
+
     res.json({ data: liability });
   } catch (error) {
     console.error('Error updating liability:', error);
@@ -115,6 +120,8 @@ router.delete('/:id', async (req, res) => {
     if (!liability) {
       return res.status(404).json({ error: 'Liability not found' });
     }
+
+    await createNetWorthSnapshotForUser(userId);
 
     res.json({ success: true });
   } catch (error) {

@@ -6,14 +6,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Image,
   StatusBar,
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { SvgXml } from 'react-native-svg';
 import { useSignUp } from '@clerk/clerk-expo';
 import { authService } from '@/services/authService';
+import { KIPPO_MARK_WHITE_SVG } from '@/constants/brand';
+import { TYPOGRAPHY } from '@/constants/design';
+import { useAppToast } from '@/hooks/useAppToast';
 
 export default function VerifyScreen(): React.ReactElement {
   const params = useLocalSearchParams<{ email: string; firstName?: string }>();
@@ -23,6 +26,7 @@ export default function VerifyScreen(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useAppToast();
 
   const { isLoaded, signUp, setActive } = useSignUp();
 
@@ -60,27 +64,16 @@ export default function VerifyScreen(): React.ReactElement {
         }
         
         await setActive({ session: completeSignUp.createdSessionId });
-        
-        Alert.alert(
-          'Success', 
-          'Email verified successfully! Welcome to Kippo.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                router.replace('/(app)');
-              },
-            },
-          ]
-        );
+        toast.success('Email verified', 'Welcome to Kippo.');
+        router.replace('/(app)');
       } else {
         setError('Verification incomplete. Please check your email.');
       }
     } catch (err: any) {
-       console.error(JSON.stringify(err, null, 2));
+      console.error(JSON.stringify(err, null, 2));
       const message = err.errors?.[0]?.message || 'Verification failed';
       setError(message);
-      Alert.alert('Error', message);
+      toast.error('Verification failed', message);
     } finally {
       setIsLoading(false);
     }
@@ -93,11 +86,11 @@ export default function VerifyScreen(): React.ReactElement {
 
     try {
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-      Alert.alert('Success', 'Verification code resent to your email!');
+      toast.success('Code resent', 'Verification code resent to your email.');
     } catch (err: any) {
       const message = err.errors?.[0]?.message || 'Failed to resend code';
       setError(message);
-      Alert.alert('Error', message);
+      toast.error('Resend failed', message);
     } finally {
       setIsResending(false);
     }
@@ -108,11 +101,7 @@ export default function VerifyScreen(): React.ReactElement {
       <StatusBar barStyle="light-content" backgroundColor="#006D4F" />
       
       <View style={styles.topSection}>
-        <Image 
-          source={require('../../assets/kippo-logo-white.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <SvgXml xml={KIPPO_MARK_WHITE_SVG} width={60} height={60} />
         <Text style={styles.title}>Verification</Text>
       </View>
 
@@ -186,17 +175,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
   },
-  logo: {
-    width: 60,
-    height: 60,
-    marginBottom: 16,
-    tintColor: '#FFFFFF',
-  },
   title: {
     fontSize: 28,
-    fontWeight: '700',
+    fontFamily: TYPOGRAPHY.fonts.display,
     color: '#FFFFFF',
-    letterSpacing: 1,
+    letterSpacing: -0.5,
   },
   bottomSection: {
     flex: 1,
@@ -216,7 +199,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: TYPOGRAPHY.fonts.display,
     color: '#0F172A',
     marginBottom: 8,
   },

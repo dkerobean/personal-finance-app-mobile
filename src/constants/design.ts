@@ -4,12 +4,12 @@ export const COLORS = {
   primary: '#006D4F',
   primaryLight: '#F0FDF4',
   primaryDark: '#022C22',
-  secondary: '#10B981',
+  secondary: '#0FB67A',
   
   // Text colors
   textPrimary: '#0F172A', // Slate 900
-  textSecondary: '#334155', // Slate 700
-  textTertiary: '#64748B', // Slate 500
+  textSecondary: '#1E293B', // Slate 800
+  textTertiary: '#475569', // Slate 600
   textInverse: '#FFFFFF',
 
   // Gradients
@@ -18,9 +18,10 @@ export const COLORS = {
   
   // Background colors
   backgroundMain: '#006D4F',
-  backgroundContent: '#FFFFFF',
+  backgroundContent: '#F8FAFC',
   backgroundCard: '#FFFFFF',
-  backgroundInput: '#F8FAFC',
+  backgroundInput: '#F1F5F9',
+  border: '#CBD5E1',
   
   // Accent colors
   accent: '#3B82F6', // Blue
@@ -40,7 +41,7 @@ export const COLORS = {
 
 export const SPACING = {
   xs: 4,
-  sm: 8,
+  sm: 9,
   md: 12,
   lg: 16,
   xl: 20,
@@ -66,6 +67,7 @@ const FONT_FAMILY = {
   medium: 'PlusJakartaSans_500Medium',
   semibold: 'PlusJakartaSans_600SemiBold',
   bold: 'PlusJakartaSans_700Bold',
+  display: 'PlusJakartaSans_700Bold',
 };
 
 export const TYPOGRAPHY = {
@@ -73,12 +75,12 @@ export const TYPOGRAPHY = {
     xs: 10,
     sm: 12,
     md: 14,
-    lg: 16,
-    xl: 18,
-    xxl: 20,
-    xxxl: 24,
-    huge: 28,
-    massive: 32,
+    lg: 17,
+    xl: 19,
+    xxl: 21,
+    xxxl: 26,
+    huge: 30,
+    massive: 34,
   },
   weights: {
     light: '300' as const,
@@ -87,29 +89,36 @@ export const TYPOGRAPHY = {
     semibold: '600' as const,
     bold: '700' as const,
   },
+  lineHeights: {
+    tight: 18,
+    body: 22,
+    relaxed: 28,
+    display: 40,
+    hero: 48,
+  },
   fonts: FONT_FAMILY, // Expose font family names
 };
 
 export const SHADOWS = {
   sm: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowRadius: 6,
     elevation: 2,
   },
   md: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 5,
   },
   lg: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 22,
     elevation: 8,
   },
 };

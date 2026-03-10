@@ -63,7 +63,9 @@ export default function IncomeExpenseSummary({
               <ArrowDownRight size={16} color="#D1FAE5" />
             </View>
             <Text style={styles.metricLabel}>Income</Text>
-            <Text style={styles.metricValue}>{formatCurrency(monthlyIncome)}</Text>
+            <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
+              {formatCurrency(monthlyIncome)}
+            </Text>
           </View>
 
           <View style={styles.metricCard}>
@@ -71,7 +73,9 @@ export default function IncomeExpenseSummary({
               <ArrowUpRight size={16} color="#FECACA" />
             </View>
             <Text style={styles.metricLabel}>Expense</Text>
-            <Text style={styles.metricValue}>-{formatCurrency(monthlyExpense)}</Text>
+            <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
+              -{formatCurrency(monthlyExpense)}
+            </Text>
           </View>
         </View>
 
@@ -87,7 +91,9 @@ export default function IncomeExpenseSummary({
 
         <View style={styles.saveRow}>
           <Text style={styles.saveLabel}>Available to save</Text>
-          <Text style={styles.saveValue}>{formatCurrency(savingsPotential)}</Text>
+          <Text style={styles.saveValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
+            {formatCurrency(savingsPotential)}
+          </Text>
         </View>
       </LinearGradient>
 
@@ -117,11 +123,12 @@ export default function IncomeExpenseSummary({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   card: {
-    borderRadius: BORDER_RADIUS.xxl,
-    padding: SPACING.lg,
+    borderRadius: 28,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.lg,
     ...SHADOWS.lg,
   },
   topRow: {
@@ -131,32 +138,41 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   snapshotLabel: {
-    fontSize: TYPOGRAPHY.sizes.md,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: 16,
     color: COLORS.white,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   snapshotSubLabel: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: '#FFFFFF',
-    marginTop: 2,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.92)',
+    marginTop: 4,
+    fontWeight: '600',
   },
   netChip: {
+    minWidth: 132,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: 'rgba(2, 44, 34, 0.45)',
+    borderRadius: BORDER_RADIUS.xl,
+    backgroundColor: 'rgba(2, 44, 34, 0.55)',
     alignItems: 'flex-end',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   netChipLabel: {
-    fontSize: TYPOGRAPHY.sizes.xs,
-    color: '#FFFFFF',
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: 'rgba(255,255,255,0.82)',
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: SPACING.xs,
   },
   netChipAmount: {
     fontSize: TYPOGRAPHY.sizes.md,
     color: '#FFFFFF',
     fontWeight: '700',
+    letterSpacing: -0.3,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -164,33 +180,37 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
     padding: SPACING.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
   },
   metricIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(2, 44, 34, 0.35)',
+    backgroundColor: 'rgba(2, 44, 34, 0.45)',
     marginBottom: SPACING.sm,
   },
   metricIconWrapExpense: {
     backgroundColor: 'rgba(127, 29, 29, 0.35)',
   },
   metricLabel: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: '#FFFFFF',
-    marginBottom: SPACING.xs,
+    fontSize: TYPOGRAPHY.sizes.md,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.86)',
+    marginBottom: 4,
+    fontWeight: '500',
   },
   metricValue: {
-    fontSize: TYPOGRAPHY.sizes.lg,
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    lineHeight: 28,
     fontWeight: '700',
     color: '#FFFFFF',
+    letterSpacing: -0.4,
   },
   progressBlock: {
     marginTop: SPACING.lg,
@@ -198,7 +218,7 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 10,
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
     overflow: 'hidden',
   },
   progressFill: {
@@ -214,12 +234,14 @@ const styles = StyleSheet.create({
   },
   progressText: {
     flex: 1,
-    fontSize: TYPOGRAPHY.sizes.xs,
-    color: '#FFFFFF',
+    fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.9)',
     fontWeight: '500',
   },
   signalText: {
-    fontSize: TYPOGRAPHY.sizes.xs,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: 18,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -230,17 +252,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    borderTopColor: 'rgba(255, 255, 255, 0.18)',
   },
   saveLabel: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: '#FFFFFF',
+    fontSize: TYPOGRAPHY.sizes.lg,
+    lineHeight: 22,
+    color: 'rgba(255,255,255,0.88)',
     fontWeight: '500',
   },
   saveValue: {
-    fontSize: TYPOGRAPHY.sizes.md,
+    flexShrink: 1,
+    marginLeft: SPACING.md,
+    fontSize: TYPOGRAPHY.sizes.xxxl,
+    lineHeight: 30,
     color: '#FFFFFF',
     fontWeight: '700',
+    letterSpacing: -0.4,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -252,8 +279,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: BORDER_RADIUS.lg,
-    paddingVertical: SPACING.md,
+    borderRadius: 18,
+    minHeight: 50,
+    paddingVertical: SPACING.sm,
     gap: SPACING.xs,
     ...SHADOWS.sm,
   },
@@ -264,8 +292,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.error,
   },
   actionButtonText: {
-    fontSize: TYPOGRAPHY.sizes.md,
+    fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: '700',
     color: COLORS.white,
+    letterSpacing: -0.2,
   },
 });

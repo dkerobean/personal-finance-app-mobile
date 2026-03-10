@@ -155,7 +155,19 @@ export default function CreateTransactionScreen() {
       isValid = false;
     }
 
-    if (!isValid || !userId) return;
+    if (!isValid) {
+      const validationMessage =
+        !amount || parseFloat(amount) <= 0
+          ? 'Enter a valid amount greater than zero'
+          : 'Select a category to continue';
+      toast.warning('Complete required fields', validationMessage);
+      return;
+    }
+
+    if (!userId) {
+      toast.error('Sign in required', 'Please sign in again before saving this transaction.');
+      return;
+    }
 
     try {
       const success = await createTransaction(

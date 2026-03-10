@@ -1,9 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 import type { Liability, LiabilityCategory } from '@/types/models';
 import { formatCurrency } from '@/lib/formatters';
+import {
+  LIABILITY_CATEGORY_OPTIONS,
+  getLiabilityDisplayType,
+} from '@/lib/netWorthCatalog';
 
 interface LiabilityItemProps {
   liability: Liability;
@@ -12,36 +16,13 @@ interface LiabilityItemProps {
   showSeparator?: boolean;
 }
 
-const CATEGORY_ICONS: Record<LiabilityCategory, string> = {
-  loans: 'account-balance',
-  credit_cards: 'credit-card',
-  mortgages: 'home',
-  business_debt: 'business',
-  other: 'category',
-};
+const CATEGORY_ICONS = Object.fromEntries(
+  LIABILITY_CATEGORY_OPTIONS.map((option) => [option.key, option.icon])
+) as Record<LiabilityCategory, string>;
 
-const CATEGORY_COLORS: Record<LiabilityCategory, string> = {
-  loans: '#DC2626', // Red
-  credit_cards: '#B91C1C', // Dark red
-  mortgages: '#991B1B', // Darker red
-  business_debt: '#7F1D1D', // Very dark red
-  other: '#6B7280', // Gray
-};
-
-const extractDescriptionMeta = (rawDescription?: string): { clean: string; customType: string } => {
-  if (!rawDescription) {
-    return { clean: '', customType: '' };
-  }
-
-  const customType = rawDescription.match(/\[\[custom_type:(.*?)\]\]/i)?.[1]?.trim() || '';
-  const clean = rawDescription
-    .replace(/\[\[custom_category:.*?\]\]/gi, '')
-    .replace(/\[\[custom_type:.*?\]\]/gi, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-  return { clean, customType };
-};
+const CATEGORY_COLORS = Object.fromEntries(
+  LIABILITY_CATEGORY_OPTIONS.map((option) => [option.key, option.color])
+) as Record<LiabilityCategory, string>;
 
 export default function LiabilityItem({
   liability,
@@ -49,147 +30,93 @@ export default function LiabilityItem({
   onDeletePress,
   showSeparator = true,
 }: LiabilityItemProps): React.ReactElement {
-  
-  const getCategoryIcon = (category: LiabilityCategory): string => {
-    return CATEGORY_ICONS[category] || CATEGORY_ICONS.other;
-  };
+  const displayType = useMemo(() => getLiabilityDisplayType(liability), [liability]);
+  const balanceDelta = useMemo(() => {
+    if (!liability.original_balance) return null;
+    return liability.original_balance - liability.current_balance;
+  }, [liability]);
 
-  const getCategoryColor = (category: LiabilityCategory): string => {
-    return CATEGORY_COLORS[category] || CATEGORY_COLORS.other;
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return 'No due date';
+    return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: '2-digit',
       year: 'numeric',
     });
   };
 
-  const getLiabilityTypeDisplayName = (type: string): string => {
-    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const getInterestRateDisplay = (interestRate?: number): string | null => {
-    if (!interestRate) return null;
-    return `${interestRate.toFixed(2)}% APR`;
-  };
-
-  const getMonthlyPaymentDisplay = (monthlyPayment?: number): string | null => {
-    if (!monthlyPayment) return null;
-    return `${formatCurrency(monthlyPayment)}/mo`;
-  };
-
-  const handlePress = () => {
-    onPress(liability.id);
-  };
-
-  const handleDeletePress = (event: any) => {
-    event.stopPropagation();
-    onDeletePress?.(liability);
-  };
-  const descriptionMeta = extractDescriptionMeta(liability.description);
-  const typeLabel =
-    liability.custom_type?.trim() || descriptionMeta.customType || getLiabilityTypeDisplayName(liability.liability_type);
-  const categoryLabel = liability.custom_category?.trim();
-
   return (
-    <TouchableOpacity onPress={handlePress} style={styles.container} activeOpacity={0.7}>
+    <TouchableOpacity onPress={() => onPress(liability.id)} style={styles.container} activeOpacity={0.82}>
       <View style={styles.content}>
-        {/* Left Section - Icon and Category */}
         <View style={styles.leftSection}>
-          <View style={[
-            styles.iconContainer,
-            { backgroundColor: getCategoryColor(liability.category) }
-          ]}>
-            <MaterialIcons 
-              name={getCategoryIcon(liability.category) as any} 
-              size={24} 
+          <View style={[styles.iconContainer, { backgroundColor: CATEGORY_COLORS[liability.category] || CATEGORY_COLORS.other }]}>
+            <MaterialIcons
+              name={(CATEGORY_ICONS[liability.category] || CATEGORY_ICONS.other) as any}
+              size={22}
               color={COLORS.white}
             />
           </View>
         </View>
 
-        {/* Middle Section - Liability Details */}
         <View style={styles.middleSection}>
           <Text style={styles.liabilityName} numberOfLines={1}>
             {liability.name}
           </Text>
-          <View style={styles.detailsRow}>
-            <Text style={styles.liabilityType}>
-              {typeLabel}
-            </Text>
-            {categoryLabel ? (
-              <>
-                <Text style={styles.dot}>•</Text>
-                <Text style={styles.liabilityType}>{categoryLabel}</Text>
-              </>
-            ) : null}
-            <Text style={styles.dot}>•</Text>
-            <Text style={styles.lastUpdated}>
-              Updated {formatDate(liability.updated_at)}
-            </Text>
-          </View>
-          
-          {/* Interest Rate and Monthly Payment Row */}
-          <View style={styles.paymentRow}>
-            {getInterestRateDisplay(liability.interest_rate) && (
-              <>
-                <Text style={styles.interestRate}>
-                  {getInterestRateDisplay(liability.interest_rate)}
-                </Text>
-                {getMonthlyPaymentDisplay(liability.monthly_payment) && (
-                  <>
-                    <Text style={styles.dot}>•</Text>
-                    <Text style={styles.monthlyPayment}>
-                      {getMonthlyPaymentDisplay(liability.monthly_payment)}
-                    </Text>
-                  </>
-                )}
-              </>
-            )}
-          </View>
 
-          {descriptionMeta.clean ? (
+          <Text style={styles.liabilityType} numberOfLines={1}>
+            {displayType}
+            {liability.custom_category ? ` • ${liability.custom_category}` : ''}
+          </Text>
+
+          <Text style={styles.metaText} numberOfLines={1}>
+            {liability.interest_rate ? `${liability.interest_rate.toFixed(2)}% APR` : 'No APR set'}
+            {liability.monthly_payment ? ` • ${formatCurrency(liability.monthly_payment)}/mo` : ''}
+          </Text>
+
+          <Text style={styles.metaText} numberOfLines={1}>
+            {liability.due_date ? `Next due ${formatDate(liability.due_date)}` : `Updated ${formatDate(liability.updated_at)}`}
+          </Text>
+
+          {liability.description ? (
             <Text style={styles.description} numberOfLines={1}>
-              {descriptionMeta.clean}
+              {liability.description}
             </Text>
           ) : null}
         </View>
 
-        {/* Right Section - Balance and Actions */}
         <View style={styles.rightSection}>
-          <Text style={styles.currentBalance}>
-            {formatCurrency(liability.current_balance)}
-          </Text>
-          
-          {/* Show balance change if original balance exists */}
-          {liability.original_balance && liability.original_balance !== liability.current_balance && (
-            <Text style={[
-              styles.balanceChange,
-              liability.current_balance < liability.original_balance 
-                ? styles.balanceReduction 
-                : styles.balanceIncrease
-            ]}>
-              {liability.current_balance < liability.original_balance ? '' : '+'}
-              {formatCurrency(liability.current_balance - liability.original_balance)}
+          <Text style={styles.currentBalance}>{formatCurrency(liability.current_balance)}</Text>
+
+          {balanceDelta !== null ? (
+            <Text
+              style={[
+                styles.balanceChange,
+                balanceDelta >= 0 ? styles.balanceReduction : styles.balanceIncrease,
+              ]}
+            >
+              {balanceDelta >= 0 ? '-' : '+'}
+              {formatCurrency(Math.abs(balanceDelta))}
             </Text>
+          ) : (
+            <Text style={styles.secondaryLabel}>Add original balance for payoff tracking</Text>
           )}
-          
-          {onDeletePress && (
-            <TouchableOpacity 
-              onPress={handleDeletePress}
+
+          {onDeletePress ? (
+            <TouchableOpacity
+              onPress={(event) => {
+                event.stopPropagation();
+                onDeletePress(liability);
+              }}
               style={styles.deleteButton}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <MaterialIcons name="more-vert" size={20} color={COLORS.textTertiary} />
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </View>
 
-      {showSeparator && <View style={styles.separator} />}
+      {showSeparator ? <View style={styles.separator} /> : null}
     </TouchableOpacity>
   );
 }
@@ -225,42 +152,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins',
     marginBottom: 4,
   },
-  detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  paymentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
   liabilityType: {
     fontSize: TYPOGRAPHY.sizes.sm,
     color: COLORS.textSecondary,
     fontFamily: 'Poppins',
+    marginBottom: 2,
   },
-  dot: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.textTertiary,
-    marginHorizontal: SPACING.xs,
-  },
-  lastUpdated: {
+  metaText: {
     fontSize: TYPOGRAPHY.sizes.sm,
     color: COLORS.textTertiary,
     fontFamily: 'Poppins',
-  },
-  interestRate: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.error,
-    fontFamily: 'Poppins',
-    fontWeight: TYPOGRAPHY.weights.medium,
-  },
-  monthlyPayment: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.textSecondary,
-    fontFamily: 'Poppins',
-    fontWeight: TYPOGRAPHY.weights.medium,
+    marginBottom: 2,
   },
   description: {
     fontSize: TYPOGRAPHY.sizes.sm,
@@ -270,12 +172,12 @@ const styles = StyleSheet.create({
   },
   rightSection: {
     alignItems: 'flex-end',
-    minWidth: 80,
+    minWidth: 112,
   },
   currentBalance: {
     fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: TYPOGRAPHY.weights.semibold,
-    color: COLORS.error, // Red for debt amounts
+    color: COLORS.error,
     fontFamily: 'Poppins',
     marginBottom: 2,
   },
@@ -285,10 +187,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   balanceReduction: {
-    color: COLORS.success, // Green when debt is reduced
+    color: COLORS.success,
   },
   balanceIncrease: {
-    color: COLORS.error, // Red when debt increases
+    color: COLORS.error,
+  },
+  secondaryLabel: {
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: COLORS.textTertiary,
+    fontFamily: 'Poppins',
+    textAlign: 'right',
+    marginBottom: 4,
   },
   deleteButton: {
     padding: 4,
@@ -297,7 +206,7 @@ const styles = StyleSheet.create({
   separator: {
     height: 1,
     backgroundColor: COLORS.backgroundInput,
-    marginLeft: 64, // Align with text content
+    marginLeft: 64,
     marginRight: SPACING.lg,
   },
 });

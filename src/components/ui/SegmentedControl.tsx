@@ -92,10 +92,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   activeText: {
-    color: COLORS.textPrimary,
+    color: COLORS.white,
   },
   inactiveText: {
-    color: COLORS.textPrimary,
+    color: COLORS.textSecondary,
     fontWeight: TYPOGRAPHY.weights.medium,
   },
 });

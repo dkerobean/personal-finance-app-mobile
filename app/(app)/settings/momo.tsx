@@ -26,6 +26,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MonoConnect } from '@/components/features/MonoConnect';
 import GradientHeader from '@/components/budgets/GradientHeader';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
+import { useAppToast } from '@/hooks/useAppToast';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -41,6 +42,7 @@ interface LinkedAccount {
 
 export default function MonoIntegrationScreen() {
   const { user } = useUser();
+  const toast = useAppToast();
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
@@ -97,17 +99,17 @@ export default function MonoIntegrationScreen() {
       const json = await response.json();
 
       if (response.ok) {
-        Alert.alert(
-          'Sync Complete',
-          `Imported ${json.data.imported} new transactions.\n${json.data.skipped} duplicates skipped.`
+        toast.success(
+          'Sync complete',
+          `Imported ${json.data.imported} new transactions. ${json.data.skipped} duplicates skipped.`
         );
         fetchLinkedAccounts();
       } else {
-        Alert.alert('Sync Failed', json.error || 'Unable to sync transactions');
+        toast.error('Sync failed', json.error || 'Unable to sync transactions');
       }
     } catch (error) {
       console.error('Error syncing transactions:', error);
-      Alert.alert('Error', 'Failed to sync transactions');
+      toast.error('Sync failed', 'Failed to sync transactions');
     } finally {
       setIsSyncing(null);
     }

@@ -124,7 +124,7 @@ export default function EditAssetScreen() {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <GradientHeader
             title="Edit Asset"
-            subtitle="Update value and details"
+            subtitle="Refresh value, units, appraisal date, and notes"
             onBackPress={() => router.back()}
             showCalendar={false}
             showNotification={false}
@@ -142,7 +142,12 @@ export default function EditAssetScreen() {
               </View>
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoTitle}>{asset.name}</Text>
-                <Text style={styles.infoDescription}>Current value: {formatCurrency(asset.current_value)}</Text>
+                <Text style={styles.infoDescription}>
+                  Current value: {formatCurrency(asset.current_value)}
+                  {asset.valuation_method
+                    ? ` • ${asset.valuation_method.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())}`
+                    : ''}
+                </Text>
               </View>
             </LinearGradient>
 

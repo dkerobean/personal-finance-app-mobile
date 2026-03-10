@@ -86,7 +86,7 @@ export default function DashboardScreen(): React.ReactElement {
         }
       >
         <GradientHeader
-          title="Financial Home"
+          title="Home"
           subtitle="Track, save, and grow steadily"
           showCalendar={false}
           onNotificationPress={() => router.push('/notifications')}
@@ -161,29 +161,30 @@ const styles = StyleSheet.create({
     minHeight: '100%',
   },
   headerAvatarButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255,255,255,0.18)',
   },
   headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   headerAvatarFallback: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: COLORS.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sectionContainer: {
     paddingHorizontal: SPACING.lg,
+    marginTop: 0,
   },
 });

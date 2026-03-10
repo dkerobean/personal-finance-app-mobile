@@ -2,12 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { COLORS } from '@/constants/design';
-
-// Kippo K Logo SVG - White for green background
-const KIPPO_LOGO = `<svg width="60" height="60" viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg">
-  <path d="M17.5 65 L37.5 15 L57.5 15 L37.5 65 Z" fill="white"/>
-  <path d="M62.5 15 L82.5 15 L70.5 40 L60.5 65 L40.5 65 L50.5 40 Z" fill="white"/>
-</svg>`;
+import { KIPPO_MARK_WHITE_SVG } from '@/constants/brand';
+import { TYPOGRAPHY } from '@/constants/design';
 
 interface SplashScreenProps {
   onFinish: () => void;
@@ -34,7 +30,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <View style={styles.content}>
-        <SvgXml xml={KIPPO_LOGO} width={60} height={60} />
+        <SvgXml xml={KIPPO_MARK_WHITE_SVG} width={60} height={60} />
         <Text style={styles.logoText}>kippo</Text>
       </View>
       <Text style={styles.tagline}>Smart Money. Simple Life.</Text>
@@ -56,15 +52,15 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: 42,
-    fontWeight: '700',
+    fontFamily: TYPOGRAPHY.fonts.display,
     color: '#FFFFFF',
-    letterSpacing: 2,
+    letterSpacing: -1,
   },
   tagline: {
     position: 'absolute',
     bottom: 80,
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
-    fontStyle: 'italic',
+    fontFamily: TYPOGRAPHY.fonts.medium,
   },
 });

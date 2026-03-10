@@ -12,14 +12,9 @@ import {
 import { SvgXml } from 'react-native-svg';
 import { router } from 'expo-router';
 import { COLORS, TYPOGRAPHY, SPACING, SHADOWS, BORDER_RADIUS } from '@/constants/design';
+import { KIPPO_MARK_PRIMARY_SVG } from '@/constants/brand';
 
-const { width, height } = Dimensions.get('window');
-
-// Kippo K Logo SVG - Primary Color
-const KIPPO_LOGO = `<svg width="32" height="32" viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg">
-  <path d="M17.5 65 L37.5 15 L57.5 15 L37.5 65 Z" fill="${COLORS.primary}"/>
-  <path d="M62.5 15 L82.5 15 L70.5 40 L60.5 65 L40.5 65 L50.5 40 Z" fill="${COLORS.primary}"/>
-</svg>`;
+const { width } = Dimensions.get('window');
 
 interface OnboardingSlide {
   id: string;
@@ -82,7 +77,7 @@ export default function OnboardingScreen() {
 
       {/* Header Logo */}
       <View style={styles.header}>
-        <SvgXml xml={KIPPO_LOGO} width={40} height={40} />
+        <SvgXml xml={KIPPO_MARK_PRIMARY_SVG} width={40} height={40} />
         <Text style={styles.logoText}>kippo</Text>
       </View>
 
@@ -150,9 +145,9 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: TYPOGRAPHY.fonts.display,
     color: COLORS.primary,
-    letterSpacing: 1,
+    letterSpacing: -0.5,
   },
   slide: {
     width,
@@ -162,7 +157,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 42,
-    fontWeight: '700', // serif font style if available, otherwise generic bold
+    fontFamily: TYPOGRAPHY.fonts.display,
     color: COLORS.textPrimary,
     textAlign: 'center',
     marginBottom: SPACING.md,

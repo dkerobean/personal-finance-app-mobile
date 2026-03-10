@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { SafeAreaView } from 'react-native';
 import { router, Stack } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AccountTypeSelectionScreen } from '@/components/features/accounts/AccountTypeSelectionScreen';
 import { MonoConnectWidget } from '@/components/features/accounts/MonoConnectWidget';
 import MoMoAccountLink from '@/components/features/MoMoAccountLink';

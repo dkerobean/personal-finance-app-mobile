@@ -25,6 +25,7 @@ import BudgetSummaryCard from '@/components/budgets/BudgetSummaryCard';
 import ProgressBarWithStatus from '@/components/budgets/ProgressBarWithStatus';
 import BudgetTransactionsList from '@/components/budgets/BudgetTransactionsList';
 import BudgetProgressCard from '@/components/budgets/BudgetProgressCard';
+import { useAppToast } from '@/hooks/useAppToast';
 
 // Interface for budget data from Supabase
 interface BudgetData {
@@ -64,6 +65,7 @@ export default function BudgetsScreen(): React.ReactElement {
   
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<any>(null);
+  const toast = useAppToast();
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -161,7 +163,7 @@ export default function BudgetsScreen(): React.ReactElement {
           onPress: async () => {
             const success = await deleteBudget(budget.id);
             if (success) {
-              Alert.alert('Success', 'Budget deleted successfully');
+              toast.success('Budget deleted', 'Budget deleted successfully.');
             }
           },
         },

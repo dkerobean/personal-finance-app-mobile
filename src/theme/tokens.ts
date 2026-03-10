@@ -48,9 +48,10 @@ export const colors = {
 };
 
 export const typography = {
-  // Font Families (System Native)
+  // Font Families
   fontFamily: {
-    system: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+    system: ['PlusJakartaSans_400Regular', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+    display: ['PlusJakartaSans_700Bold', 'PlusJakartaSans_600SemiBold', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
     mono: ['SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', 'monospace'],
   },
   

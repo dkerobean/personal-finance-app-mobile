@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { Asset } = require('../models');
+const { getAssetCurrentValue } = require('../services/netWorthCalculator');
+const { createNetWorthSnapshotForUser } = require('../services/netWorthSnapshotService');
 
 // Get all assets for user
 router.get('/', async (req, res) => {
@@ -55,6 +57,11 @@ router.post('/', async (req, res) => {
       customType,
       originalValue,
       purchaseDate,
+      valuationMethod,
+      tickerSymbol,
+      unitsHeld,
+      unitPrice,
+      lastValuationDate,
       description,
     } = req.body;
 
@@ -62,12 +69,26 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'userId, name, category, assetType, currentValue are required' });
     }
 
+    const resolvedCurrentValue = getAssetCurrentValue({
+      currentValue,
+      valuationMethod,
+      unitsHeld,
+      unitPrice,
+    });
+
     const asset = await Asset.create({
-      userId, name, category, assetType, currentValue, originalValue,
+      userId, name, category, assetType, currentValue: resolvedCurrentValue, originalValue,
       customCategory, customType,
       purchaseDate: purchaseDate ? new Date(purchaseDate) : undefined,
+      valuationMethod: valuationMethod || 'manual',
+      tickerSymbol,
+      unitsHeld,
+      unitPrice,
+      lastValuationDate: lastValuationDate ? new Date(lastValuationDate) : undefined,
       description, isActive: true,
     });
+
+    await createNetWorthSnapshotForUser(userId);
 
     res.status(201).json({ data: asset });
   } catch (error) {
@@ -82,6 +103,20 @@ router.patch('/:id', async (req, res) => {
     const userId = req.query.userId;
     const updateData = { ...req.body };
     if (updateData.purchaseDate) updateData.purchaseDate = new Date(updateData.purchaseDate);
+    if (updateData.lastValuationDate) updateData.lastValuationDate = new Date(updateData.lastValuationDate);
+
+    if (
+      updateData.valuationMethod === 'market' &&
+      updateData.unitsHeld !== undefined &&
+      updateData.unitPrice !== undefined
+    ) {
+      updateData.currentValue = getAssetCurrentValue({
+        currentValue: updateData.currentValue,
+        valuationMethod: updateData.valuationMethod,
+        unitsHeld: updateData.unitsHeld,
+        unitPrice: updateData.unitPrice,
+      });
+    }
 
     const asset = await Asset.findOneAndUpdate(
       { _id: req.params.id, userId },
@@ -92,6 +127,8 @@ router.patch('/:id', async (req, res) => {
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
     }
+
+    await createNetWorthSnapshotForUser(userId);
 
     res.json({ data: asset });
   } catch (error) {
@@ -113,6 +150,8 @@ router.delete('/:id', async (req, res) => {
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
     }
+
+    await createNetWorthSnapshotForUser(userId);
 
     res.json({ success: true });
   } catch (error) {

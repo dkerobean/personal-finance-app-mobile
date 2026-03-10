@@ -1,12 +1,10 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TrendingUp, TrendingDown, ChevronRight } from 'lucide-react-native';
 import Svg, { Path, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/design';
+import { BORDER_RADIUS, COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '@/constants/design';
 import { formatCurrency } from '@/lib/formatters';
-
-const { width: screenWidth } = Dimensions.get('window');
 
 interface NetWorthSnapshot {
   month: string;
@@ -27,14 +25,33 @@ export default function NetWorthTrendChart({
   isLoading = false,
   onViewHistory,
 }: NetWorthTrendChartProps): React.ReactElement {
-  const chartWidth = screenWidth - (SPACING.xl * 2) - (SPACING.lg * 2);
+  const [containerWidth, setContainerWidth] = useState(0);
   const chartHeight = 150;
   const hasData = historicalData.length > 0;
+  const chartWidth = Math.max(containerWidth, 240);
+  const safeData = useMemo(() => historicalData.slice(-7), [historicalData]);
+  const labelFormatter = useMemo(() => {
+    const monthKeys = new Set(
+      safeData.map((item) => {
+        const date = new Date(item.timestamp);
+        return `${date.getFullYear()}-${date.getMonth()}`;
+      })
+    );
+
+    return (timestamp: string): string => {
+      const date = new Date(timestamp);
+      if (monthKeys.size === 1) {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+
+      return date.toLocaleDateString('en-US', { month: 'short' });
+    };
+  }, [safeData]);
   
   const getMinMaxValues = () => {
     if (!hasData) return { min: 0, max: 0 };
     
-    const values = historicalData.map(item => item.netWorth);
+    const values = safeData.map(item => item.netWorth);
     return {
       min: Math.min(...values),
       max: Math.max(...values),
@@ -45,7 +62,7 @@ export default function NetWorthTrendChart({
   const valueRange = max - min || 1; // Avoid division by zero
   
   const getPointPosition = (index: number, value: number) => {
-    const x = (index / Math.max(historicalData.length - 1, 1)) * chartWidth;
+    const x = (index / Math.max(safeData.length - 1, 1)) * chartWidth;
     const y = chartHeight - ((value - min) / valueRange) * chartHeight;
     return { x, y };
   };
@@ -54,7 +71,7 @@ export default function NetWorthTrendChart({
     if (!hasData) return '';
     
     let path = '';
-    historicalData.forEach((item, index) => {
+    safeData.forEach((item, index) => {
       const { x, y } = getPointPosition(index, item.netWorth);
       if (index === 0) {
         path += `M ${x} ${y}`;
@@ -66,10 +83,10 @@ export default function NetWorthTrendChart({
   };
 
   const getLatestChange = () => {
-    if (historicalData.length < 2) return { amount: 0, percentage: 0 };
+    if (safeData.length < 2) return { amount: 0, percentage: 0 };
     
-    const latest = historicalData[historicalData.length - 1];
-    const previous = historicalData[historicalData.length - 2];
+    const latest = safeData[safeData.length - 1];
+    const previous = safeData[safeData.length - 2];
     const change = latest.netWorth - previous.netWorth;
     const percentage = previous.netWorth !== 0 ? (change / Math.abs(previous.netWorth)) * 100 : 0;
     
@@ -104,7 +121,14 @@ export default function NetWorthTrendChart({
   );
 
   const renderChart = () => (
-    <View>
+    <View
+      onLayout={(event) => {
+        const nextWidth = event.nativeEvent.layout.width - SPACING.xs * 2;
+        if (nextWidth > 0 && Math.abs(nextWidth - containerWidth) > 1) {
+          setContainerWidth(nextWidth);
+        }
+      }}
+    >
       {/* Chart Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -158,7 +182,7 @@ export default function NetWorthTrendChart({
               />
               
               {/* Data Points */}
-              {historicalData.map((item, index) => {
+              {safeData.map((item, index) => {
                 const { x, y } = getPointPosition(index, item.netWorth);
                 return (
                   <Circle
@@ -195,9 +219,9 @@ export default function NetWorthTrendChart({
 
       {/* Month Labels */}
       <View style={styles.monthLabels}>
-        {historicalData.map((item, index) => (
+        {safeData.map((item, index) => (
           <Text key={index} style={styles.monthLabel}>
-            {item.month}
+            {labelFormatter(item.timestamp)}
           </Text>
         ))}
       </View>
@@ -214,9 +238,9 @@ export default function NetWorthTrendChart({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.backgroundCard,
-    marginHorizontal: SPACING.xl,
-    marginBottom: SPACING.xl,
-    borderRadius: BORDER_RADIUS.lg,
+    width: '100%',
+    marginBottom: SPACING.lg,
+    borderRadius: 24,
     padding: SPACING.lg,
     ...SHADOWS.sm,
   },

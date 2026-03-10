@@ -15,6 +15,7 @@ import { supabase } from '@/services/supabaseClient';
 import { useAuthStore } from '@/stores/authStore';
 import GradientHeader from '@/components/budgets/GradientHeader';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface LinkedAccount {
   id: string;
@@ -31,6 +32,7 @@ export default function AccountsScreen() {
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuthStore();
+  const toast = useAppToast();
 
   const loadLinkedAccounts = async () => {
     if (!user?.id) return;
@@ -56,7 +58,7 @@ export default function AccountsScreen() {
       setLinkedAccounts(accounts || []);
     } catch (error) {
       console.error('Failed to load linked accounts:', error);
-      Alert.alert('Error', 'Failed to load accounts. Please try again.');
+      toast.error('Load failed', 'Failed to load accounts. Please try again.');
     } finally {
       setIsLoading(false);
     }

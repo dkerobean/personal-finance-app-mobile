@@ -12,6 +12,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { Budget, UpdateBudgetRequest } from '@/types/models';
 import { useBudgetStore } from '@/stores/budgetStore';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface EditBudgetModalProps {
   visible: boolean;
@@ -25,6 +26,7 @@ export default function EditBudgetModal({
   onClose,
 }: EditBudgetModalProps): React.ReactElement {
   const { updateBudget, isLoading, error, clearError } = useBudgetStore();
+  const toast = useAppToast();
   
   const [amount, setAmount] = useState<string>('');
   const [amountError, setAmountError] = useState<string>('');
@@ -68,7 +70,7 @@ export default function EditBudgetModal({
     const success = await updateBudget(budget.id, request);
     
     if (success) {
-      Alert.alert('Success', 'Budget updated successfully');
+      toast.success('Budget updated', 'Budget updated successfully.');
       onClose();
     }
   };

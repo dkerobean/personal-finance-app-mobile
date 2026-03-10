@@ -15,6 +15,8 @@ interface RecentTransactionsProps {
 
 export default function RecentTransactions({ transactions, isLoading }: RecentTransactionsProps) {
   const router = useRouter();
+  const getTransactionId = (transaction: Transaction): string =>
+    transaction.id || (transaction as any)._id || '';
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-GH', {
@@ -43,6 +45,7 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
   };
 
   const handleTransactionPress = (transactionId: string) => {
+    if (!transactionId) return;
     router.push(`/transactions/${transactionId}`);
   };
 
@@ -105,12 +108,12 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
       <View style={styles.transactionsList}>
         {recentTransactions.map((transaction, index) => (
           <TouchableOpacity
-            key={transaction.id}
+            key={getTransactionId(transaction) || `recent-${index}`}
             style={[
               styles.transactionItem,
               index === recentTransactions.length - 1 && styles.lastTransactionItem,
             ]}
-            onPress={() => handleTransactionPress(transaction.id)}
+            onPress={() => handleTransactionPress(getTransactionId(transaction))}
             activeOpacity={0.75}
           >
             <View style={styles.transactionLeft}>
@@ -127,7 +130,7 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
               
               <View style={styles.transactionDetails}>
                 <View style={styles.categoryRow}>
-                  <Text style={styles.categoryName}>
+                  <Text style={styles.categoryName} numberOfLines={1}>
                     {transaction.category?.name || 'Unknown Category'}
                   </Text>
                   {isSyncedTransaction(transaction) && (
@@ -164,11 +167,12 @@ export default function RecentTransactions({ transactions, isLoading }: RecentTr
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.backgroundCard,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
+    borderRadius: 22,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
     marginVertical: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.gray100,
+    borderColor: COLORS.border,
     ...SHADOWS.md,
   },
   header: {
@@ -178,12 +182,15 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   title: {
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: '600',
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    lineHeight: 26,
+    fontWeight: '700',
     color: COLORS.textPrimary,
+    letterSpacing: -0.4,
   },
   viewAllButton: {
-    fontSize: TYPOGRAPHY.sizes.sm,
+    fontSize: TYPOGRAPHY.sizes.md,
+    lineHeight: 18,
     color: COLORS.primary,
     fontWeight: '600',
   },
@@ -196,21 +203,22 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textTertiary,
+    color: COLORS.textSecondary,
   },
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: SPACING.xxl,
   },
   emptyTitle: {
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: '600',
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    lineHeight: 28,
+    fontWeight: '700',
     color: COLORS.textPrimary,
     marginTop: SPACING.md,
     marginBottom: SPACING.xs,
   },
   emptySubtitle: {
-    fontSize: TYPOGRAPHY.sizes.sm,
+    fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textTertiary,
     textAlign: 'center',
     lineHeight: 20,
@@ -227,7 +235,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: COLORS.white,
-    fontSize: TYPOGRAPHY.sizes.md,
+    fontSize: TYPOGRAPHY.sizes.xl,
     fontWeight: '600',
   },
   transactionsList: {},
@@ -235,13 +243,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: SPACING.md + 2,
+    paddingVertical: SPACING.sm,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray100,
   },
   lastTransactionItem: {
     borderBottomWidth: 0,
-    paddingBottom: SPACING.xs,
+    paddingBottom: 0,
   },
   transactionLeft: {
     flexDirection: 'row',
@@ -249,12 +257,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    marginRight: SPACING.sm,
   },
   incomeIcon: {
     backgroundColor: COLORS.success,
@@ -269,31 +277,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,
-    flexWrap: 'wrap',
     marginBottom: 2,
   },
   categoryName: {
+    flexShrink: 1,
     fontSize: TYPOGRAPHY.sizes.md,
+    lineHeight: 18,
     fontWeight: '600',
     color: COLORS.textPrimary,
   },
   transactionDate: {
     fontSize: TYPOGRAPHY.sizes.xs,
-    color: COLORS.textTertiary,
+    lineHeight: 16,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
   },
   transactionDescription: {
     fontSize: TYPOGRAPHY.sizes.xs,
+    lineHeight: 16,
     color: COLORS.textTertiary,
     marginTop: 2,
   },
   transactionRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: SPACING.md,
   },
   transactionAmount: {
     fontSize: TYPOGRAPHY.sizes.md,
+    lineHeight: 18,
     fontWeight: '700',
-    marginRight: SPACING.xs,
+    marginRight: 6,
+    letterSpacing: -0.3,
   },
   incomeAmount: {
     color: COLORS.success,

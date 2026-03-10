@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/design';
 import { formatCurrency } from '@/lib/formatters';
 import type { HistoricalDataPoint, TimePeriodConfig } from '../../../app/(app)/networth/history';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface ExportOptionsProps {
   data: HistoricalDataPoint[];
@@ -19,6 +20,7 @@ export default function ExportOptions({
   onExport,
 }: ExportOptionsProps): React.ReactElement {
   const [isExporting, setIsExporting] = useState<string | null>(null);
+  const toast = useAppToast();
 
   // Generate CSV content
   const generateCSV = (): string => {
@@ -105,11 +107,7 @@ Generated from kippo - Personal Finance Tracker`;
       onExport?.('csv');
     } catch (error) {
       console.error('CSV export error:', error);
-      Alert.alert(
-        'Export Failed',
-        'Unable to export CSV data. Please try again.',
-        [{ text: 'OK' }]
-      );
+      toast.error('Export failed', 'Unable to export CSV data. Please try again.');
     } finally {
       setIsExporting(null);
     }
@@ -121,20 +119,12 @@ Generated from kippo - Personal Finance Tracker`;
       setIsExporting('image');
       
       // TODO: Implement actual chart screenshot functionality
-      Alert.alert(
-        'Feature Coming Soon',
-        'Chart image export functionality will be available in a future update.',
-        [{ text: 'OK' }]
-      );
+      toast.info('Coming soon', 'Chart image export will be available in a future update.');
       
       onExport?.('image');
     } catch (error) {
       console.error('Image export error:', error);
-      Alert.alert(
-        'Export Failed',
-        'Unable to export chart image. Please try again.',
-        [{ text: 'OK' }]
-      );
+      toast.error('Export failed', 'Unable to export chart image. Please try again.');
     } finally {
       setIsExporting(null);
     }
@@ -155,11 +145,7 @@ Generated from kippo - Personal Finance Tracker`;
       onExport?.('share');
     } catch (error) {
       console.error('Share error:', error);
-      Alert.alert(
-        'Share Failed',
-        'Unable to share summary. Please try again.',
-        [{ text: 'OK' }]
-      );
+      toast.error('Share failed', 'Unable to share summary. Please try again.');
     } finally {
       setIsExporting(null);
     }

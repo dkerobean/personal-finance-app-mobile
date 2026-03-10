@@ -4,7 +4,24 @@ import { LineChart } from 'react-native-chart-kit';
 import { MaterialIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/design';
 import { formatCurrency } from '@/lib/formatters';
-import type { HistoricalDataPoint, TimePeriodConfig } from '../../../app/(app)/networth/history';
+
+interface TimePeriodConfig {
+  label: string;
+  months: number;
+  defaultChart: 'line' | 'bar';
+  dataPoints: 'all' | 'monthly' | 'quarterly';
+}
+
+interface HistoricalDataPoint {
+  date: string;
+  netWorth: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  connectedValue: number;
+  manualAssets: number;
+  manualLiabilities: number;
+  monthOverMonth: number;
+}
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -31,15 +48,23 @@ export default function NetWorthHistoryChart({
 
   const chartWidth = screenWidth - (SPACING.xl * 2);
   const chartHeight = height - 60; // Account for header space
+  const monthKeys = new Set(
+    data.map((point) => {
+      const date = new Date(point.date);
+      return `${date.getFullYear()}-${date.getMonth()}`;
+    })
+  );
 
   // Transform data for react-native-chart-kit
   const chartData = {
     labels: data.map((point, index) => {
       const date = new Date(point.date);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        year: timePeriod.months > 12 ? '2-digit' : undefined 
-      });
+      return date.toLocaleDateString('en-US', monthKeys.size === 1
+        ? { month: 'short', day: 'numeric' }
+        : {
+            month: 'short',
+            year: timePeriod.months > 12 ? '2-digit' : undefined,
+          });
     }),
     datasets: [
       {
@@ -78,13 +103,13 @@ export default function NetWorthHistoryChart({
       strokeWidth: '2',
       stroke: '#ffffff'
     },
-    formatYLabel: (value) => formatCurrency(parseFloat(value), { compact: true })
+    formatYLabel: (value: string) => formatCurrency(parseFloat(value), { compact: true })
   };
 
   // Handle data point selection
-  const handlePointPress = (data: any, index: number) => {
-    if (!interactive || !data || data.length === 0) return;
-    
+  const handlePointPress = ({ index }: { index: number }) => {
+    if (!interactive || index === undefined || !data[index]) return;
+
     const point = data[index];
     if (point) {
       setSelectedPoint(point);

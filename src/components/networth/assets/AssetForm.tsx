@@ -1,17 +1,31 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Platform,
+  View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
-import type { Asset, AssetCategory, AssetType, CreateAssetRequest, UpdateAssetRequest } from '@/types/models';
+import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/design';
+import {
+  ASSET_CATEGORY_OPTIONS,
+  APPRECIATING_ASSET_TYPES,
+  calculateAssetChange,
+  getAssetTypeLabel,
+  getAssetTypeOptions,
+} from '@/lib/netWorthCatalog';
+import type {
+  Asset,
+  AssetCategory,
+  AssetType,
+  AssetValuationMethod,
+  CreateAssetRequest,
+  UpdateAssetRequest,
+} from '@/types/models';
 
 const CURRENCY_PREFIX = 'GH¢';
 const CUSTOM_CATEGORY_REGEX = /\[\[custom_category:(.*?)\]\]/i;
@@ -26,43 +40,7 @@ interface AssetFormProps {
   mode: 'create' | 'edit';
 }
 
-const ASSET_CATEGORIES: { key: AssetCategory; label: string; types: AssetType[] }[] = [
-  {
-    key: 'property',
-    label: 'Property',
-    types: ['real_estate', 'land', 'rental_property']
-  },
-  {
-    key: 'investments',
-    label: 'Investments',
-    types: ['stocks', 'bonds', 'mutual_funds', 'etf', 'cryptocurrency', 'retirement_account', 'treasury_bill', 'pension_fund']
-  },
-  {
-    key: 'cash',
-    label: 'Cash & Savings',
-    types: ['savings', 'checking', 'money_market', 'cd', 'foreign_currency', 'mobile_money_wallet', 'emergency_fund', 'fixed_deposit']
-  },
-  {
-    key: 'vehicles',
-    label: 'Vehicles',
-    types: ['car', 'motorcycle', 'boat', 'rv']
-  },
-  {
-    key: 'personal',
-    label: 'Personal Assets',
-    types: ['jewelry', 'art', 'collectibles', 'electronics']
-  },
-  {
-    key: 'business',
-    label: 'Business Assets',
-    types: ['business_equity', 'business_assets', 'intellectual_property']
-  },
-  {
-    key: 'other',
-    label: 'Other Assets',
-    types: ['other']
-  },
-];
+type DateField = 'purchase' | 'valuation' | null;
 
 const sanitizeCustomValue = (value: string): string => value.replace(/\]\]/g, '').trim();
 
@@ -87,6 +65,17 @@ const extractCustomMeta = (rawDescription?: string): {
   return { cleanDescription, customCategory, customType };
 };
 
+const normaliseNumberInput = (value: string): string => {
+  const numericValue = value.replace(/[^0-9.]/g, '');
+  const parts = numericValue.split('.');
+  if (parts.length > 2) {
+    return `${parts[0]}.${parts[1].slice(0, 4)}`;
+  }
+  return numericValue;
+};
+
+const formatDateValue = (date?: string): Date | null => (date ? new Date(date) : null);
+
 export default function AssetForm({
   initialData,
   onSave,
@@ -96,81 +85,101 @@ export default function AssetForm({
   mode,
 }: AssetFormProps): React.ReactElement {
   const parsedMeta = useMemo(() => extractCustomMeta(initialData?.description), [initialData?.description]);
-  
-  // Form state
+
   const [name, setName] = useState(initialData?.name || '');
   const [category, setCategory] = useState<AssetCategory>(initialData?.category || 'property');
-  const [assetType, setAssetType] = useState<AssetType>(initialData?.asset_type || 'real_estate');
+  const [assetType, setAssetType] = useState<AssetType>(initialData?.asset_type || 'primary_home');
   const [currentValue, setCurrentValue] = useState(initialData?.current_value?.toString() || '');
   const [originalValue, setOriginalValue] = useState(initialData?.original_value?.toString() || '');
-  const [purchaseDate, setPurchaseDate] = useState<Date | null>(
-    initialData?.purchase_date ? new Date(initialData.purchase_date) : null
-  );
+  const [purchaseDate, setPurchaseDate] = useState<Date | null>(formatDateValue(initialData?.purchase_date));
+  const [valuationMethod, setValuationMethod] = useState<AssetValuationMethod>(initialData?.valuation_method || 'manual');
+  const [tickerSymbol, setTickerSymbol] = useState(initialData?.ticker_symbol || '');
+  const [unitsHeld, setUnitsHeld] = useState(initialData?.units_held?.toString() || '');
+  const [unitPrice, setUnitPrice] = useState(initialData?.unit_price?.toString() || '');
+  const [lastValuationDate, setLastValuationDate] = useState<Date | null>(formatDateValue(initialData?.last_valuation_date));
   const [description, setDescription] = useState(parsedMeta.cleanDescription);
   const [customCategoryName, setCustomCategoryName] = useState(initialData?.custom_category || parsedMeta.customCategory);
   const [customAssetTypeName, setCustomAssetTypeName] = useState(initialData?.custom_type || parsedMeta.customType);
-  
-  // UI state
+
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [activeDateField, setActiveDateField] = useState<DateField>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Update asset types when category changes
-  useEffect(() => {
-    const categoryData = ASSET_CATEGORIES.find(cat => cat.key === category);
-    if (categoryData && !categoryData.types.includes(assetType)) {
-      setAssetType(categoryData.types[0]);
-    }
-  }, [category, assetType]);
+  const currentCategory = useMemo(
+    () => ASSET_CATEGORY_OPTIONS.find((option) => option.key === category),
+    [category]
+  );
+  const assetTypeOptions = useMemo(() => getAssetTypeOptions(category), [category]);
+  const usesMarketTracking = valuationMethod === 'market';
+  const supportsMarketTracking = useMemo(
+    () => assetTypeOptions.find((option) => option.key === assetType)?.supportsMarketTracking ?? false,
+    [assetTypeOptions, assetType]
+  );
 
-  const getAssetTypeLabel = (type: AssetType): string => {
-    const labels: Record<AssetType, string> = {
-      real_estate: 'Real Estate',
-      land: 'Land',
-      rental_property: 'Rental Property',
-      stocks: 'Stocks',
-      bonds: 'Bonds',
-      mutual_funds: 'Mutual Funds',
-      etf: 'ETF',
-      cryptocurrency: 'Cryptocurrency',
-      retirement_account: 'Retirement Account',
-      treasury_bill: 'Treasury Bill',
-      pension_fund: 'Pension Fund',
-      savings: 'Savings Account',
-      checking: 'Checking Account',
-      money_market: 'Money Market',
-      cd: 'Certificate of Deposit',
-      foreign_currency: 'Foreign Currency',
-      mobile_money_wallet: 'Mobile Money Wallet',
-      emergency_fund: 'Emergency Fund',
-      fixed_deposit: 'Fixed Deposit',
-      car: 'Car',
-      motorcycle: 'Motorcycle',
-      boat: 'Boat',
-      rv: 'RV',
-      jewelry: 'Jewelry',
-      art: 'Art',
-      collectibles: 'Collectibles',
-      electronics: 'Electronics',
-      business_equity: 'Business Equity',
-      business_assets: 'Business Assets',
-      intellectual_property: 'Intellectual Property',
-      other: 'Other',
+  useEffect(() => {
+    if (!assetTypeOptions.some((option) => option.key === assetType)) {
+      setAssetType(assetTypeOptions[0]?.key || 'other');
+    }
+  }, [assetTypeOptions, assetType]);
+
+  useEffect(() => {
+    if (usesMarketTracking) {
+      const units = Number(unitsHeld || 0);
+      const price = Number(unitPrice || 0);
+      if (units > 0 && price > 0) {
+        setCurrentValue((units * price).toFixed(2));
+      }
+    }
+  }, [usesMarketTracking, unitsHeld, unitPrice]);
+
+  useEffect(() => {
+    if (valuationMethod === 'market' && !supportsMarketTracking) {
+      setValuationMethod('manual');
+      setTickerSymbol('');
+      setUnitsHeld('');
+      setUnitPrice('');
+    }
+  }, [supportsMarketTracking, valuationMethod]);
+
+  const gainPreview = useMemo(() => {
+    const previewAsset = {
+      current_value: Number(currentValue || 0),
+      original_value: Number(originalValue || 0),
+      valuation_method: valuationMethod,
+      units_held: Number(unitsHeld || 0) || undefined,
+      unit_price: Number(unitPrice || 0) || undefined,
     };
-    return labels[type] || type;
-  };
+    return calculateAssetChange(previewAsset);
+  }, [currentValue, originalValue, valuationMethod, unitsHeld, unitPrice]);
+
+  const isAppreciatingAsset = APPRECIATING_ASSET_TYPES.has(assetType);
+  const categoryDisplayLabel =
+    category === 'other' && customCategoryName.trim()
+      ? `Other • ${customCategoryName.trim()}`
+      : currentCategory?.label || 'Select Category';
+  const assetTypeDisplayLabel =
+    assetType === 'other' && customAssetTypeName.trim()
+      ? `Custom • ${customAssetTypeName.trim()}`
+      : getAssetTypeLabel(assetType);
 
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
+    const nextErrors: Record<string, string> = {};
 
-    if (!name.trim()) newErrors.name = 'Name is required';
-    if (!currentValue) newErrors.current_value = 'Value is required';
-    if (category === 'other' && !customCategoryName.trim()) newErrors.custom_category = 'Add your custom category';
-    if (assetType === 'other' && !customAssetTypeName.trim()) newErrors.custom_type = 'Add your custom asset type';
-    
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    if (!name.trim()) nextErrors.name = 'Asset name is required';
+    if (!currentValue || Number(currentValue) <= 0) nextErrors.current_value = 'Enter the current value';
+    if (category === 'other' && !customCategoryName.trim()) nextErrors.custom_category = 'Add your custom category';
+    if (assetType === 'other' && !customAssetTypeName.trim()) nextErrors.custom_type = 'Add your custom asset type';
+
+    if (usesMarketTracking) {
+      if (!tickerSymbol.trim()) nextErrors.ticker_symbol = 'Add a symbol or market reference';
+      if (!unitsHeld || Number(unitsHeld) <= 0) nextErrors.units_held = 'Enter units or quantity held';
+      if (!unitPrice || Number(unitPrice) <= 0) nextErrors.unit_price = 'Enter the latest unit price';
+      if (!lastValuationDate) nextErrors.last_valuation_date = 'Pick the last valuation date';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
       return false;
     }
 
@@ -178,75 +187,114 @@ export default function AssetForm({
     return true;
   };
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     if (!validateForm()) {
       return;
     }
 
-    const formData = {
+    const payload: CreateAssetRequest | UpdateAssetRequest = {
       name: name.trim(),
       category,
       asset_type: assetType,
       custom_category: category === 'other' ? sanitizeCustomValue(customCategoryName) : undefined,
       custom_type: assetType === 'other' ? sanitizeCustomValue(customAssetTypeName) : undefined,
-      current_value: parseFloat(currentValue),
-      original_value: originalValue ? parseFloat(originalValue) : undefined,
-      purchase_date: purchaseDate?.toISOString().split('T')[0],
+      current_value: Number(currentValue),
+      original_value: originalValue ? Number(originalValue) : undefined,
+      purchase_date: purchaseDate ? purchaseDate.toISOString().split('T')[0] : undefined,
+      valuation_method: valuationMethod,
+      ticker_symbol: usesMarketTracking ? tickerSymbol.trim().toUpperCase() : undefined,
+      units_held: usesMarketTracking ? Number(unitsHeld) : undefined,
+      unit_price: usesMarketTracking ? Number(unitPrice) : undefined,
+      last_valuation_date: lastValuationDate ? lastValuationDate.toISOString().split('T')[0] : undefined,
       description: description.trim() || undefined,
     };
 
-    onSave(formData);
+    onSave(payload);
   };
 
-  const formatCurrency = (value: string): string => {
-    const numericValue = value.replace(/[^0-9.]/g, '');
-    const parts = numericValue.split('.');
-    if (parts.length > 2) {
-      return `${parts[0]}.${parts[1].slice(0, 2)}`;
+  const renderDatePicker = () => {
+    if (!activeDateField) {
+      return null;
     }
-    return numericValue;
-  };
 
-  const currentCategory = ASSET_CATEGORIES.find(cat => cat.key === category);
-  const categoryDisplayLabel =
-    category === 'other' && customCategoryName.trim()
-      ? `Other • ${customCategoryName.trim()}`
-      : currentCategory?.label || 'Select Category';
-  const assetTypeDisplayLabel =
-    assetType === 'other' && customAssetTypeName.trim()
-      ? `Other • ${customAssetTypeName.trim()}`
-      : getAssetTypeLabel(assetType);
+    const value =
+      activeDateField === 'purchase'
+        ? purchaseDate || new Date()
+        : lastValuationDate || new Date();
+
+    const handleChange = (_event: unknown, selectedDate?: Date) => {
+      if (Platform.OS !== 'ios') {
+        setActiveDateField(null);
+      }
+      if (!selectedDate) {
+        return;
+      }
+
+      if (activeDateField === 'purchase') {
+        setPurchaseDate(selectedDate);
+      } else {
+        setLastValuationDate(selectedDate);
+      }
+    };
+
+    if (Platform.OS === 'ios') {
+      return (
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Date</Text>
+              <TouchableOpacity onPress={() => setActiveDateField(null)}>
+                <Text style={styles.doneText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            <DateTimePicker
+              value={value}
+              mode="date"
+              display="spinner"
+              maximumDate={new Date()}
+              onChange={handleChange}
+              style={styles.iosDatePicker}
+            />
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <DateTimePicker
+        value={value}
+        mode="date"
+        display="default"
+        maximumDate={new Date()}
+        onChange={handleChange}
+      />
+    );
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Asset Name */}
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Asset Name*</Text>
         <TextInput
           style={[styles.input, errors.name && styles.inputError]}
           value={name}
           onChangeText={setName}
-          placeholder="e.g., My House, Tesla Stock"
+          placeholder="e.g., Apple Shares, East Legon Duplex"
           placeholderTextColor={COLORS.textTertiary}
           editable={!isLoading}
         />
-        {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+        {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
       </View>
 
-      {/* Category Selection */}
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Category*</Text>
-        <TouchableOpacity
-          style={[styles.picker, errors.category && styles.inputError]}
-          onPress={() => setShowCategoryPicker(true)}
-          disabled={isLoading}
-        >
+        <TouchableOpacity style={[styles.picker, errors.category && styles.inputError]} onPress={() => setShowCategoryPicker(true)} disabled={isLoading}>
           <Text style={styles.pickerText}>{categoryDisplayLabel}</Text>
           <MaterialIcons name="arrow-drop-down" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
-        {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
       </View>
-      {category === 'other' && (
+
+      {category === 'other' ? (
         <View style={styles.fieldContainer}>
           <Text style={styles.label}>Custom Category*</Text>
           <TextInput
@@ -257,150 +305,229 @@ export default function AssetForm({
             placeholderTextColor={COLORS.textTertiary}
             editable={!isLoading}
           />
-          {errors.custom_category && <Text style={styles.errorText}>{errors.custom_category}</Text>}
+          {errors.custom_category ? <Text style={styles.errorText}>{errors.custom_category}</Text> : null}
         </View>
-      )}
+      ) : null}
 
-      {/* Asset Type Selection */}
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Asset Type*</Text>
-        <TouchableOpacity
-          style={[styles.picker, errors.asset_type && styles.inputError]}
-          onPress={() => setShowTypePicker(true)}
-          disabled={isLoading}
-        >
+        <TouchableOpacity style={[styles.picker, errors.asset_type && styles.inputError]} onPress={() => setShowTypePicker(true)} disabled={isLoading}>
           <Text style={styles.pickerText}>{assetTypeDisplayLabel}</Text>
           <MaterialIcons name="arrow-drop-down" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
-        {errors.asset_type && <Text style={styles.errorText}>{errors.asset_type}</Text>}
       </View>
-      {assetType === 'other' && (
+
+      {assetType === 'other' ? (
         <View style={styles.fieldContainer}>
           <Text style={styles.label}>Custom Asset Type*</Text>
           <TextInput
             style={[styles.input, errors.custom_type && styles.inputError]}
             value={customAssetTypeName}
             onChangeText={setCustomAssetTypeName}
-            placeholder="e.g., Kiosk Inventory"
+            placeholder="e.g., Private Syndicate Units"
             placeholderTextColor={COLORS.textTertiary}
             editable={!isLoading}
           />
-          {errors.custom_type && <Text style={styles.errorText}>{errors.custom_type}</Text>}
+          {errors.custom_type ? <Text style={styles.errorText}>{errors.custom_type}</Text> : null}
         </View>
-      )}
+      ) : null}
 
-      {/* Current Value */}
+      <View style={styles.helperCard}>
+        <Text style={styles.helperTitle}>Valuation approach</Text>
+        <Text style={styles.helperDescription}>
+          Net worth works best when assets are recorded at current value, not original cost. Use market tracking for quoted assets and appraisal for property-style assets.
+        </Text>
+      </View>
+
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Current Value*</Text>
+        <Text style={styles.label}>Tracking Method*</Text>
+        <View style={styles.segmentedControl}>
+          {([
+            { key: 'manual', label: 'Manual' },
+            { key: 'market', label: 'Market' },
+            { key: 'appraisal', label: 'Appraisal' },
+          ] as Array<{ key: AssetValuationMethod; label: string }>).map((option) => {
+            const disabled = option.key === 'market' && !supportsMarketTracking;
+            const active = valuationMethod === option.key;
+
+            return (
+              <TouchableOpacity
+                key={option.key}
+                style={[styles.segmentButton, active && styles.segmentButtonActive, disabled && styles.segmentButtonDisabled]}
+                onPress={() => !disabled && setValuationMethod(option.key)}
+                disabled={disabled || isLoading}
+              >
+                <Text style={[styles.segmentButtonText, active && styles.segmentButtonTextActive]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {usesMarketTracking ? (
+        <>
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>Ticker / Market Reference*</Text>
+            <TextInput
+              style={[styles.input, errors.ticker_symbol && styles.inputError]}
+              value={tickerSymbol}
+              onChangeText={setTickerSymbol}
+              placeholder="e.g., AAPL, GOOG, BTC"
+              placeholderTextColor={COLORS.textTertiary}
+              autoCapitalize="characters"
+              editable={!isLoading}
+            />
+            {errors.ticker_symbol ? <Text style={styles.errorText}>{errors.ticker_symbol}</Text> : null}
+          </View>
+
+          <View style={styles.twoColumnRow}>
+            <View style={[styles.fieldContainer, styles.halfField]}>
+              <Text style={styles.label}>Units Held*</Text>
+              <TextInput
+                style={[styles.input, errors.units_held && styles.inputError]}
+                value={unitsHeld}
+                onChangeText={(value) => setUnitsHeld(normaliseNumberInput(value))}
+                placeholder="0"
+                placeholderTextColor={COLORS.textTertiary}
+                keyboardType="decimal-pad"
+                editable={!isLoading}
+              />
+              {errors.units_held ? <Text style={styles.errorText}>{errors.units_held}</Text> : null}
+            </View>
+
+            <View style={[styles.fieldContainer, styles.halfField]}>
+              <Text style={styles.label}>Unit Price*</Text>
+              <View style={styles.currencyInputContainer}>
+                <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
+                <TextInput
+                  style={[styles.currencyInput, errors.unit_price && styles.inputError]}
+                  value={unitPrice}
+                  onChangeText={(value) => setUnitPrice(normaliseNumberInput(value))}
+                  placeholder="0.00"
+                  placeholderTextColor={COLORS.textTertiary}
+                  keyboardType="decimal-pad"
+                  editable={!isLoading}
+                />
+              </View>
+              {errors.unit_price ? <Text style={styles.errorText}>{errors.unit_price}</Text> : null}
+            </View>
+          </View>
+        </>
+      ) : null}
+
+      <View style={styles.fieldContainer}>
+        <Text style={styles.label}>{usesMarketTracking ? 'Computed Current Value*' : 'Current Value*'}</Text>
         <View style={styles.currencyInputContainer}>
           <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
           <TextInput
             style={[styles.currencyInput, errors.current_value && styles.inputError]}
             value={currentValue}
-            onChangeText={(value) => setCurrentValue(formatCurrency(value))}
+            onChangeText={(value) => setCurrentValue(normaliseNumberInput(value))}
             placeholder="0.00"
             placeholderTextColor={COLORS.textTertiary}
             keyboardType="decimal-pad"
-            editable={!isLoading}
+            editable={!isLoading && !usesMarketTracking}
           />
         </View>
-        {errors.current_value && <Text style={styles.errorText}>{errors.current_value}</Text>}
+        {usesMarketTracking ? <Text style={styles.helperInline}>Automatically calculated from units × price.</Text> : null}
+        {errors.current_value ? <Text style={styles.errorText}>{errors.current_value}</Text> : null}
       </View>
 
-      {/* Original Value (Optional) */}
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Original Value (Optional)</Text>
+        <Text style={styles.label}>{isAppreciatingAsset ? 'Cost Basis / Original Value' : 'Original Value'}</Text>
         <View style={styles.currencyInputContainer}>
           <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
           <TextInput
-            style={[styles.currencyInput, errors.original_value && styles.inputError]}
+            style={styles.currencyInput}
             value={originalValue}
-            onChangeText={(value) => setOriginalValue(formatCurrency(value))}
+            onChangeText={(value) => setOriginalValue(normaliseNumberInput(value))}
             placeholder="0.00"
             placeholderTextColor={COLORS.textTertiary}
             keyboardType="decimal-pad"
             editable={!isLoading}
           />
         </View>
-        {errors.original_value && <Text style={styles.errorText}>{errors.original_value}</Text>}
       </View>
 
-      {/* Purchase Date (Optional) */}
+      {(valuationMethod === 'appraisal' || usesMarketTracking) ? (
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Last Valuation Date*</Text>
+          <TouchableOpacity style={[styles.picker, errors.last_valuation_date && styles.inputError]} onPress={() => setActiveDateField('valuation')} disabled={isLoading}>
+            <Text style={styles.pickerText}>{lastValuationDate ? lastValuationDate.toLocaleDateString() : 'Select valuation date'}</Text>
+            <MaterialIcons name="event" size={24} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+          {lastValuationDate ? (
+            <TouchableOpacity style={styles.clearDateButton} onPress={() => setLastValuationDate(null)}>
+              <Text style={styles.clearDateText}>Clear valuation date</Text>
+            </TouchableOpacity>
+          ) : null}
+          {errors.last_valuation_date ? <Text style={styles.errorText}>{errors.last_valuation_date}</Text> : null}
+        </View>
+      ) : null}
+
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Purchase Date (Optional)</Text>
-        <TouchableOpacity
-          style={[styles.picker, errors.purchase_date && styles.inputError]}
-          onPress={() => setShowDatePicker(true)}
-          disabled={isLoading}
-        >
-          <Text style={styles.pickerText}>
-            {purchaseDate ? purchaseDate.toLocaleDateString() : 'Select Date'}
-          </Text>
+        <Text style={styles.label}>Purchase Date</Text>
+        <TouchableOpacity style={styles.picker} onPress={() => setActiveDateField('purchase')} disabled={isLoading}>
+          <Text style={styles.pickerText}>{purchaseDate ? purchaseDate.toLocaleDateString() : 'Select date'}</Text>
           <MaterialIcons name="event" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
-        {purchaseDate && (
-          <TouchableOpacity
-            style={styles.clearDateButton}
-            onPress={() => setPurchaseDate(null)}
-          >
-            <Text style={styles.clearDateText}>Clear Date</Text>
+        {purchaseDate ? (
+          <TouchableOpacity style={styles.clearDateButton} onPress={() => setPurchaseDate(null)}>
+            <Text style={styles.clearDateText}>Clear purchase date</Text>
           </TouchableOpacity>
-        )}
-        {errors.purchase_date && <Text style={styles.errorText}>{errors.purchase_date}</Text>}
+        ) : null}
       </View>
 
-      {/* Description (Optional) */}
+      {(gainPreview.amount !== 0 || gainPreview.percentage !== null) ? (
+        <View style={[styles.helperCard, gainPreview.amount >= 0 ? styles.gainCard : styles.lossCard]}>
+          <Text style={styles.helperTitle}>
+            {gainPreview.amount >= 0 ? 'Unrealized gain preview' : 'Value drawdown preview'}
+          </Text>
+          <Text style={styles.helperDescription}>
+            {gainPreview.amount >= 0 ? '+' : ''}
+            {CURRENCY_PREFIX}
+            {Math.abs(gainPreview.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {gainPreview.percentage !== null ? ` (${gainPreview.amount >= 0 ? '+' : ''}${gainPreview.percentage.toFixed(1)}%)` : ''}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Description (Optional)</Text>
+        <Text style={styles.label}>Notes</Text>
         <TextInput
-          style={[styles.textArea, errors.description && styles.inputError]}
+          style={styles.textArea}
           value={description}
           onChangeText={setDescription}
-          placeholder="Additional notes about this asset..."
+          placeholder="Add notes, valuation basis, or anything you want to remember."
           placeholderTextColor={COLORS.textTertiary}
           multiline
           numberOfLines={3}
           editable={!isLoading}
         />
-        {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
       </View>
 
-      {/* Action Buttons */}
       <View style={styles.buttonContainer}>
-        {mode === 'edit' && onDelete && (
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={onDelete}
-            disabled={isLoading}
-          >
-            <MaterialIcons name="delete-outline" size={24} color={COLORS.white} />
+        {mode === 'edit' && onDelete ? (
+          <TouchableOpacity style={styles.deleteButton} onPress={onDelete} disabled={isLoading}>
+            <MaterialIcons name="delete-outline" size={22} color={COLORS.white} />
             <Text style={styles.deleteButtonText}>Delete Asset</Text>
           </TouchableOpacity>
-        )}
-        
+        ) : null}
+
         <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={onCancel}
-            disabled={isLoading}
-          >
+          <TouchableOpacity style={styles.cancelButton} onPress={onCancel} disabled={isLoading}>
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={isLoading}
-          >
-            <Text style={styles.saveButtonText}>
-              {mode === 'create' ? 'Add Asset' : 'Save Changes'}
-            </Text>
+
+          <TouchableOpacity style={[styles.saveButton, isLoading && styles.saveButtonDisabled]} onPress={handleSave} disabled={isLoading}>
+            <Text style={styles.saveButtonText}>{mode === 'create' ? 'Add Asset' : 'Save Changes'}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Category Picker Modal */}
-      {showCategoryPicker && (
+      {showCategoryPicker ? (
         <View style={styles.modal}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -410,36 +537,28 @@ export default function AssetForm({
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.optionsList}>
-              {ASSET_CATEGORIES.map((cat) => (
+              {ASSET_CATEGORY_OPTIONS.map((option) => (
                 <TouchableOpacity
-                  key={cat.key}
-                  style={[
-                    styles.optionItem,
-                    category === cat.key && styles.optionItemSelected
-                  ]}
+                  key={option.key}
+                  style={[styles.optionItem, category === option.key && styles.optionItemSelected]}
                   onPress={() => {
-                    setCategory(cat.key);
+                    setCategory(option.key);
                     setShowCategoryPicker(false);
                   }}
                 >
-                  <Text style={[
-                    styles.optionText,
-                    category === cat.key && styles.optionTextSelected
-                  ]}>
-                    {cat.label}
-                  </Text>
-                  {category === cat.key && (
-                    <MaterialIcons name="check" size={24} color={COLORS.primary} />
-                  )}
+                  <View style={styles.optionCopy}>
+                    <Text style={[styles.optionText, category === option.key && styles.optionTextSelected]}>{option.label}</Text>
+                    <Text style={styles.optionMeta}>{option.description}</Text>
+                  </View>
+                  {category === option.key ? <MaterialIcons name="check" size={24} color={COLORS.primary} /> : null}
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         </View>
-      )}
+      ) : null}
 
-      {/* Asset Type Picker Modal */}
-      {showTypePicker && currentCategory && (
+      {showTypePicker ? (
         <View style={styles.modal}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -449,72 +568,30 @@ export default function AssetForm({
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.optionsList}>
-              {currentCategory.types.map((type) => (
+              {assetTypeOptions.map((option) => (
                 <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.optionItem,
-                    assetType === type && styles.optionItemSelected
-                  ]}
+                  key={option.key}
+                  style={[styles.optionItem, assetType === option.key && styles.optionItemSelected]}
                   onPress={() => {
-                    setAssetType(type);
+                    setAssetType(option.key);
                     setShowTypePicker(false);
                   }}
                 >
-                  <Text style={[
-                    styles.optionText,
-                    assetType === type && styles.optionTextSelected
-                  ]}>
-                    {getAssetTypeLabel(type)}
-                  </Text>
-                  {assetType === type && (
-                    <MaterialIcons name="check" size={24} color={COLORS.primary} />
-                  )}
+                  <View style={styles.optionCopy}>
+                    <Text style={[styles.optionText, assetType === option.key && styles.optionTextSelected]}>{option.label}</Text>
+                    <Text style={styles.optionMeta}>
+                      {option.supportsMarketTracking ? 'Supports unit-price updates' : option.appreciating ? 'Good candidate for periodic value updates' : 'Manual value updates'}
+                    </Text>
+                  </View>
+                  {assetType === option.key ? <MaterialIcons name="check" size={24} color={COLORS.primary} /> : null}
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         </View>
-      )}
+      ) : null}
 
-      {/* Date Picker */}
-      {showDatePicker && (
-        Platform.OS === 'ios' ? (
-          <View style={styles.modal}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select Date</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={{ color: COLORS.primary, fontSize: TYPOGRAPHY.sizes.md, fontWeight: '600' }}>Done</Text>
-                </TouchableOpacity>
-              </View>
-              <DateTimePicker
-                value={purchaseDate || new Date()}
-                mode="date"
-                display="spinner"
-                maximumDate={new Date()}
-                onChange={(event, selectedDate) => {
-                   if (selectedDate) setPurchaseDate(selectedDate);
-                }}
-                style={{ height: 200 }}
-              />
-            </View>
-          </View>
-        ) : (
-          <DateTimePicker
-            value={purchaseDate || new Date()}
-            mode="date"
-            display="default"
-            maximumDate={new Date()}
-            onChange={(event, selectedDate) => {
-              setShowDatePicker(false);
-              if (selectedDate) {
-                setPurchaseDate(selectedDate);
-              }
-            }}
-          />
-        )
-      )}
+      {renderDatePicker()}
     </ScrollView>
   );
 }
@@ -525,6 +602,13 @@ const styles = StyleSheet.create({
   },
   fieldContainer: {
     marginBottom: SPACING.lg,
+  },
+  halfField: {
+    flex: 1,
+  },
+  twoColumnRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
   },
   label: {
     fontSize: TYPOGRAPHY.sizes.md,
@@ -537,7 +621,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.backgroundInput,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     fontSize: TYPOGRAPHY.sizes.md,
@@ -551,27 +635,28 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.backgroundInput,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
+    minHeight: 90,
+    textAlignVertical: 'top',
     fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textPrimary,
     fontFamily: 'Poppins',
-    minHeight: 80,
-    textAlignVertical: 'top',
   },
   picker: {
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.backgroundInput,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   pickerText: {
+    flex: 1,
     fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textPrimary,
     fontFamily: 'Poppins',
@@ -582,14 +667,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.backgroundInput,
-    borderRadius: 12,
+    borderRadius: 14,
   },
   currencySymbol: {
+    minWidth: 42,
+    paddingLeft: SPACING.md,
     fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textSecondary,
     fontFamily: 'Poppins',
-    paddingLeft: SPACING.md,
-    minWidth: 34,
   },
   currencyInput: {
     flex: 1,
@@ -598,6 +683,66 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textPrimary,
     fontFamily: 'Poppins',
+  },
+  helperCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 18,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  gainCard: {
+    backgroundColor: '#ECFDF5',
+  },
+  lossCard: {
+    backgroundColor: '#FEF2F2',
+  },
+  helperTitle: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+    fontFamily: 'Poppins',
+  },
+  helperDescription: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+    fontFamily: 'Poppins',
+  },
+  helperInline: {
+    marginTop: SPACING.xs,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
+    fontFamily: 'Poppins',
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  segmentButton: {
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.backgroundInput,
+    backgroundColor: COLORS.white,
+    paddingVertical: 10,
+  },
+  segmentButtonActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  segmentButtonDisabled: {
+    opacity: 0.4,
+  },
+  segmentButtonText: {
+    color: COLORS.textSecondary,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontFamily: 'Poppins',
+  },
+  segmentButtonTextActive: {
+    color: COLORS.white,
   },
   clearDateButton: {
     marginTop: SPACING.xs,
@@ -608,10 +753,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins',
   },
   errorText: {
+    marginTop: SPACING.xs,
     fontSize: TYPOGRAPHY.sizes.sm,
     color: COLORS.error,
     fontFamily: 'Poppins',
-    marginTop: SPACING.xs,
   },
   buttonContainer: {
     marginTop: SPACING.xl,
@@ -619,11 +764,12 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: COLORS.error,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 14,
     paddingVertical: SPACING.md,
-    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SPACING.sm,
     marginBottom: SPACING.md,
   },
   deleteButtonText: {
@@ -631,22 +777,20 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.semibold,
     fontFamily: 'Poppins',
-    marginLeft: SPACING.xs,
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: SPACING.md,
   },
   cancelButton: {
     flex: 1,
     backgroundColor: COLORS.backgroundInput,
+    borderRadius: 14,
     paddingVertical: SPACING.md,
-    borderRadius: 12,
     alignItems: 'center',
-    marginRight: SPACING.sm,
   },
   cancelButtonText: {
-    color: COLORS.textSecondary,
+    color: COLORS.textPrimary,
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.semibold,
     fontFamily: 'Poppins',
@@ -654,10 +798,9 @@ const styles = StyleSheet.create({
   saveButton: {
     flex: 1,
     backgroundColor: COLORS.primary,
+    borderRadius: 14,
     paddingVertical: SPACING.md,
-    borderRadius: 12,
     alignItems: 'center',
-    marginLeft: SPACING.sm,
   },
   saveButtonDisabled: {
     opacity: 0.6,
@@ -665,63 +808,73 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: COLORS.white,
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontWeight: TYPOGRAPHY.weights.bold,
     fontFamily: 'Poppins',
   },
   modal: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
+    paddingHorizontal: SPACING.lg,
   },
   modalContent: {
     backgroundColor: COLORS.white,
-    borderRadius: 16,
-    width: '90%',
-    maxHeight: '70%',
+    borderRadius: 22,
+    maxHeight: '80%',
+    padding: SPACING.lg,
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.backgroundInput,
+    alignItems: 'center',
+    marginBottom: SPACING.md,
   },
   modalTitle: {
     fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontWeight: TYPOGRAPHY.weights.bold,
     color: COLORS.textPrimary,
     fontFamily: 'Poppins',
   },
+  doneText: {
+    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontFamily: 'Poppins',
+  },
   optionsList: {
-    maxHeight: 300,
+    flexGrow: 0,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.backgroundInput,
   },
   optionItemSelected: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: 'rgba(0, 109, 79, 0.06)',
+  },
+  optionCopy: {
+    flex: 1,
+    paddingRight: SPACING.sm,
   },
   optionText: {
     fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textPrimary,
     fontFamily: 'Poppins',
+    fontWeight: TYPOGRAPHY.weights.medium,
   },
   optionTextSelected: {
     color: COLORS.primary,
-    fontWeight: TYPOGRAPHY.weights.semibold,
+  },
+  optionMeta: {
+    marginTop: 2,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
+    fontFamily: 'Poppins',
+  },
+  iosDatePicker: {
+    height: 200,
   },
 });

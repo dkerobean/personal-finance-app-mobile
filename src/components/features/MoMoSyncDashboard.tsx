@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useMoMoStore, useMoMoSyncData, useMoMoTransactionsData } from '@/stores/momoStore';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface MoMoSyncDashboardProps {
   onSyncComplete?: () => void;
@@ -9,6 +10,7 @@ interface MoMoSyncDashboardProps {
 
 export default function MoMoSyncDashboard({ onSyncComplete }: MoMoSyncDashboardProps) {
   const { syncTransactions, initializeMoMoService } = useMoMoStore();
+  const toast = useAppToast();
   const { 
     isSyncing, 
     lastSyncTime, 
@@ -56,7 +58,7 @@ export default function MoMoSyncDashboard({ onSyncComplete }: MoMoSyncDashboardP
   const handleInitialize = async () => {
     const success = await initializeMoMoService();
     if (success) {
-      Alert.alert('Success', 'MTN MoMo service initialized successfully!');
+      toast.success('Service initialized', 'MTN MoMo service initialized successfully.');
     }
   };
 
@@ -85,7 +87,7 @@ export default function MoMoSyncDashboard({ onSyncComplete }: MoMoSyncDashboardP
         message += `\n• Errors: ${errors.length}`;
       }
 
-      Alert.alert('Sync Complete', message);
+      toast.success('Sync complete', message.replace(/\n+/g, ' '));
       onSyncComplete?.();
     }
   };

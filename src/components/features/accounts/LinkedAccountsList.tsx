@@ -26,6 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Account } from '@/types/models';
 import { accountAggregator } from '@/services/accountAggregator';
 import { formatCurrency } from '@/lib/formatters';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface LinkedAccountsListProps {
   onAddAccount: () => void;
@@ -44,6 +45,7 @@ export const LinkedAccountsList: React.FC<LinkedAccountsListProps> = ({
   const [selectedAccount, setSelectedAccount] = React.useState<Account | null>(null);
   const [showActionsheet, setShowActionsheet] = React.useState(false);
   const [unlinkingAccountId, setUnlinkingAccountId] = React.useState<string | null>(null);
+  const toast = useAppToast();
 
   const loadAccounts = async (isRefresh = false) => {
     try {
@@ -57,7 +59,7 @@ export const LinkedAccountsList: React.FC<LinkedAccountsListProps> = ({
       setAccounts(accountsData);
     } catch (error) {
       console.error('Error loading accounts:', error);
-      Alert.alert('Error', 'Failed to load accounts. Please try again.');
+      toast.error('Load failed', 'Failed to load accounts. Please try again.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -123,12 +125,12 @@ export const LinkedAccountsList: React.FC<LinkedAccountsListProps> = ({
               if (result.success) {
                 // Remove from local state
                 setAccounts(prev => prev.filter(acc => acc.id !== account.id));
-                Alert.alert('Success', 'Account unlinked successfully.');
+                toast.success('Account unlinked', 'Account unlinked successfully.');
               } else {
-                Alert.alert('Error', result.error || 'Failed to unlink account.');
+                toast.error('Unlink failed', result.error || 'Failed to unlink account.');
               }
             } catch (error) {
-              Alert.alert('Error', 'An unexpected error occurred.');
+              toast.error('Unlink failed', 'An unexpected error occurred.');
             } finally {
               setUnlinkingAccountId(null);
               setShowActionsheet(false);

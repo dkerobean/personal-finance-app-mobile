@@ -124,7 +124,7 @@ export default function EditLiabilityScreen() {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <GradientHeader
             title="Edit Liability"
-            subtitle="Update debt values and terms"
+            subtitle="Refresh balances, APR, payment schedule, and notes"
             onBackPress={() => router.back()}
             showCalendar={false}
             showNotification={false}

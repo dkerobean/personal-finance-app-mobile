@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
-  Alert,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { Category } from '@/types/models';
@@ -15,6 +14,7 @@ import { useCategoryStore } from '@/stores/categoryStore';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '@/constants/design';
 import { useAuth } from '@clerk/clerk-expo';
 import { mapIconName, getAvailableIcons } from '@/utils/iconMapping';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface CategorySelectorProps {
   categories: Category[];
@@ -39,6 +39,7 @@ export default function CategorySelector({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('apps-outline');
+  const toast = useAppToast();
   
   const { createCategory, isLoading: isCreatingCategory } = useCategoryStore();
 
@@ -67,12 +68,12 @@ export default function CategorySelector({
 
   const handleCreateCategory = async () => {
     if (!newCategoryName.trim()) {
-      Alert.alert('Error', 'Please enter a category name');
+      toast.error('Missing name', 'Please enter a category name.');
       return;
     }
 
     if (!userId) {
-      Alert.alert('Error', 'User not authenticated');
+      toast.error('Authentication required', 'User not authenticated.');
       return;
     }
 
@@ -80,7 +81,7 @@ export default function CategorySelector({
 
     
     if (success) {
-      Alert.alert('Success', 'Category created successfully');
+      toast.success('Category created', 'Category created successfully.');
       setShowCreateForm(false);
       setNewCategoryName('');
       setSelectedIcon('apps-outline');

@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, RefreshControl, FlatList } from 'react-native';
-import type { Liability } from '@/types/models';
+import type { Liability, LiabilityCategory } from '@/types/models';
 import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 import LiabilityItem from './LiabilityItem';
 import { formatCurrency } from '@/lib/formatters';
+import { getLiabilityCategoryLabel } from '@/lib/netWorthCatalog';
 
 interface LiabilitiesListProps {
   liabilities: Liability[];
@@ -19,6 +20,9 @@ interface LiabilityGroup {
   liabilities: Liability[];
   totalBalance: number;
 }
+
+type LiabilityHeaderItem = { type: 'header'; category: string; totalBalance: number };
+type LiabilityListItem = Liability | LiabilityHeaderItem;
 
 export default function LiabilitiesList({
   liabilities,
@@ -53,14 +57,7 @@ export default function LiabilitiesList({
   }, [liabilities]);
 
   const getCategoryDisplayName = (category: string): string => {
-    const names: Record<string, string> = {
-      loans: 'Loans',
-      credit_cards: 'Credit Cards',
-      mortgages: 'Mortgages',
-      business_debt: 'Business Debt',
-      other: 'Other Debts',
-    };
-    return names[category] || category;
+    return getLiabilityCategoryLabel(category as LiabilityCategory);
   };
 
   const formatCategoryTotal = (total: number): string => {
@@ -69,7 +66,7 @@ export default function LiabilitiesList({
 
   // Create flat list data with headers
   const flatListData = React.useMemo(() => {
-    const data: (Liability | { type: 'header'; category: string; totalBalance: number })[] = [];
+    const data: LiabilityListItem[] = [];
     
     groupedLiabilities.forEach(group => {
       // Add category header
@@ -88,8 +85,8 @@ export default function LiabilitiesList({
     return data;
   }, [groupedLiabilities]);
 
-  const renderItem = ({ item, index }: { item: any; index: number }) => {
-    if (item.type === 'header') {
+  const renderItem = ({ item, index }: { item: LiabilityListItem; index: number }) => {
+    if ('type' in item && item.type === 'header') {
       return (
         <View style={styles.categoryHeader}>
           <Text style={styles.categoryTitle}>
@@ -104,20 +101,18 @@ export default function LiabilitiesList({
 
     // Determine if we should show separator
     const nextItem = flatListData[index + 1];
-    const showSeparator = nextItem && nextItem.type !== 'header';
+    const showSeparator = nextItem ? !('type' in nextItem && nextItem.type === 'header') : false;
+
+    const liability = item as Liability;
 
     return (
       <LiabilityItem
-        liability={item}
+        liability={liability}
         onPress={onLiabilityPress}
         onDeletePress={onDeletePress}
         showSeparator={showSeparator}
       />
     );
-  };
-
-  const getItemType = (item: any) => {
-    return item.type === 'header' ? 'header' : 'liability';
   };
 
   if (liabilities.length === 0) {
@@ -129,7 +124,13 @@ export default function LiabilitiesList({
       <FlatList
         data={flatListData}
         renderItem={renderItem}
-        keyExtractor={(item, index) => item.type === 'header' ? `header-${item.category}` : `liability-${item.id}`}
+        keyExtractor={(item) => {
+          if ('type' in item && item.type === 'header') {
+            return `header-${item.category}`;
+          }
+
+          return `liability-${(item as Liability).id}`;
+        }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         refreshControl={

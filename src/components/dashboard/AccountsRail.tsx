@@ -9,7 +9,7 @@ interface AccountsRailProps {
   accounts: Account[];
 }
 
-const CARD_WIDTH = 220;
+const CARD_WIDTH = 208;
 
 const formatCurrency = (amount: number): string =>
   `GH¢${Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -112,7 +112,7 @@ const AccountsRail: React.FC<AccountsRailProps> = ({ accounts }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
   header: {
     flexDirection: 'row',
@@ -122,12 +122,15 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   title: {
-    fontSize: 18,
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    lineHeight: 28,
     fontWeight: '700',
     color: COLORS.textPrimary,
+    letterSpacing: -0.6,
   },
   seeAll: {
-    fontSize: TYPOGRAPHY.sizes.sm,
+    fontSize: TYPOGRAPHY.sizes.xl,
+    lineHeight: 20,
     color: COLORS.secondary,
     fontWeight: '600',
   },
@@ -137,14 +140,14 @@ const styles = StyleSheet.create({
   },
   card: {
     width: CARD_WIDTH,
-    minHeight: 156,
+    minHeight: 152,
     backgroundColor: COLORS.white,
-    borderRadius: 20,
+    borderRadius: 22,
     padding: SPACING.lg,
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: COLORS.gray100,
-    ...SHADOWS.sm,
+    borderColor: COLORS.border,
+    ...SHADOWS.md,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -152,9 +155,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -182,24 +185,30 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   accountName: {
-    fontSize: TYPOGRAPHY.sizes.md,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    lineHeight: 22,
     color: COLORS.textPrimary,
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: SPACING.xs,
   },
   institutionName: {
-    fontSize: TYPOGRAPHY.sizes.xs,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: 18,
     color: COLORS.textSecondary,
     marginBottom: SPACING.md,
+    fontWeight: '500',
   },
   balance: {
     fontSize: TYPOGRAPHY.sizes.xl,
+    lineHeight: 24,
     fontWeight: '700',
     color: COLORS.textPrimary,
+    letterSpacing: -0.4,
   },
   syncText: {
-    marginTop: SPACING.xs,
-    fontSize: TYPOGRAPHY.sizes.xs,
+    marginTop: SPACING.sm,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    lineHeight: 16,
     color: COLORS.textTertiary,
     fontWeight: '500',
   },
@@ -208,25 +217,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderStyle: 'dashed',
     borderColor: COLORS.gray400,
-    backgroundColor: COLORS.gray50,
+    backgroundColor: '#F7FAFC',
   },
   addIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: COLORS.lightBlue,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   addText: {
-    fontSize: TYPOGRAPHY.sizes.md,
+    fontSize: TYPOGRAPHY.sizes.xxl,
+    lineHeight: 28,
     fontWeight: '700',
     color: COLORS.primary,
-    marginBottom: 2,
+    marginBottom: SPACING.xs,
+    letterSpacing: -0.4,
   },
   addSubText: {
-    fontSize: TYPOGRAPHY.sizes.xs,
+    fontSize: TYPOGRAPHY.sizes.md,
+    lineHeight: 20,
     color: COLORS.textTertiary,
     fontWeight: '500',
   }

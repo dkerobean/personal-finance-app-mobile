@@ -55,7 +55,7 @@ export default function AddLiabilityScreen() {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <GradientHeader
             title="Add Liability"
-            subtitle="Track debts and payments"
+            subtitle="Track live balances, APR, and payment schedules"
             onBackPress={() => router.back()}
             showCalendar={false}
             showNotification={false}
@@ -74,13 +74,20 @@ export default function AddLiabilityScreen() {
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoTitle}>Keep Debt Visible</Text>
                 <Text style={styles.infoDescription}>
-                  Add loans, mortgages, and credit obligations to keep your net worth accurate.
+                  Add loans, mortgages, trade debt, and custom liability types so net worth stays accurate.
                 </Text>
               </View>
             </LinearGradient>
 
             <View style={styles.formContainer}>
-              <LiabilityForm onSave={handleSaveLiability} onCancel={() => router.back()} isLoading={isLoading} mode="create" />
+              <LiabilityForm
+                onSave={(data) => {
+                  void handleSaveLiability(data as CreateLiabilityRequest);
+                }}
+                onCancel={() => router.back()}
+                isLoading={isLoading}
+                mode="create"
+              />
             </View>
           </View>
         </ScrollView>

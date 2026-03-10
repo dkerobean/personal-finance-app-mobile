@@ -14,6 +14,7 @@ import {
 } from '@gluestack-ui/themed';
 import { Ionicons } from '@expo/vector-icons';
 import { accountAggregator } from '@/services/accountAggregator';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface AccountTypeSelectionScreenProps {
   onBankAccountSelected: () => void;
@@ -27,6 +28,7 @@ export const AccountTypeSelectionScreen: React.FC<AccountTypeSelectionScreenProp
   onCancel
 }) => {
   const [isLoading, setIsLoading] = React.useState(false);
+  const toast = useAppToast();
 
   React.useEffect(() => {
     // Check configuration on mount
@@ -42,18 +44,15 @@ export const AccountTypeSelectionScreen: React.FC<AccountTypeSelectionScreenProp
         `${missingServices.join(' and ')} not properly configured. Please check environment variables.`,
         [{ text: 'OK', onPress: onCancel }]
       );
+      toast.warning('Configuration incomplete', `${missingServices.join(' and ')} not properly configured.`);
     }
-  }, [onCancel]);
+  }, [onCancel, toast]);
 
   const handleBankAccountPress = () => {
     const config = accountAggregator.checkConfiguration();
     
     if (!config.mono) {
-      Alert.alert(
-        'Bank Linking Unavailable',
-        'Mono API is not configured. Please contact support.',
-        [{ text: 'OK' }]
-      );
+      toast.error('Bank linking unavailable', 'Mono API is not configured.');
       return;
     }
 
@@ -69,11 +68,7 @@ export const AccountTypeSelectionScreen: React.FC<AccountTypeSelectionScreenProp
     const config = accountAggregator.checkConfiguration();
     
     if (!config.mtnMomo) {
-      Alert.alert(
-        'MTN MoMo Linking Unavailable',
-        'MTN MoMo API is not configured. Please contact support.',
-        [{ text: 'OK' }]
-      );
+      toast.error('MTN MoMo unavailable', 'MTN MoMo API is not configured.');
       return;
     }
 

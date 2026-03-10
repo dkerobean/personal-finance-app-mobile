@@ -55,7 +55,7 @@ export default function AddAssetScreen() {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <GradientHeader
             title="Add Asset"
-            subtitle="Record ownership and value"
+            subtitle="Record current value, cost basis, and tracking method"
             onBackPress={() => router.back()}
             showCalendar={false}
             showNotification={false}
@@ -74,13 +74,20 @@ export default function AddAssetScreen() {
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoTitle}>Grow Your Net Worth</Text>
                 <Text style={styles.infoDescription}>
-                  Add property, investments, savings, and business assets in Ghana Cedis.
+                  Add property, investments, savings, and business assets with manual, appraisal, or market-based valuation.
                 </Text>
               </View>
             </LinearGradient>
 
             <View style={styles.formContainer}>
-              <AssetForm onSave={handleSaveAsset} onCancel={() => router.back()} isLoading={isLoading} mode="create" />
+              <AssetForm
+                onSave={(data) => {
+                  void handleSaveAsset(data as CreateAssetRequest);
+                }}
+                onCancel={() => router.back()}
+                isLoading={isLoading}
+                mode="create"
+              />
             </View>
           </View>
         </ScrollView>

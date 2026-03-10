@@ -7,32 +7,34 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   Modal,
   Platform,
   ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialIcons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { transactionsApi, isSyncedTransaction } from '@/services/api/transactions';
 import SyncedTransactionBadge from '@/components/SyncedTransactionBadge';
 import CategorySuggestionBadge from '@/components/transactions/CategorySuggestionBadge';
 import BulkCategorizeModal from '@/components/features/BulkCategorizeModal';
-import { useCustomAlert } from '@/hooks/useCustomAlert';
-import CustomAlert from '@/components/ui/CustomAlert';
+import { useAppToast } from '@/hooks/useAppToast';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import GradientHeader from '@/components/budgets/GradientHeader';
 import { COLORS, BORDER_RADIUS, SPACING, TYPOGRAPHY, SHADOWS, BUDGET } from '@/constants/design';
 import type { Transaction, TransactionType } from '@/types/models';
+import { useAuth } from '@clerk/clerk-expo';
 
 export default function EditTransactionScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { updateTransaction, isLoading: updating } = useTransactionStore();
+  const { userId } = useAuth();
+  const toast = useAppToast();
+  const { updateTransaction, isLoading: updating, error: transactionError } = useTransactionStore();
   const { categories, loadCategories } = useCategoryStore();
-  const { alert, alertProps } = useCustomAlert();
 
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,20 +60,22 @@ export default function EditTransactionScreen() {
   const [categoryError, setCategoryError] = useState('');
 
   useEffect(() => {
-    if (id) {
+    if (id && userId) {
       loadTransaction();
     }
-    loadCategories();
-  }, [id]);
+    if (userId) {
+      loadCategories(userId);
+    }
+  }, [id, userId, loadCategories]);
 
   const loadTransaction = async () => {
-    if (!id) return;
+    if (!id || !userId) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await transactionsApi.getById(id);
+      const response = await transactionsApi.getById(userId, id);
       
       if (response.error) {
         setError(response.error.message);
@@ -123,7 +127,20 @@ export default function EditTransactionScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!validateForm() || !transaction) return;
+    if (!validateForm()) {
+      const validationMessage = !amount.trim()
+        ? 'Enter an amount before updating this transaction'
+        : 'Select a category to continue';
+      toast.warning('Complete required fields', validationMessage);
+      return;
+    }
+
+    if (!transaction) return;
+
+    if (!userId) {
+      toast.error('Sign in required', 'Please sign in again before updating this transaction.');
+      return;
+    }
 
     // Combine date and time into a single datetime
     const combinedDateTime = new Date(
@@ -136,6 +153,7 @@ export default function EditTransactionScreen() {
     );
 
     const success = await updateTransaction(
+      userId,
       transaction.id,
       parseFloat(amount),
       type,
@@ -145,10 +163,13 @@ export default function EditTransactionScreen() {
     );
     
     if (success) {
-      alert('Success', 'Transaction updated successfully');
-      router.back();
+      toast.success(
+        type === 'income' ? 'Income Updated' : 'Expense Updated',
+        `GH¢${parseFloat(amount).toFixed(2)} updated successfully`
+      );
+      setTimeout(() => router.back(), 450);
     } else {
-      alert('Error', 'Failed to update transaction');
+      toast.error('Update failed', transactionError || 'Failed to update transaction');
     }
   };
 
@@ -281,17 +302,21 @@ export default function EditTransactionScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Green Header Section */}
-      <View style={styles.greenHeader}>
-        <TouchableOpacity style={styles.headerBackButton} onPress={handleCancel}>
-          <MaterialIcons name="arrow-back" size={24} color="#093030" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Transaction</Text>
-      </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView
+        style={styles.mainScrollView}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <GradientHeader
+          title="Edit Transaction"
+          subtitle="Update amount, category, and timing"
+          onBackPress={handleCancel}
+          showCalendar={false}
+          showNotification={false}
+        />
 
-      {/* Curved White Content Section */}
-      <ScrollView style={styles.whiteContent} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.contentCard}>
           {isSync && (
             <View style={styles.syncNotice}>
               <SyncedTransactionBadge accountName={transaction?.account?.account_name} />
@@ -492,6 +517,8 @@ export default function EditTransactionScreen() {
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
+        </View>
+        <View style={[styles.bottomSafeArea, { height: insets.bottom + 24 }]} />
       </ScrollView>
 
       {/* Date Picker Modal */}
@@ -655,7 +682,7 @@ export default function EditTransactionScreen() {
             <TouchableOpacity
               onPress={() => {
                 setShowFeedbackModal(false);
-                alert('Thank you!', 'Your feedback helps improve our categorization system.');
+                toast.info('Feedback received', 'Your feedback helps improve our categorization system.');
               }}
             >
               <Text style={styles.feedbackSubmitText}>Submit</Text>
@@ -695,47 +722,33 @@ export default function EditTransactionScreen() {
           </ScrollView>
         </View>
       </Modal>
-      
-      <CustomAlert {...alertProps} />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#00D09E',
+    backgroundColor: COLORS.primary,
   },
-  greenHeader: {
-    paddingTop: 68,
-    paddingBottom: 40,
-    paddingHorizontal: 37,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerBackButton: {
-    padding: 8,
-    marginRight: 16,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#093030',
-    fontFamily: 'Poppins',
+  mainScrollView: {
     flex: 1,
-    textAlign: 'center',
-    marginRight: 40, // Account for back button width
   },
-  whiteContent: {
+  mainScrollContent: {
+    flexGrow: 1,
+  },
+  contentCard: {
     flex: 1,
-    backgroundColor: '#F1FFF3',
-    borderTopLeftRadius: 70,
-    borderTopRightRadius: 70,
+    backgroundColor: COLORS.backgroundContent,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -20,
+    paddingTop: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
   },
-  contentContainer: {
-    paddingTop: 40,
-    paddingHorizontal: 37,
-    paddingBottom: 40,
+  bottomSafeArea: {
+    backgroundColor: COLORS.backgroundContent,
   },
   syncNotice: {
     backgroundColor: '#fff3e0',
@@ -794,35 +807,37 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#093030',
-    fontFamily: 'Poppins',
+    color: COLORS.textSecondary,
+    fontFamily: TYPOGRAPHY.fonts.semibold,
     marginBottom: 8,
-    marginLeft: 16,
+    marginLeft: 4,
   },
   inputContainer: {
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#DFF7E2',
-    borderRadius: 18,
-    paddingHorizontal: 34,
+    backgroundColor: COLORS.backgroundInput,
+    borderRadius: 20,
+    paddingHorizontal: SPACING.xl,
     paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   currencySymbol: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#007bff',
+    color: COLORS.primary,
     marginRight: 8,
-    fontFamily: 'Poppins',
+    fontFamily: TYPOGRAPHY.fonts.bold,
   },
   input: {
-    backgroundColor: '#DFF7E2',
-    borderRadius: 18,
-    paddingHorizontal: 34,
+    backgroundColor: COLORS.backgroundInput,
+    borderRadius: 20,
+    paddingHorizontal: SPACING.xl,
     paddingVertical: 14,
     fontSize: 16,
-    fontFamily: 'Poppins',
-    color: '#093030',
+    fontFamily: TYPOGRAPHY.fonts.medium,
+    color: COLORS.textPrimary,
     borderWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
@@ -834,13 +849,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   textAreaInput: {
-    backgroundColor: '#DFF7E2',
-    borderRadius: 18,
-    paddingHorizontal: 34,
+    backgroundColor: COLORS.backgroundInput,
+    borderRadius: 20,
+    paddingHorizontal: SPACING.xl,
     paddingVertical: 14,
     fontSize: 16,
-    fontFamily: 'Poppins',
-    color: '#093030',
+    fontFamily: TYPOGRAPHY.fonts.medium,
+    color: COLORS.textPrimary,
     borderWidth: 0,
     minHeight: 100,
     textAlignVertical: 'top',
@@ -853,8 +868,8 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 16,
-    color: '#093030',
-    fontFamily: 'Poppins',
+    color: COLORS.textPrimary,
+    fontFamily: TYPOGRAPHY.fonts.medium,
     flex: 1,
     marginLeft: 12,
   },
@@ -874,7 +889,7 @@ const styles = StyleSheet.create({
   disabledText: {
     fontSize: 12,
     color: '#9ca3af',
-    fontFamily: 'Poppins',
+    fontFamily: TYPOGRAPHY.fonts.medium,
     fontStyle: 'italic',
     marginTop: 4,
     marginLeft: 16,
@@ -882,9 +897,9 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#ef4444',
     fontSize: 12,
-    fontFamily: 'Poppins',
+    fontFamily: TYPOGRAPHY.fonts.medium,
     marginTop: 4,
-    marginLeft: 16,
+    marginLeft: 4,
   },
   categorySelector: {
     backgroundColor: COLORS.backgroundInput,
@@ -896,6 +911,7 @@ const styles = StyleSheet.create({
     minHeight: 60,
   },
   dateTimeButton: {
+    flex: 1,
     backgroundColor: COLORS.backgroundInput,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
@@ -939,14 +955,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins',
   },
   updateButton: {
-    backgroundColor: '#00D09E',
+    backgroundColor: COLORS.primary,
     borderRadius: 30,
     paddingVertical: 15,
     paddingHorizontal: 24,
     alignItems: 'center',
     marginBottom: 16,
     elevation: 2,
-    shadowColor: '#00D09E',
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -954,11 +970,13 @@ const styles = StyleSheet.create({
   updateButtonText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#093030',
-    fontFamily: 'Poppins',
+    color: COLORS.white,
+    fontFamily: TYPOGRAPHY.fonts.bold,
   },
   cancelButton: {
-    backgroundColor: '#DFF7E2',
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     borderRadius: 30,
     paddingVertical: 15,
     paddingHorizontal: 24,
@@ -968,8 +986,8 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#0E3E3E',
-    fontFamily: 'Poppins',
+    color: COLORS.textSecondary,
+    fontFamily: TYPOGRAPHY.fonts.bold,
   },
   buttonDisabled: {
     opacity: 0.6,

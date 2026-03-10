@@ -11,6 +11,7 @@ export interface AuthResult {
   success: boolean;
   error?: string;
   user?: any;
+  deletedCounts?: Record<string, number>;
 }
 
 export const authService = {
@@ -99,6 +100,28 @@ export const authService = {
       return { success: true, user: data.data };
     } catch (error: any) {
       console.error('Error updating user profile:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async deleteAccountData(clerkUserId: string): Promise<AuthResult> {
+    try {
+      const response = await fetch(`${API_URL}/users/${clerkUserId}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete account data');
+      }
+
+      return {
+        success: true,
+        deletedCounts: data.deletedCounts,
+      };
+    } catch (error: any) {
+      console.error('Error deleting account data:', error);
       return { success: false, error: error.message };
     }
   },

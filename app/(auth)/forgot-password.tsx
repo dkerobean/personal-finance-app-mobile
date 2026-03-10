@@ -8,7 +8,6 @@ import {
   ScrollView,
   StatusBar,
   ActivityIndicator,
-  Image,
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -16,6 +15,8 @@ import { SvgXml } from 'react-native-svg';
 import { useSignIn } from '@clerk/clerk-expo';
 import { validateEmail } from '@/lib/validators';
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/design';
+import { KIPPO_MARK_WHITE_SVG } from '@/constants/brand';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface FormErrors {
   email?: string;
@@ -26,13 +27,9 @@ interface FormErrors {
 
 type ResetStep = 'email' | 'code' | 'password';
 
-const KIPPO_LOGO_WHITE = `<svg width="50" height="50" viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg">
-  <path d="M17.5 65 L37.5 15 L57.5 15 L37.5 65 Z" fill="white"/>
-  <path d="M62.5 15 L82.5 15 L70.5 40 L60.5 65 L40.5 65 L50.5 40 Z" fill="white"/>
-</svg>`;
-
 export default function ForgotPasswordScreen(): React.ReactElement {
   const { signIn, setActive, isLoaded } = useSignIn();
+  const toast = useAppToast();
   
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -44,7 +41,7 @@ export default function ForgotPasswordScreen(): React.ReactElement {
 
   const handleSendCode = async () => {
     if (!isLoaded || !signIn) {
-      Alert.alert('Error', 'Authentication service not ready.');
+      toast.error('Authentication unavailable', 'Authentication service not ready.');
       return;
     }
 
@@ -69,7 +66,7 @@ export default function ForgotPasswordScreen(): React.ReactElement {
       });
 
       setStep('code');
-      Alert.alert('Code Sent', `We've sent a verification code to ${email}`);
+      toast.success('Code sent', `We sent a verification code to ${email}.`);
     } catch (err: any) {
       console.error('Password reset error:', JSON.stringify(err, null, 2));
       let errorMessage = 'Failed to send reset code';
@@ -140,7 +137,7 @@ export default function ForgotPasswordScreen(): React.ReactElement {
 
       if (result?.status === 'complete' && result.createdSessionId) {
         await setActive?.({ session: result.createdSessionId });
-        Alert.alert('Success', 'Your password has been reset successfully!');
+        toast.success('Password reset', 'Your password has been reset successfully.');
         router.replace('/(app)');
       } else {
         setErrors({ general: 'Failed to reset password. Please try again.' });
@@ -299,7 +296,7 @@ export default function ForgotPasswordScreen(): React.ReactElement {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       
       <View style={styles.topSection}>
-        <SvgXml xml={KIPPO_LOGO_WHITE} width={50} height={50} />
+        <SvgXml xml={KIPPO_MARK_WHITE_SVG} width={50} height={50} />
         <Text style={styles.title}>
           {step === 'email' ? 'Reset Password' : step === 'code' ? 'Verify Code' : 'New Password'}
         </Text>

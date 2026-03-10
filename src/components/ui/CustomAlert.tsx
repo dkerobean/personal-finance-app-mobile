@@ -32,6 +32,9 @@ const { width } = Dimensions.get('window');
 
 export default function CustomAlert({ visible, options, onDismiss }: CustomAlertProps) {
   const { title, message, actions = [] } = options;
+  const hasActions = actions.length > 0;
+  const isSingleAction = actions.length <= 1;
+  const isVerticalActions = actions.length > 2;
 
   const handleActionPress = (action: AlertAction) => {
     onDismiss();
@@ -73,11 +76,11 @@ export default function CustomAlert({ visible, options, onDismiss }: CustomAlert
           {/* Actions */}
           <View style={[
             styles.actionsContainer, 
-            actions.length > 2 && styles.actionsContainerVertical // Stack vertically if > 2 actions
+            isSingleAction && styles.actionsContainerSingle,
+            isVerticalActions && styles.actionsContainerVertical,
           ]}>
-            {actions.length === 0 ? (
-               // Default OK button if no actions provided
-               <TouchableOpacity
+            {!hasActions ? (
+              <TouchableOpacity
                 style={[styles.actionButton, styles.primaryButton]}
                 onPress={onDismiss}
               >
@@ -92,9 +95,9 @@ export default function CustomAlert({ visible, options, onDismiss }: CustomAlert
                     key={index}
                     style={[
                       styles.actionButton,
-                      // Layout logic: if 2 buttons, split 50/50. If vertical, full width.
+                      isSingleAction && styles.actionButtonSingle,
                       actions.length === 2 && styles.actionButtonHalf,
-                      actions.length > 2 && styles.actionButtonFull,
+                      isVerticalActions && styles.actionButtonFull,
                       
                       // Style logic
                       isPrimary && styles.primaryButton,
@@ -170,6 +173,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: SPACING.md,
   },
+  actionsContainerSingle: {
+    justifyContent: 'center',
+  },
   actionsContainerVertical: {
     flexDirection: 'column',
   },
@@ -180,6 +186,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 100,
+  },
+  actionButtonSingle: {
+    minWidth: 172,
   },
   actionButtonHalf: {
     flex: 1,

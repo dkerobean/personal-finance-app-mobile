@@ -16,17 +16,19 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.kippo.app",
-      infoPlist: {
-        NSCameraUsageDescription: "This app needs access to camera to scan QR codes for bank account verification"
+      buildNumber: "1",
+      config: {
+        usesNonExemptEncryption: false
       }
     },
     android: {
       package: "com.kippo.app",
+      versionCode: 1,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
-      permissions: ["android.permission.CAMERA"]
+      permissions: []
     },
     web: {
       favicon: "./assets/favicon.png",
@@ -37,9 +39,17 @@ export default {
       "expo-router",
       "expo-secure-store",
       [
+        "expo-build-properties",
+        {
+          ios: {
+            deploymentTarget: "15.1"
+          }
+        }
+      ],
+      [
         "onesignal-expo-plugin",
         {
-          mode: "development"
+          mode: process.env.EAS_BUILD_PROFILE === "production" ? "production" : "development"
         }
       ]
     ],
@@ -48,8 +58,12 @@ export default {
     },
     extra: {
       oneSignalAppId: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID,
-      mongodbUri: process.env.EXPO_PUBLIC_MONGODB_URI,
       clerkPublishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
+      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      apiUrl: process.env.EXPO_PUBLIC_API_URL,
+      monoAppId: process.env.EXPO_PUBLIC_MONO_APP_ID,
+      monoPublicKey: process.env.EXPO_PUBLIC_MONO_PUBLIC_KEY,
       eas: {
         projectId: "cc382c54-3fc2-484f-b9f9-103579b6b013"
       }

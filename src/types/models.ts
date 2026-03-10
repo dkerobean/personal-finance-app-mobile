@@ -268,19 +268,22 @@ export interface ReportComparison {
 // Net Worth Types
 export type AssetCategory = 'property' | 'investments' | 'cash' | 'vehicles' | 'personal' | 'business' | 'other';
 export type AssetType = 
-  | 'real_estate' | 'land' | 'rental_property'
-  | 'stocks' | 'bonds' | 'mutual_funds' | 'etf' | 'cryptocurrency' | 'retirement_account' | 'treasury_bill' | 'pension_fund'
-  | 'savings' | 'checking' | 'money_market' | 'cd' | 'foreign_currency' | 'mobile_money_wallet' | 'emergency_fund' | 'fixed_deposit'
-  | 'car' | 'motorcycle' | 'boat' | 'rv'
-  | 'jewelry' | 'art' | 'collectibles' | 'electronics'
-  | 'business_equity' | 'business_assets' | 'intellectual_property'
+  | 'primary_home' | 'real_estate' | 'land' | 'rental_property' | 'commercial_property'
+  | 'stocks' | 'bonds' | 'mutual_funds' | 'etf' | 'cryptocurrency' | 'retirement_account' | 'treasury_bill' | 'pension_fund' | 'brokerage_account' | 'reits' | 'private_equity'
+  | 'savings' | 'checking' | 'money_market' | 'cd' | 'foreign_currency' | 'mobile_money_wallet' | 'emergency_fund' | 'fixed_deposit' | 'cash_on_hand'
+  | 'car' | 'motorcycle' | 'boat' | 'rv' | 'commercial_vehicle'
+  | 'jewelry' | 'art' | 'collectibles' | 'electronics' | 'precious_metals'
+  | 'business_equity' | 'business_assets' | 'intellectual_property' | 'inventory' | 'accounts_receivable' | 'equipment'
   | 'other';
 
 export type LiabilityCategory = 'loans' | 'credit_cards' | 'mortgages' | 'business_debt' | 'other';
 export type LiabilityType =
   | 'mortgage' | 'auto_loan' | 'personal_loan' | 'credit_card' | 'student_loan' | 'business_loan'
   | 'overdraft' | 'payday_loan' | 'buy_now_pay_later' | 'medical_debt' | 'tax_debt' | 'utility_bill'
+  | 'line_of_credit' | 'margin_loan' | 'family_loan' | 'home_equity_loan' | 'vendor_payable' | 'legal_obligation'
   | 'other';
+
+export type AssetValuationMethod = 'manual' | 'market' | 'appraisal';
 
 export interface Asset {
   id: string;
@@ -293,6 +296,11 @@ export interface Asset {
   current_value: number;
   original_value?: number;
   purchase_date?: string;
+  valuation_method?: AssetValuationMethod;
+  ticker_symbol?: string;
+  units_held?: number;
+  unit_price?: number;
+  last_valuation_date?: string;
   description?: string;
   is_active: boolean;
   created_at: string;
@@ -361,6 +369,11 @@ export interface CreateAssetRequest {
   current_value: number;
   original_value?: number;
   purchase_date?: string;
+  valuation_method?: AssetValuationMethod;
+  ticker_symbol?: string;
+  units_held?: number;
+  unit_price?: number;
+  last_valuation_date?: string;
   description?: string;
 }
 
@@ -373,6 +386,11 @@ export interface UpdateAssetRequest {
   current_value?: number;
   original_value?: number;
   purchase_date?: string;
+  valuation_method?: AssetValuationMethod;
+  ticker_symbol?: string;
+  units_held?: number;
+  unit_price?: number;
+  last_valuation_date?: string;
   description?: string;
   is_active?: boolean;
 }

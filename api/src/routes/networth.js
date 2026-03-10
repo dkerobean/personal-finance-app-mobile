@@ -4,6 +4,7 @@ const NetWorthSnapshot = require('../models/NetWorthSnapshot');
 const Asset = require('../models/Asset');
 const Liability = require('../models/Liability');
 const Account = require('../models/Account');
+const { calculateNetWorthSummary } = require('../services/netWorthCalculator');
 
 // GET /api/networth/history
 // Get net worth history for a user
@@ -51,58 +52,25 @@ router.post('/snapshot', async (req, res) => {
       Account.find({ userId })
     ]);
 
-    // 2. Calculate totals
-    // Assets = Manual Assets + Linked Accounts (Cash, Investment, etc treated as assets)
-    // Note: In this app's model, "Accounts" are usually cash/bank accounts. 
-    // They should be included in Total Assets.
-    
-    // Sum of manually tracked assets
-    const manualAssetsTotal = assets.reduce(
-      (sum, item) => sum + (Number(item.currentValue) || Number(item.current_value) || 0),
-      0
-    );
-    
-    // Sum of linked accounts (usually positive balances are assets)
-    const accountsTotal = accounts.reduce((sum, acc) => sum + (Number(acc.balance) || 0), 0);
-    
-    const totalAssets = manualAssetsTotal + accountsTotal;
-
-    // Sum of liabilities
-    const totalLiabilities = liabilities.reduce(
-      (sum, item) => sum + (Number(item.currentBalance) || Number(item.current_balance) || 0),
-      0
-    );
-
-    const netWorth = totalAssets - totalLiabilities;
-
-    // 3. Create breakdown for analytics
-    const assetBreakdown = {
-      manual: manualAssetsTotal,
-      accounts: accountsTotal,
-      byCategory: assets.reduce((acc, item) => {
-        const value = Number(item.currentValue) || Number(item.current_value) || 0;
-        acc[item.category] = (acc[item.category] || 0) + value;
-        return acc;
-      }, {})
-    };
-
-    const liabilityBreakdown = {
-      byCategory: liabilities.reduce((acc, item) => {
-        const value = Number(item.currentBalance) || Number(item.current_balance) || 0;
-        acc[item.category] = (acc[item.category] || 0) + value;
-        return acc;
-      }, {})
-    };
+    const summary = calculateNetWorthSummary({ assets, liabilities, accounts });
 
     // 4. Save Snapshot
     const snapshot = new NetWorthSnapshot({
       userId,
-      totalAssets,
-      totalLiabilities,
-      netWorth,
+      totalAssets: summary.totalAssets,
+      totalLiabilities: summary.totalLiabilities,
+      netWorth: summary.netWorth,
       breakdown: {
-        assets: assetBreakdown,
-        liabilities: liabilityBreakdown
+        assets: {
+          manual: summary.manualAssetsValue,
+          accounts: summary.connectedAccountsValue,
+          categories: summary.assetsBreakdown,
+        },
+        liabilities: {
+          manual: summary.manualLiabilitiesValue,
+          overdrawnAccounts: summary.connectedAccountDebt,
+          categories: summary.liabilitiesBreakdown,
+        }
       },
       createdAt: new Date()
     });
@@ -139,29 +107,6 @@ router.get('/current', async (req, res) => {
     // Log raw data for debugging
     if (assets.length > 0) console.log('[NetWorth] First Asset:', assets[0]);
 
-    // Use correct field names based on Schema (currentValue vs current_value)
-    // The Schema uses camelCase (currentValue), but typical DB might have snake_case if migrated?
-    // Let's check the Schema again: api/src/models/Asset.js uses 'currentValue'.
-    
-    // Sum of manually tracked assets
-    const manualAssetsTotal = assets.reduce((sum, item) => {
-        const val = Number(item.currentValue) || Number(item.current_value) || 0;
-        return sum + val;
-    }, 0);
-    
-    // Sum of linked accounts (usually positive balances are assets)
-    const accountsTotal = accounts.reduce((sum, acc) => sum + (Number(acc.balance) || 0), 0);
-    
-    const totalAssets = manualAssetsTotal + accountsTotal;
-
-    // Liabilities also use currentBalance based on naming conventions, let's assume safely
-    const totalLiabilities = liabilities.reduce((sum, item) => {
-         const val = Number(item.currentBalance) || Number(item.current_balance) || 0;
-         return sum + val;
-    }, 0);
-
-    const netWorth = totalAssets - totalLiabilities;
-    
     // Calculate Monthly Change
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -171,34 +116,15 @@ router.get('/current', async (req, res) => {
       createdAt: { $lte: startOfMonth } // Compare vs Start of Month for "This Month"
     }).sort({ createdAt: -1 });
 
-    let monthlyChange = 0;
-    let monthlyChangePercentage = 0;
-
-    if (previousSnapshot) {
-      monthlyChange = netWorth - previousSnapshot.netWorth;
-      if (previousSnapshot.netWorth !== 0) {
-        monthlyChangePercentage = (monthlyChange / Math.abs(previousSnapshot.netWorth)) * 100;
-      } else {
-        monthlyChangePercentage = monthlyChange > 0 ? 100 : 0;
-      }
-    } else {
-       // Fallback: If no snapshot before this month, check if we have ANY snapshot (new user case)
-       // If this is the first month, maybe compare vs the FIRST snapshot of this month?
-       const firstSnapshotOfMonth = await NetWorthSnapshot.findOne({
-         userId,
-         createdAt: { $gte: startOfMonth }
-       }).sort({ createdAt: 1 });
-       
-       if (firstSnapshotOfMonth) {
-          monthlyChange = netWorth - firstSnapshotOfMonth.netWorth;
-          if (firstSnapshotOfMonth.netWorth !== 0) {
-            monthlyChangePercentage = (monthlyChange / Math.abs(firstSnapshotOfMonth.netWorth)) * 100;
-          }
-       }
-    }
+    const summary = calculateNetWorthSummary({
+      assets,
+      liabilities,
+      accounts,
+      previousSnapshot,
+    });
     
-    console.log(`[NetWorth] Calculated: Assets=${totalAssets}, Liabilities=${totalLiabilities}, NetWorth=${netWorth}`);
-    console.log(`[NetWorth] Change: ${monthlyChange} (${monthlyChangePercentage.toFixed(2)}%)`);
+    console.log(`[NetWorth] Calculated: Assets=${summary.totalAssets}, Liabilities=${summary.totalLiabilities}, NetWorth=${summary.netWorth}`);
+    console.log(`[NetWorth] Change: ${summary.monthlyChange} (${summary.monthlyChangePercentage.toFixed(2)}%)`);
 
     // Auto-create snapshot if none exists today (builds trend data over time)
     const todayDate = new Date();
@@ -213,17 +139,23 @@ router.get('/current', async (req, res) => {
 
     if (!todaysSnapshot) {
       // Create a snapshot for today
-      const assetBreakdown = {
-        manual: manualAssetsTotal,
-        accounts: accountsTotal,
-      };
-
       const newSnapshot = new NetWorthSnapshot({
         userId,
-        totalAssets,
-        totalLiabilities,
-        netWorth,
-        breakdown: { assets: assetBreakdown, liabilities: {} },
+        totalAssets: summary.totalAssets,
+        totalLiabilities: summary.totalLiabilities,
+        netWorth: summary.netWorth,
+        breakdown: {
+          assets: {
+            manual: summary.manualAssetsValue,
+            accounts: summary.connectedAccountsValue,
+            categories: summary.assetsBreakdown,
+          },
+          liabilities: {
+            manual: summary.manualLiabilitiesValue,
+            overdrawnAccounts: summary.connectedAccountDebt,
+            categories: summary.liabilitiesBreakdown,
+          },
+        },
         createdAt: new Date()
       });
 
@@ -233,11 +165,7 @@ router.get('/current', async (req, res) => {
 
     res.json({
         data: {
-            netWorth,
-            totalAssets,
-            totalLiabilities,
-            monthlyChange,
-            monthlyChangePercentage,
+            ...summary,
             currency: 'GHS'
         }
     });

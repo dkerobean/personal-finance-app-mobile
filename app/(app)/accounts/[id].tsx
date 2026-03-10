@@ -12,6 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/services/supabaseClient';
 import { useAuthStore } from '@/stores/authStore';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface AccountDetails {
   id: string;
@@ -31,6 +32,7 @@ export default function AccountDetailsScreen() {
   const [account, setAccount] = useState<AccountDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuthStore();
+  const toast = useAppToast();
 
   const loadAccountDetails = async () => {
     if (!user?.id || !id) return;
@@ -58,7 +60,7 @@ export default function AccountDetailsScreen() {
       setAccount(accountData);
     } catch (error) {
       console.error('Failed to load account details:', error);
-      Alert.alert('Error', 'Failed to load account details. Please try again.');
+      toast.error('Load failed', 'Failed to load account details. Please try again.');
       router.back();
     } finally {
       setIsLoading(false);
@@ -89,12 +91,11 @@ export default function AccountDetailsScreen() {
 
               if (error) throw error;
 
-              Alert.alert('Success', 'Account deactivated successfully', [
-                { text: 'OK', onPress: () => router.back() }
-              ]);
+              toast.success('Account deactivated', 'Account deactivated successfully.');
+              router.back();
             } catch (error) {
               console.error('Failed to deactivate account:', error);
-              Alert.alert('Error', 'Failed to deactivate account. Please try again.');
+              toast.error('Deactivate failed', 'Failed to deactivate account. Please try again.');
             }
           }
         }
@@ -113,7 +114,7 @@ export default function AccountDetailsScreen() {
         {
           text: 'Sync Now',
           onPress: () => {
-            Alert.alert('Info', 'Manual sync feature will be implemented in a future update.');
+            toast.info('Coming soon', 'Manual sync will be implemented in a future update.');
           }
         }
       ]

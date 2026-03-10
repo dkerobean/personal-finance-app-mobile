@@ -7,40 +7,43 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { transactionsApi } from '@/services/api/transactions';
 import type { Transaction } from '@/types/models';
-import { useCustomAlert } from '@/hooks/useCustomAlert';
-import CustomAlert from '@/components/ui/CustomAlert';
+import { useAppToast } from '@/hooks/useAppToast';
 import { COLORS, BORDER_RADIUS, SPACING, TYPOGRAPHY } from '@/constants/design';
+import { useAuth } from '@clerk/clerk-expo';
+import { mapIconName } from '@/utils/iconMapping';
 
 export default function TransactionDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { deleteTransaction } = useTransactionStore();
-  const { alert, alertProps } = useCustomAlert();
+  const { userId } = useAuth();
+  const toast = useAppToast();
+  const { deleteTransaction, error: transactionError } = useTransactionStore();
 
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id) {
+    if (id && userId) {
       loadTransaction();
     }
-  }, [id]);
+  }, [id, userId]);
 
   const loadTransaction = async () => {
-    if (!id) return;
+    if (!id || !userId) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await transactionsApi.getById(id);
+      const response = await transactionsApi.getById(userId, id);
       
       if (response.error) {
         setError(response.error.message);
@@ -64,9 +67,9 @@ export default function TransactionDetailScreen() {
   const handleDelete = () => {
     if (!transaction) return;
 
-    alert(
+    Alert.alert(
       'Delete Transaction',
-      `Are you sure you want to delete this ${transaction.type} of $${transaction.amount.toFixed(2)}? This action cannot be undone.`,
+      `Are you sure you want to delete this ${transaction.type} of GH¢${transaction.amount.toFixed(2)}? This action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -79,16 +82,25 @@ export default function TransactionDetailScreen() {
   };
 
   const confirmDelete = async () => {
-    if (!transaction) return;
+    if (!transaction) {
+      return;
+    }
 
-    const success = await deleteTransaction(transaction.id);
+    if (!userId) {
+      toast.error('Sign in required', 'Please sign in again before deleting this transaction.');
+      return;
+    }
+
+    const success = await deleteTransaction(userId, transaction.id);
     
     if (success) {
-      alert('Success', 'Transaction deleted successfully', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      toast.success(
+        transaction.type === 'income' ? 'Income Deleted' : 'Expense Deleted',
+        `GH¢${transaction.amount.toFixed(2)} removed successfully`
+      );
+      setTimeout(() => router.back(), 450);
     } else {
-      alert('Error', 'Failed to delete transaction');
+      toast.error('Delete failed', transactionError || 'Failed to delete transaction');
     }
   };
 
@@ -121,8 +133,10 @@ export default function TransactionDetailScreen() {
 
   const formatAmount = (amount: number, type: 'income' | 'expense') => {
     const sign = type === 'income' ? '+' : '-';
-    return `${sign}$${amount.toFixed(2)}`;
+    return `${sign}GH¢${amount.toFixed(2)}`;
   };
+
+  const transactionIcon = mapIconName(transaction?.category?.icon_name, transaction?.category?.name);
 
   if (isLoading) {
     return (
@@ -168,7 +182,7 @@ export default function TransactionDetailScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Transaction Details</Text>
           <TouchableOpacity style={styles.notificationButton}>
-            <MaterialIcons name="notifications-none" size={24} color={COLORS.primaryDark} />
+            <MaterialIcons name="notifications-none" size={22} color={COLORS.white} />
           </TouchableOpacity>
         </View>
       </View>
@@ -197,15 +211,19 @@ export default function TransactionDetailScreen() {
           <View style={styles.detailsContainer}>
             <View style={styles.detailCard}>
               <View style={styles.detailRow}>
-                <MaterialIcons name="category" size={20} color={COLORS.primaryDark} />
                 <Text style={styles.detailLabel}>Category</Text>
               </View>
               <View style={styles.categoryValue}>
-                <MaterialIcons
-                  name={transaction.category?.icon_name as any || 'category'}
-                  size={20}
-                  color={COLORS.primaryDark}
-                />
+                <View style={[
+                  styles.categoryIconWrap,
+                  transaction.type === 'income' ? styles.categoryIconIncome : styles.categoryIconExpense,
+                ]}>
+                  <Ionicons
+                    name={transactionIcon as any}
+                    size={18}
+                    color={COLORS.white}
+                  />
+                </View>
                 <Text style={styles.detailValue}>
                   {transaction.category?.name || 'Unknown Category'}
                 </Text>
@@ -263,8 +281,6 @@ export default function TransactionDetailScreen() {
           <Text style={styles.deleteButtonText}>Delete</Text>
         </TouchableOpacity>
       </View>
-      
-      <CustomAlert {...alertProps} />
     </SafeAreaView>
   );
 }
@@ -275,9 +291,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   header: {
-    paddingTop: 68,
-    paddingBottom: 40,
-    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
     backgroundColor: COLORS.primary,
   },
   headerContent: {
@@ -294,30 +310,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 30,
-    fontWeight: '600',
-    color: COLORS.primaryDark,
-    fontFamily: 'Poppins',
+    fontSize: TYPOGRAPHY.sizes.xxxl,
+    fontWeight: '700',
+    color: COLORS.white,
+    fontFamily: TYPOGRAPHY.fonts.display,
   },
   notificationButton: {
     width: 44,
     height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
     flex: 1,
     backgroundColor: COLORS.backgroundContent,
-    borderTopLeftRadius: 70,
-    borderTopRightRadius: 70,
-    paddingTop: 40,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    paddingTop: SPACING.xl,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 37,
-    paddingBottom: 40,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: 24,
   },
   loadingContainer: {
     flex: 1,
@@ -368,31 +386,30 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   backToListButtonText: {
-    color: COLORS.primaryDark,
-    fontSize: 20,
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: '600',
-    fontFamily: 'Poppins',
+    fontFamily: TYPOGRAPHY.fonts.semibold,
   },
   amountCard: {
     backgroundColor: COLORS.backgroundInput,
-    borderRadius: 18,
-    paddingVertical: 24,
-    paddingHorizontal: 34,
-    marginBottom: 24,
+    borderRadius: 20,
+    paddingVertical: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.lg,
     alignItems: 'center',
-    marginHorizontal: 16,
   },
   amountText: {
-    fontSize: 36,
-    fontWeight: '600',
-    marginBottom: 8,
-    fontFamily: 'Poppins',
+    fontSize: 40,
+    fontWeight: '700',
+    marginBottom: SPACING.xs,
+    fontFamily: TYPOGRAPHY.fonts.display,
   },
   typeText: {
-    fontSize: 16,
-    color: COLORS.primaryDark,
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textSecondary,
     fontWeight: '500',
-    fontFamily: 'Poppins',
+    fontFamily: TYPOGRAPHY.fonts.medium,
     textTransform: 'capitalize',
   },
   detailsContainer: {
@@ -400,11 +417,10 @@ const styles = StyleSheet.create({
   },
   detailCard: {
     backgroundColor: COLORS.backgroundInput,
-    borderRadius: 18,
-    paddingVertical: 16,
-    paddingHorizontal: 34,
-    marginBottom: 16,
-    marginHorizontal: 16,
+    borderRadius: 20,
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   detailRow: {
     flexDirection: 'row',
@@ -412,26 +428,39 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   detailLabel: {
-    fontSize: 15,
-    color: COLORS.primaryDark,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
     fontWeight: '500',
-    fontFamily: 'Poppins',
-    marginLeft: 8,
+    fontFamily: TYPOGRAPHY.fonts.medium,
   },
   detailValue: {
-    fontSize: 16,
-    color: COLORS.primaryDark,
-    fontWeight: '500',
-    fontFamily: 'Poppins',
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
+    fontWeight: '600',
+    fontFamily: TYPOGRAPHY.fonts.semibold,
   },
   categoryValue: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  categoryIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.sm,
+  },
+  categoryIconIncome: {
+    backgroundColor: COLORS.success,
+  },
+  categoryIconExpense: {
+    backgroundColor: COLORS.error,
+  },
   actionsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 37,
-    paddingTop: 24,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.lg,
     paddingBottom: 120,
     backgroundColor: COLORS.backgroundContent,
   },
@@ -452,14 +481,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   editButtonText: {
-    fontSize: 20,
+    fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: '600',
-    color: COLORS.primaryDark,
-    fontFamily: 'Poppins',
+    color: COLORS.white,
+    fontFamily: TYPOGRAPHY.fonts.bold,
   },
   deleteButton: {
     flex: 1,
-    backgroundColor: COLORS.backgroundInput,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: '#FECACA',
     borderRadius: 30,
     paddingVertical: 15,
     paddingHorizontal: 24,
@@ -468,9 +499,9 @@ const styles = StyleSheet.create({
     minHeight: 50,
   },
   deleteButtonText: {
-    fontSize: 20,
+    fontSize: TYPOGRAPHY.sizes.lg,
     fontWeight: '600',
     color: COLORS.error,
-    fontFamily: 'Poppins',
+    fontFamily: TYPOGRAPHY.fonts.bold,
   },
 });

@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, RefreshControl, FlatList } from 'react-native';
-import type { Asset } from '@/types/models';
+import type { Asset, AssetCategory } from '@/types/models';
 import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
 import AssetItem from './AssetItem';
 import { formatCurrency } from '@/lib/formatters';
+import { calculateAssetCurrentValue, getAssetCategoryLabel } from '@/lib/netWorthCatalog';
 
 interface AssetsListProps {
   assets: Asset[];
@@ -19,6 +20,9 @@ interface AssetGroup {
   assets: Asset[];
   totalValue: number;
 }
+
+type AssetHeaderItem = { type: 'header'; category: string; totalValue: number };
+type AssetListItem = Asset | AssetHeaderItem;
 
 export default function AssetsList({
   assets,
@@ -44,8 +48,8 @@ export default function AssetsList({
     // Convert to array of groups and sort by total value
     const groupArray: AssetGroup[] = Object.entries(groups).map(([category, categoryAssets]) => ({
       category,
-      assets: categoryAssets.sort((a, b) => b.current_value - a.current_value),
-      totalValue: categoryAssets.reduce((sum, asset) => sum + asset.current_value, 0),
+      assets: categoryAssets.sort((a, b) => calculateAssetCurrentValue(b) - calculateAssetCurrentValue(a)),
+      totalValue: categoryAssets.reduce((sum, asset) => sum + calculateAssetCurrentValue(asset), 0),
     }));
 
     // Sort groups by total value (highest first)
@@ -53,16 +57,7 @@ export default function AssetsList({
   }, [assets]);
 
   const getCategoryDisplayName = (category: string): string => {
-    const names: Record<string, string> = {
-      property: 'Property',
-      investments: 'Investments',
-      cash: 'Cash & Savings',
-      vehicles: 'Vehicles',
-      personal: 'Personal Assets',
-      business: 'Business Assets',
-      other: 'Other Assets',
-    };
-    return names[category] || category;
+    return getAssetCategoryLabel(category as AssetCategory);
   };
 
   const formatCategoryTotal = (total: number): string => {
@@ -71,7 +66,7 @@ export default function AssetsList({
 
   // Create flat list data with headers
   const flatListData = React.useMemo(() => {
-    const data: (Asset | { type: 'header'; category: string; totalValue: number })[] = [];
+    const data: AssetListItem[] = [];
     
     groupedAssets.forEach(group => {
       // Add category header
@@ -90,8 +85,8 @@ export default function AssetsList({
     return data;
   }, [groupedAssets]);
 
-  const renderItem = ({ item, index }: { item: any; index: number }) => {
-    if (item.type === 'header') {
+  const renderItem = ({ item, index }: { item: AssetListItem; index: number }) => {
+    if ('type' in item && item.type === 'header') {
       return (
         <View style={styles.categoryHeader}>
           <Text style={styles.categoryTitle}>
@@ -106,20 +101,18 @@ export default function AssetsList({
 
     // Determine if we should show separator
     const nextItem = flatListData[index + 1];
-    const showSeparator = nextItem && nextItem.type !== 'header';
+    const showSeparator = nextItem ? !('type' in nextItem && nextItem.type === 'header') : false;
+
+    const asset = item as Asset;
 
     return (
       <AssetItem
-        asset={item}
+        asset={asset}
         onPress={onAssetPress}
         onDeletePress={onDeletePress}
         showSeparator={showSeparator}
       />
     );
-  };
-
-  const getItemType = (item: any) => {
-    return item.type === 'header' ? 'header' : 'asset';
   };
 
   if (assets.length === 0) {
@@ -131,7 +124,13 @@ export default function AssetsList({
       <FlatList
         data={flatListData}
         renderItem={renderItem}
-        keyExtractor={(item, index) => item.type === 'header' ? `header-${item.category}` : `asset-${item.id}`}
+        keyExtractor={(item) => {
+          if ('type' in item && item.type === 'header') {
+            return `header-${item.category}`;
+          }
+
+          return `asset-${(item as Asset).id}`;
+        }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         refreshControl={

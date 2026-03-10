@@ -8,6 +8,7 @@ import ErrorBoundary from '../src/components/ErrorBoundary';
 import { ClerkAuthProvider } from '../src/providers/ClerkProvider';
 import { ToastProvider } from '../src/hooks/useAppToast';
 import SplashScreen from '../src/components/SplashScreen';
+import { applyGlobalTypography } from '../src/lib/applyGlobalTypography';
 import { 
   useFonts,
   PlusJakartaSans_300Light,
@@ -25,7 +26,15 @@ export default function RootLayout(): React.ReactElement {
     PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
+    Poppins: PlusJakartaSans_400Regular,
+    'League Spartan': PlusJakartaSans_700Bold,
   });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      applyGlobalTypography();
+    }
+  }, [fontsLoaded]);
 
   if (!fontsLoaded || showSplash) {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;

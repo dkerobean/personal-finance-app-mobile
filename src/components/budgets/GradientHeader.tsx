@@ -69,7 +69,7 @@ export default function GradientHeader({
 const styles = StyleSheet.create({
   container: {
     paddingTop: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingBottom: SPACING.xxl,
     backgroundColor: COLORS.backgroundMain,
   },
   headerSection: {
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
   },
   leftSection: {
-    width: 56,
+    width: 60,
     alignItems: 'flex-start',
   },
   backButton: {
@@ -89,31 +89,37 @@ const styles = StyleSheet.create({
   centerSection: {
     flex: 1,
     alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
   },
   title: {
-    fontSize: TYPOGRAPHY.sizes.xl,
-    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontSize: TYPOGRAPHY.sizes.xxxl,
+    lineHeight: 30,
+    fontWeight: TYPOGRAPHY.weights.bold,
     color: COLORS.white,
+    letterSpacing: -0.4,
   },
   subtitle: {
-    fontSize: TYPOGRAPHY.sizes.sm,
+    fontSize: TYPOGRAPHY.sizes.md,
+    lineHeight: 20,
     fontWeight: TYPOGRAPHY.weights.normal,
-    color: COLORS.white,
-    marginTop: 2,
+    color: 'rgba(255,255,255,0.88)',
+    marginTop: SPACING.xs,
   },
   rightSection: {
     width: 60,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 8,
+    gap: SPACING.sm,
   },
   iconButton: {
-    width: 36,
-    height: 36,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
 });

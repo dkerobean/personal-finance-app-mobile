@@ -14,6 +14,7 @@ import { useTransactionStore } from '@/stores/transactionStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { transactionsApi } from '@/services/api/transactions';
 import CategorySuggestionBadge from '@/components/transactions/CategorySuggestionBadge';
+import { useAppToast } from '@/hooks/useAppToast';
 import type { Transaction, Category } from '@/types/models';
 
 interface BulkCategorizeModalProps {
@@ -38,6 +39,7 @@ export default function BulkCategorizeModal({
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const toast = useAppToast();
 
   const { transactions, updateTransaction } = useTransactionStore();
   const { categories } = useCategoryStore();
@@ -122,7 +124,7 @@ export default function BulkCategorizeModal({
 
   const handleBulkUpdate = async () => {
     if (!selectedCategory) {
-      Alert.alert('Error', 'Please select a category');
+      toast.error('Select a category', 'Please select a category first.');
       return;
     }
 
@@ -131,7 +133,7 @@ export default function BulkCategorizeModal({
       .map(item => item.transaction);
 
     if (selectedTransactions.length === 0) {
-      Alert.alert('Error', 'Please select at least one transaction');
+      toast.error('Select transactions', 'Please select at least one transaction.');
       return;
     }
 
@@ -150,19 +152,16 @@ export default function BulkCategorizeModal({
               const response = await transactionsApi.bulkRecategorize(transactionIds, selectedCategory.id);
               
               if (response.error) {
-                Alert.alert('Error', response.error.message);
+                toast.error('Update failed', response.error.message);
                 return;
               }
 
               const { updated, errors } = response.data!;
               
               if (errors.length > 0) {
-                Alert.alert(
-                  'Partial Success', 
-                  `Updated ${updated} transactions. ${errors.length} failed:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? '\n...' : ''}`
-                );
+                toast.warning('Partial success', `Updated ${updated} transactions. ${errors.length} failed.`);
               } else {
-                Alert.alert('Success', `Updated ${updated} transactions`);
+                toast.success('Transactions updated', `Updated ${updated} transactions.`);
               }
               
               // Refresh the transaction store
@@ -171,7 +170,7 @@ export default function BulkCategorizeModal({
               
               onClose();
             } catch (error) {
-              Alert.alert('Error', 'Failed to update transactions');
+              toast.error('Update failed', 'Failed to update transactions.');
             } finally {
               setUpdating(false);
             }

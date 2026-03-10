@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { supabase } from '@/services/supabaseClient';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface CategorizationRule {
   id: string;
@@ -41,6 +42,7 @@ export default function CategorizationRulesManager() {
     rule_value: '',
     priority: 1,
   });
+  const toast = useAppToast();
 
   useEffect(() => {
     loadRules();
@@ -60,7 +62,7 @@ export default function CategorizationRulesManager() {
       setRules(data || []);
     } catch (error) {
       console.error('Failed to load rules:', error);
-      Alert.alert('Error', 'Failed to load categorization rules');
+      toast.error('Load failed', 'Failed to load categorization rules.');
     } finally {
       setLoading(false);
     }
@@ -68,7 +70,7 @@ export default function CategorizationRulesManager() {
 
   const addRule = async () => {
     if (!newRule.category_id || !newRule.rule_value) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      toast.error('Missing fields', 'Please fill in all required fields.');
       return;
     }
 
@@ -87,10 +89,10 @@ export default function CategorizationRulesManager() {
         priority: 1,
       });
       loadRules();
-      Alert.alert('Success', 'Rule added successfully');
+      toast.success('Rule added', 'Rule added successfully.');
     } catch (error) {
       console.error('Failed to add rule:', error);
-      Alert.alert('Error', 'Failed to add rule');
+      toast.error('Add failed', 'Failed to add rule.');
     }
   };
 
@@ -105,7 +107,7 @@ export default function CategorizationRulesManager() {
       loadRules();
     } catch (error) {
       console.error('Failed to update rule:', error);
-      Alert.alert('Error', 'Failed to update rule');
+      toast.error('Update failed', 'Failed to update rule.');
     }
   };
 
@@ -127,10 +129,10 @@ export default function CategorizationRulesManager() {
 
               if (error) throw error;
               loadRules();
-              Alert.alert('Success', 'Rule deleted successfully');
+              toast.success('Rule deleted', 'Rule deleted successfully.');
             } catch (error) {
               console.error('Failed to delete rule:', error);
-              Alert.alert('Error', 'Failed to delete rule');
+              toast.error('Delete failed', 'Failed to delete rule.');
             }
           },
         },

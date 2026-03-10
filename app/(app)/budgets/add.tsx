@@ -16,10 +16,12 @@ import CategorySelector from '@/components/CategorySelector';
 import { Category, CreateBudgetRequest } from '@/types/models';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useCategoryStore } from '@/stores/categoryStore';
+import { useAppToast } from '@/hooks/useAppToast';
 
 export default function AddBudgetScreen(): React.ReactElement {
   const { createBudget, isLoading, error, clearError } = useBudgetStore();
   const { categories, loadCategories, isLoading: categoriesLoading, error: categoriesError } = useCategoryStore();
+  const toast = useAppToast();
   
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
@@ -100,12 +102,8 @@ export default function AddBudgetScreen(): React.ReactElement {
     const success = await createBudget(request);
     
     if (success) {
-      Alert.alert('Success', 'Budget created successfully', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]);
+      toast.success('Budget created', 'Budget created successfully.');
+      router.back();
     }
   };
 

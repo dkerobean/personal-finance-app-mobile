@@ -5,19 +5,20 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ScrollView,
   StatusBar,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SvgXml } from 'react-native-svg';
 import { useSignUp, useAuth, useOAuth } from '@clerk/clerk-expo';
 import * as WebBrowser from 'expo-web-browser';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { validateEmail, validatePassword } from '@/lib/validators';
 import { authService } from '@/services/authService';
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/design';
+import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '@/constants/design';
+import { KIPPO_MARK_WHITE_SVG } from '@/constants/brand';
+import { useAppToast } from '@/hooks/useAppToast';
 
 // Warm up the browser for OAuth
 WebBrowser.maybeCompleteAuthSession();
@@ -33,10 +34,9 @@ const APPLE_ICON = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" 
 <path d="M17.05 20.28C16.07 21.23 15 21.08 13.97 20.63C12.88 20.17 11.88 20.15 10.73 20.63C9.29 21.25 8.53 21.07 7.67 20.28C2.79 15.25 3.51 7.59 9.05 7.31C10.4 7.38 11.34 8.05 12.13 8.11C13.31 7.87 14.44 7.18 15.69 7.27C17.19 7.39 18.32 7.99 19.07 9.07C15.98 10.94 16.72 15.05 19.58 16.2C18.97 17.82 18.17 19.42 17.04 20.29L17.05 20.28ZM12.03 7.25C11.88 5.02 13.69 3.18 15.77 3C16.06 5.58 13.43 7.5 12.03 7.25Z" fill="#000000"/>
 </svg>`;
 
-// Kippo K Logo - White version for green background
-const KIPPO_LOGO_WHITE = `<svg width="50" height="50" viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg">
-  <path d="M17.5 65 L37.5 15 L57.5 15 L37.5 65 Z" fill="white"/>
-  <path d="M62.5 15 L82.5 15 L70.5 40 L60.5 65 L40.5 65 L50.5 40 Z" fill="white"/>
+const FACEBOOK_ICON = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M24 12.073C24 5.405 18.627 0 12 0C5.373 0 0 5.405 0 12.073C0 18.099 4.388 23.094 10.125 24V15.562H7.078V12.073H10.125V9.413C10.125 6.387 11.917 4.715 14.658 4.715C15.971 4.715 17.344 4.95 17.344 4.95V7.922H15.83C14.339 7.922 13.875 8.854 13.875 9.811V12.073H17.203L16.671 15.562H13.875V24C19.612 23.094 24 18.099 24 12.073Z" fill="#1877F2"/>
+<path d="M16.671 15.562L17.203 12.073H13.875V9.811C13.875 8.857 14.339 7.922 15.83 7.922H17.344V4.95C17.344 4.95 15.971 4.715 14.658 4.715C11.917 4.715 10.125 6.387 10.125 9.413V12.073H7.078V15.562H10.125V24C10.736 24.097 11.363 24.146 12 24.146C12.637 24.146 13.264 24.097 13.875 24V15.562H16.671Z" fill="#FFFFFF"/>
 </svg>`;
 
 const EYE_ICON = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -72,11 +72,13 @@ interface PasswordVisibility {
 }
 
 export default function RegisterScreen(): React.ReactElement {
+  const insets = useSafeAreaInsets();
   const { signUp, setActive, isLoaded } = useSignUp();
   const { isSignedIn } = useAuth();
   const { startOAuthFlow: startGoogleOAuth } = useOAuth({ strategy: 'oauth_google' });
   const { startOAuthFlow: startAppleOAuth } = useOAuth({ strategy: 'oauth_apple' });
-  const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | null>(null);
+  const { startOAuthFlow: startFacebookOAuth } = useOAuth({ strategy: 'oauth_facebook' });
+  const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | 'facebook' | null>(null);
   
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
@@ -93,6 +95,8 @@ export default function RegisterScreen(): React.ReactElement {
     password: false,
     confirmPassword: false,
   });
+  const [hasScrolledSignup, setHasScrolledSignup] = useState(false);
+  const toast = useAppToast();
 
   // Redirect if already signed in
   React.useEffect(() => {
@@ -112,7 +116,7 @@ export default function RegisterScreen(): React.ReactElement {
       }
     } catch (error: any) {
       console.error('Google OAuth error:', error);
-      Alert.alert('Google Sign Up Failed', error?.message || 'An error occurred');
+      toast.error('Google sign up failed', error?.message || 'An error occurred');
     } finally {
       setSocialLoading(null);
     }
@@ -129,7 +133,24 @@ export default function RegisterScreen(): React.ReactElement {
       }
     } catch (error: any) {
       console.error('Apple OAuth error:', error);
-      Alert.alert('Apple Sign Up Failed', error?.message || 'An error occurred');
+      toast.error('Apple sign up failed', error?.message || 'An error occurred');
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const handleFacebookSignUp = async () => {
+    try {
+      setSocialLoading('facebook');
+      const { createdSessionId, setActive: setActiveSession } = await startFacebookOAuth();
+      
+      if (createdSessionId && setActiveSession) {
+        await setActiveSession({ session: createdSessionId });
+        router.replace('/(app)');
+      }
+    } catch (error: any) {
+      console.error('Facebook OAuth error:', error);
+      toast.error('Facebook sign up failed', error?.message || 'An error occurred');
     } finally {
       setSocialLoading(null);
     }
@@ -175,7 +196,7 @@ export default function RegisterScreen(): React.ReactElement {
 
   const onSignUpPress = async () => {
     if (!isLoaded || !signUp) {
-      Alert.alert('Error', 'Authentication service not ready. Please try again.');
+      toast.error('Authentication unavailable', 'Please try again.');
       return;
     }
 
@@ -206,7 +227,7 @@ export default function RegisterScreen(): React.ReactElement {
         errorMessage = err.errors[0].message;
       }
       
-      Alert.alert('Registration Failed', errorMessage);
+      toast.error('Registration failed', errorMessage);
       setIsLoading(false);
     }
   };
@@ -249,7 +270,7 @@ export default function RegisterScreen(): React.ReactElement {
         router.replace('/(app)');
       } else {
         console.error(JSON.stringify(completeSignUp, null, 2));
-        Alert.alert('Verification Failed', 'Invalid code or verification incomplete.');
+        toast.error('Verification failed', 'Invalid code or verification incomplete.');
       }
     } catch (err: any) {
       console.error(JSON.stringify(err, null, 2));
@@ -289,10 +310,10 @@ export default function RegisterScreen(): React.ReactElement {
                 return;
              } catch (activationError) {
                  console.error("Failed to activate session after verified error:", activationError);
-                 Alert.alert('Error', 'Verification successful but failed to activate session.');
+                 toast.error('Activation failed', 'Verification succeeded but session activation failed.');
              }
           } else {
-             Alert.alert('Info', 'Email is already verified. Please try logging in.');
+             toast.info('Already verified', 'Email is already verified. Please try logging in.');
              router.replace('/login');
           }
           setIsLoading(false);
@@ -303,7 +324,7 @@ export default function RegisterScreen(): React.ReactElement {
       if (err.errors && err.errors.length > 0) {
         errorMessage = err.errors[0].message;
       }
-      Alert.alert('Verification Error', errorMessage);
+      toast.error('Verification error', errorMessage);
       setIsLoading(false);
     }
   };
@@ -325,12 +346,10 @@ export default function RegisterScreen(): React.ReactElement {
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-            <View style={styles.verificationContainer}>
-                <Image 
-                    source={require('../../assets/kippo-logo-white.png')}
-                    style={styles.logoSmall}
-                    resizeMode="contain"
-                />
+            <View style={[styles.verificationContainer, { paddingTop: Math.max(insets.top + SPACING.lg, SPACING.xxxl) }]}>
+                <View style={styles.logoBadge}>
+                  <SvgXml xml={KIPPO_MARK_WHITE_SVG} width={38} height={38} />
+                </View>
                 <Text style={styles.title}>Verification</Text>
                 <Text style={[styles.subtitle, { color: '#FFFFFF', textAlign: 'center' }]}>We've sent a code to {formData.email}</Text>
                 
@@ -367,16 +386,31 @@ export default function RegisterScreen(): React.ReactElement {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       
-      <View style={styles.topSection}>
-        <SvgXml xml={KIPPO_LOGO_WHITE} width={50} height={50} />
-        <Text style={styles.title}>Create Account</Text>
+      <View style={[styles.topSection, { paddingTop: Math.max(insets.top + SPACING.xl, SPACING.huge) }]}>
+        <View style={styles.logoBadge}>
+          <SvgXml xml={KIPPO_MARK_WHITE_SVG} width={42} height={42} />
+        </View>
+        <Text style={styles.eyebrow}>One app for every cedi</Text>
+        <Text style={styles.title}>Create your account</Text>
+        <Text style={styles.subtitle}>
+          Build budgets, link bank and mobile money accounts, and make better money decisions from day one.
+        </Text>
       </View>
 
       <View style={styles.bottomSection}>
         <ScrollView 
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: Math.max(insets.bottom + SPACING.xxxl, SPACING.huge) },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onScroll={(event) => {
+            if (!hasScrolledSignup && event.nativeEvent.contentOffset.y > 12) {
+              setHasScrolledSignup(true);
+            }
+          }}
+          scrollEventThrottle={16}
         >
           <View style={styles.formContainer}>
             <View style={styles.inputGroup}>
@@ -526,6 +560,18 @@ export default function RegisterScreen(): React.ReactElement {
               
               <TouchableOpacity
                 style={styles.socialButton}
+                onPress={handleFacebookSignUp}
+                disabled={isLoading || socialLoading !== null}
+              >
+                {socialLoading === 'facebook' ? (
+                  <ActivityIndicator color="#006D4F" size="small" />
+                ) : (
+                  <SvgXml xml={FACEBOOK_ICON} width={24} height={24} />
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.socialButton}
                 onPress={handleAppleSignUp}
                 disabled={isLoading || socialLoading !== null}
               >
@@ -545,6 +591,14 @@ export default function RegisterScreen(): React.ReactElement {
             </View>
           </View>
         </ScrollView>
+        {!hasScrolledSignup && (
+          <View pointerEvents="none" style={styles.scrollHintContainer}>
+            <View style={styles.scrollHintPill}>
+              <Text style={styles.scrollHintArrow}>↓</Text>
+              <Text style={styles.scrollHintText}>Scroll to continue</Text>
+            </View>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -556,51 +610,58 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   topSection: {
-    height: '25%',
-    justifyContent: 'center',
+    minHeight: 270,
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: SPACING.xxxl,
+    paddingBottom: SPACING.xxl,
   },
   bottomSection: {
     flex: 1,
     backgroundColor: COLORS.backgroundCard,
-    borderTopLeftRadius: BORDER_RADIUS.huge,
-    borderTopRightRadius: BORDER_RADIUS.huge,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
     overflow: 'hidden',
   },
   scrollContent: {
     flexGrow: 1,
-    padding: SPACING.xl,
+    paddingHorizontal: SPACING.xxxl,
     paddingTop: SPACING.xxxl,
+    paddingBottom: SPACING.huge,
   },
-  headerContainer: {
+  logoBadge: {
+    width: 78,
+    height: 78,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
-    marginBottom: SPACING.huge,
+    justifyContent: 'center',
+    marginBottom: SPACING.xl,
   },
-  logo: {
-    width: 50,
-    height: 50,
-    marginBottom: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  logoSmall: {
-    width: 48,
-    height: 48,
-    marginBottom: SPACING.xxl,
-    borderRadius: BORDER_RADIUS.md,
+  eyebrow: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: TYPOGRAPHY.fonts.semibold,
+    color: 'rgba(255,255,255,0.78)',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: SPACING.sm,
   },
   title: {
-    fontSize: TYPOGRAPHY.sizes.massive,
-    fontWeight: '800',
+    fontSize: TYPOGRAPHY.sizes.massive + 2,
+    fontFamily: TYPOGRAPHY.fonts.display,
     color: COLORS.white,
-    marginBottom: SPACING.sm,
     textAlign: 'center',
+    lineHeight: TYPOGRAPHY.lineHeights.hero,
+    letterSpacing: -1.2,
   },
   subtitle: {
     fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.lightBlue,
+    fontFamily: TYPOGRAPHY.fonts.medium,
+    color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: TYPOGRAPHY.lineHeights.body,
+    marginTop: SPACING.md,
+    maxWidth: 320,
   },
   formContainer: {
     width: '100%',
@@ -611,30 +672,53 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       padding: SPACING.xxl,
   },
+  scrollHintContainer: {
+    position: 'absolute',
+    top: 12,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  scrollHintPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0, 109, 79, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 109, 79, 0.12)',
+  },
+  scrollHintArrow: {
+    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontFamily: TYPOGRAPHY.fonts.bold,
+    lineHeight: 18,
+  },
+  scrollHintText: {
+    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: TYPOGRAPHY.fonts.semibold,
+  },
   inputGroup: {
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xl,
     width: '100%',
   },
   label: {
     fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: TYPOGRAPHY.fonts.semibold,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
-    backgroundColor: COLORS.backgroundCard,
-    alignSelf: 'flex-start',
-    zIndex: 1,
-    marginLeft: SPACING.md,
-    paddingHorizontal: SPACING.xs,
-    position: 'absolute',
-    top: -10,
-    fontWeight: '600',
+    marginBottom: SPACING.sm,
+    letterSpacing: 0.1,
   },
   inputContainer: {
     backgroundColor: COLORS.backgroundInput,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1.5,
-    borderColor: COLORS.gray100,
-    paddingHorizontal: SPACING.lg,
-    height: 56,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.xl,
+    height: 62,
     justifyContent: 'center',
   },
   inputError: {
@@ -643,9 +727,9 @@ const styles = StyleSheet.create({
   },
   input: {
     fontSize: TYPOGRAPHY.sizes.md,
+    fontFamily: TYPOGRAPHY.fonts.medium,
     color: COLORS.textPrimary,
     height: '100%',
-    fontWeight: '500',
   },
   passwordWrapper: {
     flexDirection: 'row',
@@ -655,9 +739,9 @@ const styles = StyleSheet.create({
   passwordInput: {
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.md,
+    fontFamily: TYPOGRAPHY.fonts.medium,
     color: COLORS.textPrimary,
     height: '100%',
-    fontWeight: '500',
   },
   eyeIcon: {
     padding: SPACING.xs,
@@ -665,21 +749,21 @@ const styles = StyleSheet.create({
   errorText: {
     color: COLORS.error,
     fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: TYPOGRAPHY.fonts.medium,
     marginTop: SPACING.xs,
-    marginLeft: SPACING.sm,
   },
   button: {
     backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.round,
-    height: 56,
+    borderRadius: 22,
+    height: 58,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: SPACING.xxl,
+    marginTop: SPACING.lg,
     marginBottom: SPACING.xxl,
     width: '100%',
     ...SHADOWS.md,
     shadowColor: COLORS.primary,
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.25,
   },
   buttonDisabled: {
     opacity: 0.7,
@@ -687,52 +771,53 @@ const styles = StyleSheet.create({
   buttonText: {
     color: COLORS.white,
     fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: '700',
+    fontFamily: TYPOGRAPHY.fonts.bold,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.xxl,
+    marginBottom: SPACING.xl,
   },
   footerText: {
     color: COLORS.textSecondary,
     fontSize: TYPOGRAPHY.sizes.md,
+    fontFamily: TYPOGRAPHY.fonts.medium,
   },
   footerLink: {
     color: COLORS.primary,
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: '700',
+    fontFamily: TYPOGRAPHY.fonts.bold,
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: SPACING.xl,
+    marginVertical: SPACING.xxl,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: COLORS.gray100,
+    backgroundColor: COLORS.border,
   },
   dividerText: {
     paddingHorizontal: SPACING.md,
     color: COLORS.textTertiary,
     fontSize: TYPOGRAPHY.sizes.sm,
-    fontWeight: '500',
+    fontFamily: TYPOGRAPHY.fonts.medium,
   },
   socialButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: SPACING.xl,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xxxl,
   },
   socialButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 24,
     backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: COLORS.gray100,
+    borderColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
     ...SHADOWS.sm,

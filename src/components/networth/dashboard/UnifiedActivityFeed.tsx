@@ -6,12 +6,20 @@ import { formatCurrency, formatDateRelative } from '@/lib/formatters';
 
 export interface ActivityItem {
   id: string;
-  type: 'asset_added' | 'liability_added' | 'asset_updated' | 'liability_updated' | 'net_worth_calculated';
+  type:
+    | 'asset_added'
+    | 'liability_added'
+    | 'asset_updated'
+    | 'liability_updated'
+    | 'net_worth_calculated'
+    | 'transaction_income'
+    | 'transaction_expense';
   title: string;
   description: string;
   amount?: number;
   timestamp: string;
   category?: string;
+  detailsRoute?: string;
 }
 
 interface UnifiedActivityFeedProps {
@@ -43,6 +51,10 @@ export default function UnifiedActivityFeed({
         return 'edit';
       case 'net_worth_calculated':
         return 'calculate';
+      case 'transaction_income':
+        return 'south-west';
+      case 'transaction_expense':
+        return 'north-east';
       default:
         return 'info';
     }
@@ -58,6 +70,10 @@ export default function UnifiedActivityFeed({
         return COLORS.error;
       case 'net_worth_calculated':
         return COLORS.primary;
+      case 'transaction_income':
+        return COLORS.success;
+      case 'transaction_expense':
+        return COLORS.error;
       default:
         return COLORS.textSecondary;
     }
@@ -94,7 +110,8 @@ export default function UnifiedActivityFeed({
         {item.amount !== undefined && (
           <View style={styles.amountContainer}>
             <Text style={[styles.activityAmount, { color: getActivityColor(item.type) }]}>
-              {item.type.includes('liability') ? '-' : '+'}{formatCurrency(item.amount)}
+              {item.type === 'transaction_expense' || item.type.includes('liability') ? '-' : '+'}
+              {formatCurrency(item.amount)}
             </Text>
             {item.category && (
               <View style={[styles.categoryTag, { backgroundColor: `${getActivityColor(item.type)}15` }]}>
@@ -179,10 +196,10 @@ export default function UnifiedActivityFeed({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.backgroundCard,
-    marginHorizontal: SPACING.xl,
+    width: '100%',
     marginBottom: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.xl,
+    borderRadius: 24,
+    padding: SPACING.lg,
     ...SHADOWS.sm,
   },
   header: {

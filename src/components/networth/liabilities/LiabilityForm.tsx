@@ -1,16 +1,28 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
+  View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/design';
-import type { Liability, LiabilityCategory, LiabilityType, CreateLiabilityRequest, UpdateLiabilityRequest } from '@/types/models';
+import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/design';
+import {
+  LIABILITY_CATEGORY_OPTIONS,
+  getLiabilityTypeLabel,
+  getLiabilityTypeOptions,
+} from '@/lib/netWorthCatalog';
+import type {
+  CreateLiabilityRequest,
+  Liability,
+  LiabilityCategory,
+  LiabilityType,
+  UpdateLiabilityRequest,
+} from '@/types/models';
 
 const CURRENCY_PREFIX = 'GH¢';
 const CUSTOM_CATEGORY_REGEX = /\[\[custom_category:(.*?)\]\]/i;
@@ -24,34 +36,6 @@ interface LiabilityFormProps {
   isLoading?: boolean;
   mode: 'create' | 'edit';
 }
-
-const LIABILITY_CATEGORIES: { key: LiabilityCategory; label: string; types: LiabilityType[] }[] = [
-  {
-    key: 'loans',
-    label: 'Loans',
-    types: ['personal_loan', 'auto_loan', 'student_loan', 'payday_loan']
-  },
-  {
-    key: 'credit_cards',
-    label: 'Credit Cards',
-    types: ['credit_card', 'buy_now_pay_later', 'overdraft']
-  },
-  {
-    key: 'mortgages',
-    label: 'Mortgages',
-    types: ['mortgage']
-  },
-  {
-    key: 'business_debt',
-    label: 'Business Debt',
-    types: ['business_loan']
-  },
-  {
-    key: 'other',
-    label: 'Other Debts',
-    types: ['other', 'medical_debt', 'tax_debt', 'utility_bill']
-  },
-];
 
 const sanitizeCustomValue = (value: string): string => value.replace(/\]\]/g, '').trim();
 
@@ -76,6 +60,17 @@ const extractCustomMeta = (rawDescription?: string): {
   return { cleanDescription, customCategory, customType };
 };
 
+const normaliseNumberInput = (value: string): string => {
+  const numericValue = value.replace(/[^0-9.]/g, '');
+  const parts = numericValue.split('.');
+  if (parts.length > 2) {
+    return `${parts[0]}.${parts[1].slice(0, 4)}`;
+  }
+  return numericValue;
+};
+
+const formatDateValue = (date?: string): Date | null => (date ? new Date(date) : null);
+
 export default function LiabilityForm({
   initialData,
   onSave,
@@ -85,8 +80,7 @@ export default function LiabilityForm({
   mode,
 }: LiabilityFormProps): React.ReactElement {
   const parsedMeta = useMemo(() => extractCustomMeta(initialData?.description), [initialData?.description]);
-  
-  // Form state
+
   const [name, setName] = useState(initialData?.name || '');
   const [category, setCategory] = useState<LiabilityCategory>(initialData?.category || 'loans');
   const [liabilityType, setLiabilityType] = useState<LiabilityType>(initialData?.liability_type || 'personal_loan');
@@ -94,73 +88,50 @@ export default function LiabilityForm({
   const [originalBalance, setOriginalBalance] = useState(initialData?.original_balance?.toString() || '');
   const [interestRate, setInterestRate] = useState(initialData?.interest_rate?.toString() || '');
   const [monthlyPayment, setMonthlyPayment] = useState(initialData?.monthly_payment?.toString() || '');
-  const [dueDate, setDueDate] = useState<Date | null>(
-    initialData?.due_date ? new Date(initialData.due_date) : null
-  );
+  const [dueDate, setDueDate] = useState<Date | null>(formatDateValue(initialData?.due_date));
   const [description, setDescription] = useState(parsedMeta.cleanDescription);
   const [customCategoryName, setCustomCategoryName] = useState(initialData?.custom_category || parsedMeta.customCategory);
   const [customLiabilityTypeName, setCustomLiabilityTypeName] = useState(initialData?.custom_type || parsedMeta.customType);
-  
-  // UI state
+
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Update liability types when category changes
-  useEffect(() => {
-    const categoryData = LIABILITY_CATEGORIES.find(cat => cat.key === category);
-    if (categoryData && !categoryData.types.includes(liabilityType)) {
-      setLiabilityType(categoryData.types[0]);
-    }
-  }, [category, liabilityType]);
+  const currentCategory = useMemo(
+    () => LIABILITY_CATEGORY_OPTIONS.find((option) => option.key === category),
+    [category]
+  );
+  const liabilityTypeOptions = useMemo(() => getLiabilityTypeOptions(category), [category]);
 
-  const getLiabilityTypeLabel = (type: LiabilityType): string => {
-    const labels: Record<LiabilityType, string> = {
-      mortgage: 'Mortgage',
-      auto_loan: 'Auto Loan',
-      personal_loan: 'Personal Loan',
-      credit_card: 'Credit Card',
-      student_loan: 'Student Loan',
-      business_loan: 'Business Loan',
-      overdraft: 'Overdraft',
-      payday_loan: 'Payday Loan',
-      buy_now_pay_later: 'Buy Now Pay Later',
-      medical_debt: 'Medical Debt',
-      tax_debt: 'Tax Debt',
-      utility_bill: 'Utility Bill',
-      other: 'Other',
-    };
-    return labels[type] || type;
-  };
+  useEffect(() => {
+    if (!liabilityTypeOptions.some((option) => option.key === liabilityType)) {
+      setLiabilityType(liabilityTypeOptions[0]?.key || 'other');
+    }
+  }, [liabilityTypeOptions, liabilityType]);
+
+  const categoryDisplayLabel =
+    category === 'other' && customCategoryName.trim()
+      ? `Other • ${customCategoryName.trim()}`
+      : currentCategory?.label || 'Select Category';
+  const liabilityTypeDisplayLabel =
+    liabilityType === 'other' && customLiabilityTypeName.trim()
+      ? `Custom • ${customLiabilityTypeName.trim()}`
+      : getLiabilityTypeLabel(liabilityType);
 
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
+    const nextErrors: Record<string, string> = {};
 
-    if (!name.trim()) {
-      newErrors.name = 'Debt name is required';
-    }
-    if (!currentBalance) {
-      newErrors.current_balance = 'Current balance is required';
-    }
-    if (currentBalance && (isNaN(parseFloat(currentBalance)) || parseFloat(currentBalance) < 0)) {
-      newErrors.current_balance = 'Enter a valid amount';
-    }
-    if (interestRate && (isNaN(parseFloat(interestRate)) || parseFloat(interestRate) < 0 || parseFloat(interestRate) > 100)) {
-      newErrors.interest_rate = 'Interest rate must be between 0 and 100';
-    }
-    if (monthlyPayment && (isNaN(parseFloat(monthlyPayment)) || parseFloat(monthlyPayment) < 0)) {
-      newErrors.monthly_payment = 'Enter a valid monthly payment';
-    }
-    if (category === 'other' && !customCategoryName.trim()) {
-      newErrors.custom_category = 'Add your custom category';
-    }
-    if (liabilityType === 'other' && !customLiabilityTypeName.trim()) {
-      newErrors.custom_type = 'Add your custom debt type';
-    }
+    if (!name.trim()) nextErrors.name = 'Debt name is required';
+    if (!currentBalance || Number(currentBalance) <= 0) nextErrors.current_balance = 'Enter the balance owed';
+    if (originalBalance && Number(originalBalance) < 0) nextErrors.original_balance = 'Original balance cannot be negative';
+    if (interestRate && (Number(interestRate) < 0 || Number(interestRate) > 100)) nextErrors.interest_rate = 'APR must be between 0 and 100';
+    if (monthlyPayment && Number(monthlyPayment) < 0) nextErrors.monthly_payment = 'Monthly payment cannot be negative';
+    if (category === 'other' && !customCategoryName.trim()) nextErrors.custom_category = 'Add your custom category';
+    if (liabilityType === 'other' && !customLiabilityTypeName.trim()) nextErrors.custom_type = 'Add your custom debt type';
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
       return false;
     }
 
@@ -168,73 +139,87 @@ export default function LiabilityForm({
     return true;
   };
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     if (!validateForm()) {
       return;
     }
 
-    const formData = {
+    const payload: CreateLiabilityRequest | UpdateLiabilityRequest = {
       name: name.trim(),
       category,
       liability_type: liabilityType,
       custom_category: category === 'other' ? sanitizeCustomValue(customCategoryName) : undefined,
       custom_type: liabilityType === 'other' ? sanitizeCustomValue(customLiabilityTypeName) : undefined,
-      current_balance: parseFloat(currentBalance),
-      original_balance: originalBalance ? parseFloat(originalBalance) : undefined,
-      interest_rate: interestRate ? parseFloat(interestRate) : undefined,
-      monthly_payment: monthlyPayment ? parseFloat(monthlyPayment) : undefined,
-      due_date: dueDate?.toISOString().split('T')[0],
+      current_balance: Number(currentBalance),
+      original_balance: originalBalance ? Number(originalBalance) : undefined,
+      interest_rate: interestRate ? Number(interestRate) : undefined,
+      monthly_payment: monthlyPayment ? Number(monthlyPayment) : undefined,
+      due_date: dueDate ? dueDate.toISOString().split('T')[0] : undefined,
       description: description.trim() || undefined,
     };
 
-    onSave(formData);
+    onSave(payload);
   };
 
-  const formatCurrency = (value: string): string => {
-    const numericValue = value.replace(/[^0-9.]/g, '');
-    const parts = numericValue.split('.');
-    if (parts.length > 2) {
-      return `${parts[0]}.${parts[1].slice(0, 2)}`;
+  const renderDatePicker = () => {
+    if (!showDatePicker) {
+      return null;
     }
-    return numericValue;
-  };
 
-  const formatPercentage = (value: string): string => {
-    const numericValue = value.replace(/[^0-9.]/g, '');
-    const parts = numericValue.split('.');
-    if (parts.length > 2) {
-      return `${parts[0]}.${parts[1].slice(0, 2)}`;
+    const value = dueDate || new Date();
+
+    const handleChange = (_event: unknown, selectedDate?: Date) => {
+      if (Platform.OS !== 'ios') {
+        setShowDatePicker(false);
+      }
+
+      if (selectedDate) {
+        setDueDate(selectedDate);
+      }
+    };
+
+    if (Platform.OS === 'ios') {
+      return (
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Due Date</Text>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Text style={styles.doneText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            <DateTimePicker
+              value={value}
+              mode="date"
+              display="spinner"
+              onChange={handleChange}
+              style={styles.iosDatePicker}
+            />
+          </View>
+        </View>
+      );
     }
-    return numericValue;
+
+    return <DateTimePicker value={value} mode="date" display="default" onChange={handleChange} />;
   };
 
-  const currentCategory = LIABILITY_CATEGORIES.find(cat => cat.key === category);
-  const categoryDisplayLabel =
-    category === 'other' && customCategoryName.trim()
-      ? `Other • ${customCategoryName.trim()}`
-      : currentCategory?.label || 'Select Category';
-  const liabilityTypeDisplayLabel =
-    liabilityType === 'other' && customLiabilityTypeName.trim()
-      ? `Other • ${customLiabilityTypeName.trim()}`
-      : getLiabilityTypeLabel(liabilityType);
+  const balanceChange = currentBalance && originalBalance ? Number(originalBalance) - Number(currentBalance) : 0;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Liability Name */}
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Debt Name*</Text>
         <TextInput
           style={[styles.input, errors.name && styles.inputError]}
           value={name}
           onChangeText={setName}
-          placeholder="e.g., Chase Credit Card, Car Loan"
+          placeholder="e.g., Brokerage Margin, Car Loan"
           placeholderTextColor={COLORS.textTertiary}
           editable={!isLoading}
         />
-        {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+        {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
       </View>
 
-      {/* Category Selection */}
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Category*</Text>
         <TouchableOpacity
@@ -245,24 +230,23 @@ export default function LiabilityForm({
           <Text style={styles.pickerText}>{categoryDisplayLabel}</Text>
           <MaterialIcons name="arrow-drop-down" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
-        {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
       </View>
-      {category === 'other' && (
+
+      {category === 'other' ? (
         <View style={styles.fieldContainer}>
           <Text style={styles.label}>Custom Category*</Text>
           <TextInput
             style={[styles.input, errors.custom_category && styles.inputError]}
             value={customCategoryName}
             onChangeText={setCustomCategoryName}
-            placeholder="e.g., Family Debt"
+            placeholder="e.g., Court Settlements"
             placeholderTextColor={COLORS.textTertiary}
             editable={!isLoading}
           />
-          {errors.custom_category && <Text style={styles.errorText}>{errors.custom_category}</Text>}
+          {errors.custom_category ? <Text style={styles.errorText}>{errors.custom_category}</Text> : null}
         </View>
-      )}
+      ) : null}
 
-      {/* Liability Type Selection */}
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Debt Type*</Text>
         <TouchableOpacity
@@ -273,24 +257,31 @@ export default function LiabilityForm({
           <Text style={styles.pickerText}>{liabilityTypeDisplayLabel}</Text>
           <MaterialIcons name="arrow-drop-down" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
-        {errors.liability_type && <Text style={styles.errorText}>{errors.liability_type}</Text>}
       </View>
-      {liabilityType === 'other' && (
+
+      {liabilityType === 'other' ? (
         <View style={styles.fieldContainer}>
           <Text style={styles.label}>Custom Debt Type*</Text>
           <TextInput
             style={[styles.input, errors.custom_type && styles.inputError]}
             value={customLiabilityTypeName}
             onChangeText={setCustomLiabilityTypeName}
-            placeholder="e.g., Informal Loan"
+            placeholder="e.g., Partner Advance"
             placeholderTextColor={COLORS.textTertiary}
             editable={!isLoading}
           />
-          {errors.custom_type && <Text style={styles.errorText}>{errors.custom_type}</Text>}
+          <Text style={styles.helperInline}>Custom types still roll up under the selected category.</Text>
+          {errors.custom_type ? <Text style={styles.errorText}>{errors.custom_type}</Text> : null}
         </View>
-      )}
+      ) : null}
 
-      {/* Current Balance */}
+      <View style={styles.helperCard}>
+        <Text style={styles.helperTitle}>Track debt at the live balance</Text>
+        <Text style={styles.helperDescription}>
+          Net worth should use what you owe now. Keep original balance for payoff progress and add APR plus monthly payment for better debt planning.
+        </Text>
+      </View>
+
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Current Balance*</Text>
         <View style={styles.currencyInputContainer}>
@@ -298,149 +289,135 @@ export default function LiabilityForm({
           <TextInput
             style={[styles.currencyInput, errors.current_balance && styles.inputError]}
             value={currentBalance}
-            onChangeText={(value) => setCurrentBalance(formatCurrency(value))}
+            onChangeText={(value) => setCurrentBalance(normaliseNumberInput(value))}
             placeholder="0.00"
             placeholderTextColor={COLORS.textTertiary}
             keyboardType="decimal-pad"
             editable={!isLoading}
           />
         </View>
-        {errors.current_balance && <Text style={styles.errorText}>{errors.current_balance}</Text>}
+        {errors.current_balance ? <Text style={styles.errorText}>{errors.current_balance}</Text> : null}
       </View>
 
-      {/* Original Balance (Optional) */}
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Original Balance (Optional)</Text>
+        <Text style={styles.label}>Original Balance</Text>
         <View style={styles.currencyInputContainer}>
           <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
           <TextInput
             style={[styles.currencyInput, errors.original_balance && styles.inputError]}
             value={originalBalance}
-            onChangeText={(value) => setOriginalBalance(formatCurrency(value))}
+            onChangeText={(value) => setOriginalBalance(normaliseNumberInput(value))}
             placeholder="0.00"
             placeholderTextColor={COLORS.textTertiary}
             keyboardType="decimal-pad"
             editable={!isLoading}
           />
         </View>
-        {errors.original_balance && <Text style={styles.errorText}>{errors.original_balance}</Text>}
+        {errors.original_balance ? <Text style={styles.errorText}>{errors.original_balance}</Text> : null}
       </View>
 
-      {/* Interest Rate (Optional) */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Interest Rate (Optional)</Text>
-        <View style={styles.currencyInputContainer}>
-          <TextInput
-            style={[styles.currencyInput, errors.interest_rate && styles.inputError]}
-            value={interestRate}
-            onChangeText={(value) => setInterestRate(formatPercentage(value))}
-            placeholder="0.00"
-            placeholderTextColor={COLORS.textTertiary}
-            keyboardType="decimal-pad"
-            editable={!isLoading}
-          />
-          <Text style={styles.percentageSymbol}>% APR</Text>
+      <View style={styles.twoColumnRow}>
+        <View style={[styles.fieldContainer, styles.halfField]}>
+          <Text style={styles.label}>Interest Rate</Text>
+          <View style={styles.currencyInputContainer}>
+            <TextInput
+              style={[styles.currencyInput, errors.interest_rate && styles.inputError]}
+              value={interestRate}
+              onChangeText={(value) => setInterestRate(normaliseNumberInput(value))}
+              placeholder="0.00"
+              placeholderTextColor={COLORS.textTertiary}
+              keyboardType="decimal-pad"
+              editable={!isLoading}
+            />
+            <Text style={styles.percentageSymbol}>% APR</Text>
+          </View>
+          {errors.interest_rate ? <Text style={styles.errorText}>{errors.interest_rate}</Text> : null}
         </View>
-        <Text style={styles.fieldHint}>Annual Percentage Rate</Text>
-        {errors.interest_rate && <Text style={styles.errorText}>{errors.interest_rate}</Text>}
-      </View>
 
-      {/* Monthly Payment (Optional) */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Monthly Payment (Optional)</Text>
-        <View style={styles.currencyInputContainer}>
-          <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
-          <TextInput
-            style={[styles.currencyInput, errors.monthly_payment && styles.inputError]}
-            value={monthlyPayment}
-            onChangeText={(value) => setMonthlyPayment(formatCurrency(value))}
-            placeholder="0.00"
-            placeholderTextColor={COLORS.textTertiary}
-            keyboardType="decimal-pad"
-            editable={!isLoading}
-          />
+        <View style={[styles.fieldContainer, styles.halfField]}>
+          <Text style={styles.label}>Monthly Payment</Text>
+          <View style={styles.currencyInputContainer}>
+            <Text style={styles.currencySymbol}>{CURRENCY_PREFIX}</Text>
+            <TextInput
+              style={[styles.currencyInput, errors.monthly_payment && styles.inputError]}
+              value={monthlyPayment}
+              onChangeText={(value) => setMonthlyPayment(normaliseNumberInput(value))}
+              placeholder="0.00"
+              placeholderTextColor={COLORS.textTertiary}
+              keyboardType="decimal-pad"
+              editable={!isLoading}
+            />
+          </View>
+          {errors.monthly_payment ? <Text style={styles.errorText}>{errors.monthly_payment}</Text> : null}
         </View>
-        <Text style={styles.fieldHint}>Minimum monthly payment amount</Text>
-        {errors.monthly_payment && <Text style={styles.errorText}>{errors.monthly_payment}</Text>}
       </View>
 
-      {/* Due Date (Optional) */}
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Next Payment Due (Optional)</Text>
-        <TouchableOpacity
-          style={[styles.picker, errors.due_date && styles.inputError]}
-          onPress={() => setShowDatePicker(true)}
-          disabled={isLoading}
-        >
-          <Text style={styles.pickerText}>
-            {dueDate ? dueDate.toLocaleDateString() : 'Select Date'}
-          </Text>
+        <Text style={styles.label}>Next Payment Due</Text>
+        <TouchableOpacity style={styles.picker} onPress={() => setShowDatePicker(true)} disabled={isLoading}>
+          <Text style={styles.pickerText}>{dueDate ? dueDate.toLocaleDateString() : 'Select date'}</Text>
           <MaterialIcons name="event" size={24} color={COLORS.textSecondary} />
         </TouchableOpacity>
-        {dueDate && (
-          <TouchableOpacity
-            style={styles.clearDateButton}
-            onPress={() => setDueDate(null)}
-          >
-            <Text style={styles.clearDateText}>Clear Date</Text>
+        {dueDate ? (
+          <TouchableOpacity style={styles.clearDateButton} onPress={() => setDueDate(null)}>
+            <Text style={styles.clearDateText}>Clear due date</Text>
           </TouchableOpacity>
-        )}
-        <Text style={styles.fieldHint}>When is your next payment due?</Text>
-        {errors.due_date && <Text style={styles.errorText}>{errors.due_date}</Text>}
+        ) : null}
       </View>
 
-      {/* Description (Optional) */}
+      {(balanceChange !== 0 || monthlyPayment || interestRate) ? (
+        <View style={[styles.helperCard, balanceChange >= 0 ? styles.gainCard : styles.lossCard]}>
+          <Text style={styles.helperTitle}>
+            {balanceChange >= 0 ? 'Paydown progress' : 'Balance growth warning'}
+          </Text>
+          <Text style={styles.helperDescription}>
+            {balanceChange >= 0 ? '-' : '+'}
+            {CURRENCY_PREFIX}
+            {Math.abs(balanceChange).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {monthlyPayment ? ` • Payment ${CURRENCY_PREFIX}${Number(monthlyPayment).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo` : ''}
+            {interestRate ? ` • APR ${Number(interestRate).toFixed(2)}%` : ''}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Description (Optional)</Text>
+        <Text style={styles.label}>Notes</Text>
         <TextInput
-          style={[styles.textArea, errors.description && styles.inputError]}
+          style={styles.textArea}
           value={description}
           onChangeText={setDescription}
-          placeholder="Additional notes about this debt..."
+          placeholder="Add lender details, payoff notes, or collateral information."
           placeholderTextColor={COLORS.textTertiary}
           multiline
           numberOfLines={3}
           editable={!isLoading}
         />
-        {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
       </View>
 
-      {/* Action Buttons */}
       <View style={styles.buttonContainer}>
-        {mode === 'edit' && onDelete && (
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={onDelete}
-            disabled={isLoading}
-          >
-            <MaterialIcons name="delete-outline" size={24} color={COLORS.white} />
+        {mode === 'edit' && onDelete ? (
+          <TouchableOpacity style={styles.deleteButton} onPress={onDelete} disabled={isLoading}>
+            <MaterialIcons name="delete-outline" size={22} color={COLORS.white} />
             <Text style={styles.deleteButtonText}>Delete Debt</Text>
           </TouchableOpacity>
-        )}
-        
+        ) : null}
+
         <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={onCancel}
-            disabled={isLoading}
-          >
+          <TouchableOpacity style={styles.cancelButton} onPress={onCancel} disabled={isLoading}>
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
             onPress={handleSave}
             disabled={isLoading}
           >
-            <Text style={styles.saveButtonText}>
-              {mode === 'create' ? 'Add Debt' : 'Save Changes'}
-            </Text>
+            <Text style={styles.saveButtonText}>{mode === 'create' ? 'Add Liability' : 'Save Changes'}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Category Picker Modal */}
-      {showCategoryPicker && (
+      {showCategoryPicker ? (
         <View style={styles.modal}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -450,36 +427,28 @@ export default function LiabilityForm({
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.optionsList}>
-              {LIABILITY_CATEGORIES.map((cat) => (
+              {LIABILITY_CATEGORY_OPTIONS.map((option) => (
                 <TouchableOpacity
-                  key={cat.key}
-                  style={[
-                    styles.optionItem,
-                    category === cat.key && styles.optionItemSelected
-                  ]}
+                  key={option.key}
+                  style={[styles.optionItem, category === option.key && styles.optionItemSelected]}
                   onPress={() => {
-                    setCategory(cat.key);
+                    setCategory(option.key);
                     setShowCategoryPicker(false);
                   }}
                 >
-                  <Text style={[
-                    styles.optionText,
-                    category === cat.key && styles.optionTextSelected
-                  ]}>
-                    {cat.label}
-                  </Text>
-                  {category === cat.key && (
-                    <MaterialIcons name="check" size={24} color={COLORS.error} />
-                  )}
+                  <View style={styles.optionCopy}>
+                    <Text style={[styles.optionText, category === option.key && styles.optionTextSelected]}>{option.label}</Text>
+                    <Text style={styles.optionMeta}>{option.description}</Text>
+                  </View>
+                  {category === option.key ? <MaterialIcons name="check" size={24} color={COLORS.error} /> : null}
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         </View>
-      )}
+      ) : null}
 
-      {/* Liability Type Picker Modal */}
-      {showTypePicker && currentCategory && (
+      {showTypePicker ? (
         <View style={styles.modal}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -489,49 +458,30 @@ export default function LiabilityForm({
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.optionsList}>
-              {currentCategory.types.map((type) => (
+              {liabilityTypeOptions.map((option) => (
                 <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.optionItem,
-                    liabilityType === type && styles.optionItemSelected
-                  ]}
+                  key={option.key}
+                  style={[styles.optionItem, liabilityType === option.key && styles.optionItemSelected]}
                   onPress={() => {
-                    setLiabilityType(type);
+                    setLiabilityType(option.key);
                     setShowTypePicker(false);
                   }}
                 >
-                  <Text style={[
-                    styles.optionText,
-                    liabilityType === type && styles.optionTextSelected
-                  ]}>
-                    {getLiabilityTypeLabel(type)}
-                  </Text>
-                  {liabilityType === type && (
-                    <MaterialIcons name="check" size={24} color={COLORS.error} />
-                  )}
+                  <View style={styles.optionCopy}>
+                    <Text style={[styles.optionText, liabilityType === option.key && styles.optionTextSelected]}>{option.label}</Text>
+                    <Text style={styles.optionMeta}>
+                      {option.key === 'other' ? 'Create a custom subtype under this category.' : 'Included in this liability category.'}
+                    </Text>
+                  </View>
+                  {liabilityType === option.key ? <MaterialIcons name="check" size={24} color={COLORS.error} /> : null}
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         </View>
-      )}
+      ) : null}
 
-      {/* Date Picker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={dueDate || new Date()}
-          mode="date"
-          display="default"
-          minimumDate={new Date()}
-          onChange={(event, selectedDate) => {
-            setShowDatePicker(false);
-            if (selectedDate) {
-              setDueDate(selectedDate);
-            }
-          }}
-        />
-      )}
+      {renderDatePicker()}
     </ScrollView>
   );
 }
@@ -543,6 +493,13 @@ const styles = StyleSheet.create({
   fieldContainer: {
     marginBottom: SPACING.lg,
   },
+  halfField: {
+    flex: 1,
+  },
+  twoColumnRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
   label: {
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.medium,
@@ -552,108 +509,136 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: COLORS.white,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: COLORS.backgroundInput,
-    borderRadius: 12,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
     fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textPrimary,
     fontFamily: 'Poppins',
-  },
-  inputError: {
-    borderColor: COLORS.error,
-  },
-  textArea: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.backgroundInput,
-    borderRadius: 12,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-    minHeight: 80,
-    textAlignVertical: 'top',
   },
   picker: {
     backgroundColor: COLORS.white,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: COLORS.backgroundInput,
-    borderRadius: 12,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   pickerText: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textPrimary,
-    fontFamily: 'Poppins',
-  },
-  currencyInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.backgroundInput,
-    borderRadius: 12,
-  },
-  currencySymbol: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textSecondary,
-    fontFamily: 'Poppins',
-    paddingLeft: SPACING.md,
-    minWidth: 34,
-  },
-  percentageSymbol: {
-    fontSize: TYPOGRAPHY.sizes.md,
-    color: COLORS.textSecondary,
-    fontFamily: 'Poppins',
-    paddingRight: SPACING.md,
-  },
-  currencyInput: {
     flex: 1,
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: SPACING.sm,
-    fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textPrimary,
+    fontSize: TYPOGRAPHY.sizes.md,
     fontFamily: 'Poppins',
   },
-  fieldHint: {
+  inputError: {
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    marginTop: SPACING.xs,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.error,
+    fontFamily: 'Poppins',
+  },
+  helperInline: {
+    marginTop: SPACING.xs,
     fontSize: TYPOGRAPHY.sizes.sm,
     color: COLORS.textTertiary,
     fontFamily: 'Poppins',
-    marginTop: SPACING.xs,
-    fontStyle: 'italic',
   },
-  clearDateButton: {
-    marginTop: SPACING.xs,
+  helperCard: {
+    borderRadius: 22,
+    padding: SPACING.lg,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    marginBottom: SPACING.lg,
   },
-  clearDateText: {
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.error,
+  gainCard: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  lossCard: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  helperTitle: {
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    color: COLORS.textPrimary,
     fontFamily: 'Poppins',
+    marginBottom: 6,
   },
-  errorText: {
+  helperDescription: {
     fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.error,
+    color: COLORS.textSecondary,
     fontFamily: 'Poppins',
-    marginTop: SPACING.xs,
+    lineHeight: 20,
   },
-  buttonContainer: {
-    marginTop: SPACING.xl,
-    paddingBottom: SPACING.xl,
-  },
-  deleteButton: {
-    backgroundColor: COLORS.error,
+  currencyInputContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+  },
+  currencySymbol: {
+    color: COLORS.textTertiary,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontFamily: 'Poppins',
+    marginRight: SPACING.sm,
+  },
+  percentageSymbol: {
+    color: COLORS.textTertiary,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: 'Poppins',
+  },
+  currencyInput: {
+    flex: 1,
     paddingVertical: SPACING.md,
-    borderRadius: 12,
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
+    fontFamily: 'Poppins',
+  },
+  clearDateButton: {
+    marginTop: SPACING.sm,
+  },
+  clearDateText: {
+    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    fontFamily: 'Poppins',
+    fontWeight: TYPOGRAPHY.weights.medium,
+  },
+  textArea: {
+    backgroundColor: COLORS.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    minHeight: 110,
+    textAlignVertical: 'top',
+    fontSize: TYPOGRAPHY.sizes.md,
+    color: COLORS.textPrimary,
+    fontFamily: 'Poppins',
+  },
+  buttonContainer: {
+    paddingBottom: SPACING.xxxl,
+  },
+  deleteButton: {
+    borderRadius: 18,
+    backgroundColor: COLORS.error,
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: SPACING.sm,
     marginBottom: SPACING.md,
   },
   deleteButtonText: {
@@ -661,19 +646,20 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.sizes.md,
     fontWeight: TYPOGRAPHY.weights.semibold,
     fontFamily: 'Poppins',
-    marginLeft: SPACING.xs,
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: SPACING.md,
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: COLORS.backgroundInput,
-    paddingVertical: SPACING.md,
-    borderRadius: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
     alignItems: 'center',
-    marginRight: SPACING.sm,
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
   },
   cancelButtonText: {
     color: COLORS.textSecondary,
@@ -683,11 +669,11 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     flex: 1,
-    backgroundColor: COLORS.error, // Red for debt actions
-    paddingVertical: SPACING.md,
-    borderRadius: 12,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
-    marginLeft: SPACING.sm,
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
   },
   saveButtonDisabled: {
     opacity: 0.6,
@@ -695,63 +681,77 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: COLORS.white,
     fontSize: TYPOGRAPHY.sizes.md,
-    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontWeight: TYPOGRAPHY.weights.bold,
     fontFamily: 'Poppins',
   },
   modal: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
+    inset: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: COLORS.white,
-    borderRadius: 16,
-    width: '90%',
-    maxHeight: '70%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.xxxl,
+    maxHeight: '72%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.backgroundInput,
+    marginBottom: SPACING.md,
   },
   modalTitle: {
     fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontWeight: TYPOGRAPHY.weights.bold,
     color: COLORS.textPrimary,
     fontFamily: 'Poppins',
   },
+  doneText: {
+    color: COLORS.primary,
+    fontSize: TYPOGRAPHY.sizes.md,
+    fontWeight: TYPOGRAPHY.weights.semibold,
+    fontFamily: 'Poppins',
+  },
+  iosDatePicker: {
+    alignSelf: 'center',
+  },
   optionsList: {
-    maxHeight: 300,
+    maxHeight: 420,
   },
   optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.backgroundInput,
+    borderBottomColor: COLORS.gray100,
+    gap: SPACING.md,
   },
   optionItemSelected: {
-    backgroundColor: '#fef2f2', // Light red background for debt
+    backgroundColor: '#FEF2F2',
+  },
+  optionCopy: {
+    flex: 1,
   },
   optionText: {
     fontSize: TYPOGRAPHY.sizes.md,
     color: COLORS.textPrimary,
     fontFamily: 'Poppins',
+    fontWeight: TYPOGRAPHY.weights.medium,
+    marginBottom: 4,
   },
   optionTextSelected: {
     color: COLORS.error,
-    fontWeight: TYPOGRAPHY.weights.semibold,
+  },
+  optionMeta: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textTertiary,
+    fontFamily: 'Poppins',
+    lineHeight: 18,
   },
 });

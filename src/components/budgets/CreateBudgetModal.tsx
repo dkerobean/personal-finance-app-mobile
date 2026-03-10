@@ -14,6 +14,7 @@ import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Category, CreateBudgetRequest } from '@/types/models';
 import { useBudgetStore } from '@/stores/budgetStore';
+import { useAppToast } from '@/hooks/useAppToast';
 
 interface CreateBudgetModalProps {
   visible: boolean;
@@ -29,6 +30,7 @@ export default function CreateBudgetModal({
   defaultMonth,
 }: CreateBudgetModalProps): React.ReactElement {
   const { createBudget, isLoading, error, clearError } = useBudgetStore();
+  const toast = useAppToast();
   
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
@@ -106,7 +108,7 @@ export default function CreateBudgetModal({
     const success = await createBudget(request);
     
     if (success) {
-      Alert.alert('Success', 'Budget created successfully');
+      toast.success('Budget created', 'Budget created successfully.');
       onClose();
     }
   };

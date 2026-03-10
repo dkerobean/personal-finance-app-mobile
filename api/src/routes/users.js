@@ -1,6 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { User } = require('../models');
+const {
+  User,
+  Category,
+  Transaction,
+  Account,
+  Budget,
+  Asset,
+  Liability,
+  AlertSettings,
+} = require('../models');
+const Notification = require('../models/Notification');
+const NetWorthSnapshot = require('../models/NetWorthSnapshot');
 
 // Sync user from Clerk
 router.post('/sync', async (req, res) => {
@@ -85,8 +96,36 @@ router.patch('/:clerkId', async (req, res) => {
 // Delete user
 router.delete('/:clerkId', async (req, res) => {
   try {
-    await User.findOneAndDelete({ clerkId: req.params.clerkId });
-    res.json({ success: true });
+    const clerkId = req.params.clerkId;
+
+    const deletions = await Promise.all([
+      User.deleteOne({ clerkId }),
+      Category.deleteMany({ userId: clerkId }),
+      Transaction.deleteMany({ userId: clerkId }),
+      Account.deleteMany({ userId: clerkId }),
+      Budget.deleteMany({ userId: clerkId }),
+      Asset.deleteMany({ userId: clerkId }),
+      Liability.deleteMany({ userId: clerkId }),
+      AlertSettings.deleteMany({ userId: clerkId }),
+      Notification.deleteMany({ userId: clerkId }),
+      NetWorthSnapshot.deleteMany({ userId: clerkId }),
+    ]);
+
+    res.json({
+      success: true,
+      deletedCounts: {
+        users: deletions[0].deletedCount || 0,
+        categories: deletions[1].deletedCount || 0,
+        transactions: deletions[2].deletedCount || 0,
+        accounts: deletions[3].deletedCount || 0,
+        budgets: deletions[4].deletedCount || 0,
+        assets: deletions[5].deletedCount || 0,
+        liabilities: deletions[6].deletedCount || 0,
+        alertSettings: deletions[7].deletedCount || 0,
+        notifications: deletions[8].deletedCount || 0,
+        netWorthSnapshots: deletions[9].deletedCount || 0,
+      },
+    });
   } catch (error) {
     console.error('Error deleting user:', error);
     res.status(500).json({ error: error.message });
